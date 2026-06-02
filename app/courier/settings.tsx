@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppContentWidth } from '@/components/app-content-width';
 import { ThemeModePicker } from '@/components/theme-mode-picker';
+import { BiometricLockToggle } from '@/components/biometric-lock-toggle';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -167,6 +168,22 @@ export default function CourierSettingsScreen() {
               <ThemedText style={styles.primaryBtnText}>Enregistrer</ThemedText>
             )}
           </Pressable>
+
+          <ThemedText style={[styles.section, { marginTop: 16, color: palette.primaryDeep }]}>Sécurité</ThemedText>
+          <BiometricLockToggle
+            colors={{
+              primary: palette.primary,
+              primaryMuted: palette.primaryMuted,
+              primarySoft: palette.primarySoft,
+              surfaceElevated: palette.surfaceElevated,
+              borderStrong: palette.trackStroke,
+              text: palette.text,
+              textMuted: palette.muted,
+            }}
+            cardBackground={palette.card}
+            cardBorder={palette.border}
+            hint="Au retour sur l’app (optionnel, désactivable à tout moment)"
+          />
 
           <ThemedText style={[styles.section, { marginTop: 16, color: palette.primaryDeep }]}>Mot de passe</ThemedText>
           <View style={[styles.group, { backgroundColor: palette.card, borderColor: palette.border }]}>

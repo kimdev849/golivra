@@ -5,10 +5,12 @@ function courierFromApp(p: typeof AppPaletteLight) {
   return {
     primary: p.primary,
     primaryDeep: p.primaryDeep,
+    primaryMuted: p.primaryMuted,
     primarySoft: p.primarySoft,
     accent: p.warning,
     bg: p.backgroundAlt,
     card: p.surface,
+    surfaceElevated: p.surfaceElevated,
     border: p.border,
     muted: p.textMuted,
     text: p.text,

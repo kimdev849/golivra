@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { BiometricLockToggle } from '@/components/biometric-lock-toggle';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { pickVendorImageAsset } from '@/components/vendor-form-shared';
 import { apiFetch } from '@/lib/api';
@@ -316,6 +317,12 @@ export default function AccountSettingsScreen() {
               </Pressable>
 
               <ThemedText style={[styles.sectionHeader, { color: colors.textMuted }, styles.sectionSpaced]}>Sécurité</ThemedText>
+              <BiometricLockToggle
+                colors={colors}
+                cardBackground={colors.surface}
+                cardBorder={colors.border}
+                hint="Au retour sur l’app (optionnel, désactivable à tout moment)"
+              />
               <ThemedText style={[styles.sectionHint, { color: colors.textMuted }]}>Saisissez votre mot de passe actuel pour en définir un nouveau.</ThemedText>
 
               <View style={[styles.groupCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>

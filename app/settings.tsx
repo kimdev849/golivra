@@ -1,23 +1,18 @@
 import Constants from 'expo-constants';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { Bell, ChevronLeft, Fingerprint, Moon, Smartphone, Sun } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Bell, ChevronLeft, Moon, Smartphone, Sun } from 'lucide-react-native';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { BiometricLockToggle } from '@/components/biometric-lock-toggle';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { createScreenStyles } from '@/constants/ui-styles';
 import { useAppTheme } from '@/contexts/app-theme-context';
 import { getSessionToken } from '@/lib/auth';
-import {
-  biometricLockLabel,
-  getBiometricLockEnabled,
-  isBiometricHardwareAvailable,
-  setBiometricLockEnabled,
-} from '@/lib/biometric-lock';
 import { fetchPreferences, updatePreferences } from '@/lib/preferences-api';
 import type { ThemePreference } from '@/contexts/app-theme-context';
 import type { AppPalette } from '@/constants/app-palette';
@@ -35,9 +30,6 @@ export default function SettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [notifPush, setNotifPush] = useState(true);
   const [notifEmail, setNotifEmail] = useState(true);
-  const [biometricAvailable, setBiometricAvailable] = useState(false);
-  const [biometricEnabled, setBiometricEnabled] = useState(false);
-  const [biometricLabel, setBiometricLabel] = useState('Biométrie');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -52,17 +44,6 @@ export default function SettingsScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  useEffect(() => {
-    void (async () => {
-      const available = await isBiometricHardwareAvailable();
-      setBiometricAvailable(available);
-      if (available) {
-        setBiometricEnabled(await getBiometricLockEnabled());
-        setBiometricLabel(await biometricLockLabel());
-      }
-    })();
   }, []);
 
   useFocusEffect(
@@ -192,32 +173,10 @@ export default function SettingsScreen() {
               </View>
             </View>
 
-            {biometricAvailable ? (
-              <>
-                <ThemedText style={[localStyles.sectionLabel, { marginTop: 18 }]}>Sécurité</ThemedText>
-                <View style={localStyles.menuCard}>
-                  <View style={localStyles.toggleRow}>
-                    <View style={localStyles.menuIcon}>
-                      <Fingerprint size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <ThemedText type="defaultSemiBold">Verrouiller avec {biometricLabel}</ThemedText>
-                      <ThemedText type="muted">Au retour sur l’app (optionnel)</ThemedText>
-                    </View>
-                    <Switch
-                      value={biometricEnabled}
-                      onValueChange={(v) => {
-                        void setBiometricLockEnabled(v)
-                          .then(() => setBiometricEnabled(v))
-                          .catch(() => setBiometricEnabled(!v));
-                      }}
-                      trackColor={{ false: colors.borderStrong, true: colors.primaryMuted }}
-                      thumbColor={biometricEnabled ? colors.primary : colors.surfaceElevated}
-                    />
-                  </View>
-                </View>
-              </>
-            ) : null}
+            <>
+              <ThemedText style={[localStyles.sectionLabel, { marginTop: 18 }]}>Sécurité</ThemedText>
+              <BiometricLockToggle colors={colors} />
+            </>
           </>
         )}
 
