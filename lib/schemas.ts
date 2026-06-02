@@ -16,20 +16,25 @@ export const AuthMeSchema = z.object({
 export type AuthMeZod = z.infer<typeof AuthMeSchema>;
 
 // ─── Entreprise (Restaurant / Boutique) ────────────────────────────────────────
-export const EnterprisePublicSchema = z.object({
-  id: z.string().uuid(),
-  nom: z.string(),
-  type: z.enum(['restaurant', 'boutique']),
-  categorie_nom: z.string().nullable().optional(),
-  image_url: z.string().nullable().optional(),
-  banniere_url: z.string().nullable().optional(),
-  note_moyenne: z.number().nullable().optional(),
-  nb_avis: z.number().optional().default(0),
-  est_ouvert: z.boolean().optional().default(true),
-  temps_preparation_min: z.number().nullable().optional(),
-  adresse_ville: z.string().nullable().optional(),
-  adresse_quartier: z.string().nullable().optional(),
-});
+export const EnterprisePublicSchema = z
+  .object({
+    id: z.string().uuid(),
+    nom: z.string(),
+    type: z.enum(['restaurant', 'boutique']),
+    categorie_nom: z.string().nullable().optional(),
+    image_url: z.string().nullable().optional(),
+    banniere_url: z.string().nullable().optional(),
+    note_moyenne: z.number().nullable().optional(),
+    nb_avis: z.number().optional().default(0),
+    est_ouvert: z.boolean().optional().default(true),
+    temps_preparation_min: z.number().nullable().optional(),
+    adresse_ville: z.string().nullable().optional(),
+    adresse_quartier: z.string().nullable().optional(),
+  })
+  .transform((v) => ({
+    ...v,
+    note_moyenne: v.note_moyenne ?? undefined,
+  }));
 export type EnterprisePublicZod = z.infer<typeof EnterprisePublicSchema>;
 
 // ─── Produit ───────────────────────────────────────────────────────────────────

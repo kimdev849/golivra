@@ -15,6 +15,7 @@ import { menuItemToFormValues } from '@/lib/vendor-menu-item-form-init';
 import { productToFormValues } from '@/lib/vendor-product-form-init';
 import { deleteVendorProduct } from '@/lib/vendor-api';
 import { VENDOR_HREF } from '@/lib/vendor-nav';
+import type { VendorProduct } from '@/lib/vendor-types';
 
 export default function VendorStockScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -87,7 +88,7 @@ function BoutiqueProductEdit({
   onSaved,
   onDelete,
 }: {
-  existing: NonNullable<ReturnType<typeof useVendor>['products'][number]>;
+  existing: VendorProduct;
   enterpriseId: string;
   palette: { primary: string; primaryDeep: string };
   insets: { bottom: number };
@@ -143,7 +144,7 @@ function RestaurantMenuItemEdit({
   onSaved,
   onDelete,
 }: {
-  existing: NonNullable<ReturnType<typeof useVendor>['products'][number]>;
+  existing: VendorProduct;
   enterpriseId: string;
   palette: { primary: string; primaryDeep: string };
   insets: { bottom: number };

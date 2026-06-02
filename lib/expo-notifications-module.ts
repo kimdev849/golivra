@@ -24,6 +24,8 @@ export function loadExpoNotifications(): Promise<ExpoNotifications | null> {
               shouldShowAlert: true,
               shouldPlaySound: true,
               shouldSetBadge: true,
+              shouldShowBanner: true,
+              shouldShowList: true,
             }),
           });
           handlerInstalled = true;

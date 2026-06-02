@@ -427,7 +427,6 @@ export default function MarketplaceListScreen() {
         <FlashList
           data={filteredEnterprises.slice(0, 12)}
           renderItem={renderEnterpriseItem}
-          estimatedItemSize={110}
           ListHeaderComponent={renderHeader}
           ListFooterComponent={renderFooter}
           refreshing={isRefetching}

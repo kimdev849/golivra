@@ -35,10 +35,11 @@ export function subscribeCart(listener: CartListener): () => void {
 
 function notifyCartChanged(): void {
   currentCartCount = getCartItemCount(memoryCart);
-  if (typeof global !== 'undefined' && (global as { updateCartState?: () => void }).updateCartState) {
-    (global as { updateCartState: () => void }).updateCartState();
-  } else if (typeof global !== 'undefined' && (global as { updateCartCount?: (n: number) => void }).updateCartCount) {
-    (global as { updateCartCount: (n: number) => void }).updateCartCount(currentCartCount);
+  const g = global as unknown as { updateCartState?: () => void; updateCartCount?: (n: number) => void };
+  if (typeof global !== 'undefined' && g.updateCartState) {
+    g.updateCartState();
+  } else if (typeof global !== 'undefined' && g.updateCartCount) {
+    g.updateCartCount(currentCartCount);
   }
   cartListeners.forEach((fn) => {
     try {

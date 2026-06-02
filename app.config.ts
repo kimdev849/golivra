@@ -17,8 +17,13 @@ const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN?.trim() ?? '';
 const sentryOrg = process.env.SENTRY_ORG?.trim() || 'golivra';
 const sentryProject = process.env.SENTRY_PROJECT?.trim() || 'react-native';
 
-function withoutSentryPlugin(plugins: ExpoConfig['plugins']): ExpoConfig['plugins'] {
-  return (plugins ?? []).filter((p) => {
+type PluginEntry = string | [string] | [string, Record<string, unknown>];
+
+function withoutSentryPlugin(plugins: ExpoConfig['plugins']): PluginEntry[] {
+  const list: PluginEntry[] = Array.isArray(plugins)
+    ? (plugins as PluginEntry[])
+    : [];
+  return list.filter((p) => {
     if (p === '@sentry/react-native') return false;
     return !(Array.isArray(p) && p[0] === '@sentry/react-native');
   });

@@ -44,7 +44,6 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
         allowSound: true,
         allowDisplayInCarPlay: false,
         allowCriticalAlerts: false,
-        allowAnnouncements: false,
       },
     });
 

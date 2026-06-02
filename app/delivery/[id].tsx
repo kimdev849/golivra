@@ -76,6 +76,7 @@ type DeliveryDetails = {
     prete_at?: string | null;
     collectee_at?: string | null;
     livree_at?: string | null;
+    reglee_at?: string | null;
   } | null;
   articles: { id: string; nom: string; description?: string | null; quantite: number; prix_unitaire: number | null }[];
   paiement: {
@@ -193,9 +194,9 @@ export default function DeliveryDetailScreen() {
   const steps = adaptTimeline(data);
   const tone = deliveryStatusTone(liv.statut);
   const toneColor =
-    tone === 'success' ? colors.success : tone === 'danger' ? colors.danger : tone === 'warn' ? colors.warning : colors.primary;
+    tone === 'success' ? colors.success : tone === 'danger' ? colors.error : tone === 'warn' ? colors.warning : colors.primary;
   const toneSoft =
-    tone === 'success' ? colors.successSoft : tone === 'danger' ? colors.dangerSoft : tone === 'warn' ? colors.warningSoft : colors.primarySoft;
+    tone === 'success' ? colors.successSoft : tone === 'danger' ? colors.errorSoft : tone === 'warn' ? colors.warningSoft : colors.primarySoft;
 
   return (
     <ThemedView style={styles.screen} lightColor={colors.backgroundAlt} darkColor={colors.backgroundAlt}>

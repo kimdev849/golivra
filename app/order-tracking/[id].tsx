@@ -12,7 +12,13 @@ import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { apiFetch } from '@/lib/api';
 import { getSessionToken } from '@/lib/auth';
-import type { TimelineStep } from '@/lib/datetime';
+import type { TimelineStep as _TimelineStep } from '@/lib/datetime';
+
+type LocalTimelineStep = {
+  titre: string;
+  date: string | null;
+  type: 'fait' | 'encours' | 'afaire';
+};
 
 type OrderDetail = {
   id: string;
@@ -27,8 +33,8 @@ type OrderDetail = {
     note_moyenne?: number;
   };
   timeline?: {
-    commande?: TimelineStep[];
-    livraisons?: { timeline?: TimelineStep[] }[];
+    commande?: LocalTimelineStep[];
+    livraisons?: { timeline?: LocalTimelineStep[] }[];
   };
 };
 
@@ -109,7 +115,12 @@ export default function OrderTrackingScreen() {
     );
   }
 
-  const steps = order?.timeline?.livraisons?.[0]?.timeline || order?.timeline?.commande || [];
+  const rawSteps = order?.timeline?.livraisons?.[0]?.timeline || order?.timeline?.commande || [];
+  const steps: _TimelineStep[] = rawSteps.map((s, i) => ({
+    key: `step-${i}`,
+    label: s.titre,
+    at: s.date ?? '',
+  }));
   const primaryDeliveryId =
     order?.livraison_id ||
     (Array.isArray(order?.livraisons) && order.livraisons.length > 0 ? order.livraisons[0].id : null);
@@ -130,11 +141,10 @@ export default function OrderTrackingScreen() {
         <View style={[styles.mapPreviewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={[styles.staticMapContainer, { backgroundColor: colors.surfaceMuted }]}>
             {/* Image placeholder statique simulant une map */}
-            <Image 
-              source={{ uri: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=800' }} 
+            <Image
+              source={{ uri: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=800' }}
               style={StyleSheet.absoluteFillObject}
               contentFit="cover"
-              opacity={0.6}
             />
             {/* Overlay Gradient pour la lisibilité */}
             <View style={[StyleSheet.absoluteFillObject, { backgroundColor: colors.background, opacity: 0.2 }]} />
@@ -331,4 +341,21 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   timelineTitle: { fontSize: 16, fontWeight: '800' },
+  deliveryLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  deliveryLinkIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deliveryLinkTitle: { fontSize: 15, fontWeight: '800' },
+  deliveryLinkSub: { fontSize: 12, marginTop: 2 },
 });

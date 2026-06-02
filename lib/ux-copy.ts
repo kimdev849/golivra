@@ -3,7 +3,7 @@
  * Une idée = une phrase. Ne jamais exposer les clés backend (snake_case).
  */
 
-export const UX_ERRORS = {
+export const UX_ERRORS: Readonly<Record<string, string>> = {
   network: 'Problème de connexion. Vérifiez votre internet.',
   generic: 'Une erreur est survenue. Réessayez.',
   auth: 'Numéro ou mot de passe incorrect.',
@@ -11,7 +11,7 @@ export const UX_ERRORS = {
   session: 'Reconnectez-vous pour continuer.',
   notFound: 'Élément introuvable.',
   forbidden: 'Action non autorisée.',
-} as const;
+};
 
 export const UX_ONBOARDING = [
   {
@@ -121,7 +121,7 @@ const BACKEND_MESSAGE_MAP: Record<string, string> = {
 };
 
 /** Transforme un message technique (API / backend) en texte lisible. */
-export function friendlyErrorMessage(raw: unknown, fallback = UX_ERRORS.generic): string {
+export function friendlyErrorMessage(raw: unknown, fallback: string = UX_ERRORS.generic): string {
   const msg = raw instanceof Error ? raw.message : typeof raw === 'string' ? raw : '';
   const trimmed = msg.trim();
   if (!trimmed) return fallback;
