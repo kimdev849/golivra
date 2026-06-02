@@ -7,7 +7,8 @@ export type EnterprisePayload = {
   categorieId: string;
   description?: string | null;
   telephone: string;
-  adresse: string;
+  /** Adresse détaillée. Requise pour les restaurants, OPTIONNELLE pour les boutiques (e-commerce). */
+  adresse?: string;
   /** URL publique (Supabase Storage) après upload. */
   imageUrl?: string | null;
   /** Secours si l’upload Storage échoue : enregistrement BYTEA côté API. */

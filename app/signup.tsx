@@ -218,8 +218,17 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
       if (profile === 'client') { await new Promise<void>((r) => setTimeout(r, 0)); router.replace('/(tabs)'); return; }
       if (!commerceKind) { setError("Type de commerce introuvable."); return; }
       const enterprise = await createEnterpriseRemote(session.token, {
-        nom: businessName.trim(), type: commerceKind, categorieId: businessCategoryId!, description: businessDescription.trim() || null,
-        telephone: phoneE164!, adresse: businessAddress.trim(), imageUrl: finalBusinessImageUrl || null,
+        nom: businessName.trim(),
+        type: commerceKind,
+        categorieId: businessCategoryId!,
+        description: businessDescription.trim() || null,
+        telephone: phoneE164!,
+        ...(commerceKind === 'restaurant'
+          ? { adresse: businessAddress.trim() }
+          : businessAddress.trim()
+            ? { adresse: businessAddress.trim() }
+            : {}),
+        imageUrl: finalBusinessImageUrl || null,
         imageDataUrl: !finalBusinessImageUrl && businessImageDataUrl ? businessImageDataUrl : undefined,
       });
       await new Promise<void>((r) => setTimeout(r, 0));
