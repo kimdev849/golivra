@@ -36,8 +36,11 @@ export default function VendorProductsTabScreen() {
   const { palette, labels, commerceType } = useVendorTheme();
   const [tab, setTab] = useState<'all' | 'on' | 'off'>('all');
   const [busyId, setBusyId] = useState<string | null>(null);
-  const bottom = Math.max(insets.bottom, 10) + VENDOR_TAB_BAR_PADDING_BOTTOM;
-  const fabClearance = bottom + 76;
+  const tabBarHeight = Math.max(insets.bottom, 10) + VENDOR_TAB_BAR_PADDING_BOTTOM;
+  // Petit espace visible entre la base du FAB et le haut de la barre d'onglets,
+  // pour qu'il flotte au-dessus sans toucher le menu.
+  const fabBottom = tabBarHeight + 12;
+  const fabClearance = fabBottom + 76;
 
   const filtered = useMemo(() => {
     if (tab === 'on') return products.filter((p) => p.enLigne);
@@ -177,7 +180,7 @@ export default function VendorProductsTabScreen() {
       </ScrollView>
       <VendorAddProductFab
         label={labels.addProductFab}
-        bottom={bottom}
+        bottom={fabBottom}
         onPress={() => router.push(VENDOR_HREF.addProduct)}
       />
     </ThemedView>

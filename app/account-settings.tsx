@@ -271,7 +271,7 @@ export default function AccountSettingsScreen() {
                 <>
                   <ThemedText style={[styles.sectionHeader, { color: colors.textMuted }]}>Photo de profil</ThemedText>
                   <View style={styles.avatarBlock}>
-                    <Pressable style={[styles.avatarCircle, { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong }]} onPress={() => void pickPhoto()}>
+                    <Pressable style={[styles.avatarCircle, { backgroundColor: colors.primarySoft, borderColor: avatarDataUrl ? colors.primary : colors.borderStrong }]} onPress={() => void pickPhoto()}>
                       {avatarUri ? (
                         <Image source={{ uri: avatarUri }} style={styles.avatarImg} contentFit="cover" />
                       ) : (
@@ -282,17 +282,29 @@ export default function AccountSettingsScreen() {
                       </View>
                     </Pressable>
                     {avatarDataUrl ? (
-                      <Pressable
-                        style={[styles.photoSaveBtn, { backgroundColor: colors.primary }, savingPhoto && styles.btnDisabled]}
-                        onPress={() => void savePhoto()}
-                        disabled={savingPhoto}>
-                        {savingPhoto ? (
-                          <ActivityIndicator color="#FFF" size="small" />
-                        ) : (
-                          <ThemedText style={styles.photoSaveTxt}>Enregistrer la photo</ThemedText>
-                        )}
-                      </Pressable>
-                    ) : null}
+                      <>
+                        <ThemedText style={[styles.photoHint, { color: colors.success }]}>✓ Nouvelle photo sélectionnée</ThemedText>
+                        <View style={styles.photoBtnRow}>
+                          <Pressable
+                            style={[styles.photoCancelBtn, { borderColor: colors.border }]}
+                            onPress={() => { setAvatarDataUrl(null); }}>
+                            <ThemedText style={[styles.photoCancelTxt, { color: colors.textSecondary }]}>Annuler</ThemedText>
+                          </Pressable>
+                          <Pressable
+                            style={[styles.photoSaveBtn, { backgroundColor: colors.primary }, savingPhoto && styles.btnDisabled]}
+                            onPress={() => void savePhoto()}
+                            disabled={savingPhoto}>
+                            {savingPhoto ? (
+                              <ActivityIndicator color="#FFF" size="small" />
+                            ) : (
+                              <ThemedText style={styles.photoSaveTxt}>Enregistrer la photo</ThemedText>
+                            )}
+                          </Pressable>
+                        </View>
+                      </>
+                    ) : (
+                      <ThemedText style={[styles.photoHint, { color: colors.textMuted }]}>Touchez la photo pour la modifier</ThemedText>
+                    )}
                   </View>
 
                   <ThemedText style={[styles.sectionHeader, { color: colors.textMuted }]}>Informations personnelles</ThemedText>
@@ -515,11 +527,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   photoSaveBtn: {
+    flex: 1,
     borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
+    paddingVertical: 11,
+    alignItems: 'center',
   },
   photoSaveTxt: { color: '#FFF', fontWeight: '700', fontSize: 14 },
+  photoHint: { fontSize: 13, fontWeight: '700' },
+  photoBtnRow: { flexDirection: 'row', gap: 10, alignSelf: 'stretch' },
+  photoCancelBtn: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+  },
+  photoCancelTxt: { fontWeight: '700', fontSize: 14 },
   sectionSpaced: { marginTop: 22 },
   sectionHint: {
     fontSize: 13,

@@ -386,12 +386,19 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
                         </View>
                         <View style={styles.inputBody}>
                           <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>{commerceKind === 'restaurant' ? 'Logo du restaurant' : 'Logo de la boutique'}</ThemedText>
-                          <ThemedText style={[styles.imagePickHint, { color: colors.textMuted }]}>{businessImagePreview ? 'Image sélectionnée' : 'Choisir une image'}</ThemedText>
+                          <ThemedText style={[styles.imagePickHint, { color: businessImagePreview ? colors.success : colors.textMuted }]}>
+                            {businessImagePreview ? '✓ Photo sélectionnée' : 'Choisir une image'}
+                          </ThemedText>
                         </View>
                       </View>
                       <View style={styles.imagePickRight}>
-                        {businessImagePreview ? <Image source={{ uri: businessImagePreview }} style={[styles.imageThumb, { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong }]} contentFit="cover" /> : null}
-                        <MaterialIcons name="chevron-right" size={22} color={colors.textMuted} />
+                        {businessImagePreview ? (
+                          <Image source={{ uri: businessImagePreview }} style={[styles.imageThumb, { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong }]} contentFit="cover" />
+                        ) : (
+                          <View style={[styles.imageThumbEmpty, { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong }]}>
+                            <MaterialIcons name="add-a-photo" size={26} color={colors.primary} />
+                          </View>
+                        )}
                       </View>
                     </Pressable>
                   </>
@@ -420,12 +427,19 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
                     </View>
                     <View style={styles.inputBody}>
                       <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Photo de profil (optionnel)</ThemedText>
-                      <ThemedText style={[styles.imagePickHint, { color: colors.textMuted }]}>{profileImagePreview ? 'Image sélectionnée' : 'Choisir une image'}</ThemedText>
+                      <ThemedText style={[styles.imagePickHint, { color: profileImagePreview ? colors.success : colors.textMuted }]}>
+                        {profileImagePreview ? '✓ Photo sélectionnée' : 'Choisir une image'}
+                      </ThemedText>
                     </View>
                   </View>
                   <View style={styles.imagePickRight}>
-                    {profileImagePreview ? <Image source={{ uri: profileImagePreview }} style={[styles.imageThumb, { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong }]} contentFit="cover" /> : null}
-                    <MaterialIcons name="chevron-right" size={22} color={colors.textMuted} />
+                    {profileImagePreview ? (
+                      <Image source={{ uri: profileImagePreview }} style={[styles.imageThumb, { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong }]} contentFit="cover" />
+                    ) : (
+                      <View style={[styles.imageThumbEmpty, { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong }]}>
+                        <MaterialIcons name="add-a-photo" size={26} color={colors.primary} />
+                      </View>
+                    )}
                   </View>
                 </Pressable>
               ) : null}
@@ -519,8 +533,17 @@ const styles = StyleSheet.create({
   imagePickCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderWidth: 1, borderRadius: 18, paddingVertical: 12, paddingHorizontal: 12, elevation: 4 },
   imagePickLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   imagePickRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  imagePickHint: { fontSize: 12, lineHeight: 16 },
-  imageThumb: { width: 34, height: 34, borderRadius: 10, borderWidth: 1 },
+  imagePickHint: { fontSize: 12, lineHeight: 16, fontWeight: '700' },
+  imageThumb: { width: 72, height: 72, borderRadius: 14, borderWidth: 1.5 },
+  imageThumbEmpty: {
+    width: 72,
+    height: 72,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   sectionTitle: { marginTop: 10, fontSize: 14, fontWeight: '800', letterSpacing: 0.35, textTransform: 'uppercase' },
   buttonDisabled: { opacity: 0.65 },
   buttonPressed: { opacity: 0.88, transform: [{ scale: 0.995 }] },

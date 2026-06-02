@@ -37,8 +37,9 @@ export default function VendorCatalogScreen() {
   const { commerceType, palette } = useVendorTheme();
   const [query, setQuery] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
-  const bottom = Math.max(insets.bottom, 10) + VENDOR_TAB_BAR_PADDING_BOTTOM;
-  const fabClearance = bottom + 76;
+  const tabBarHeight = Math.max(insets.bottom, 10) + VENDOR_TAB_BAR_PADDING_BOTTOM;
+  const fabBottom = tabBarHeight + 12;
+  const fabClearance = fabBottom + 76;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -185,7 +186,7 @@ export default function VendorCatalogScreen() {
       </ScrollView>
       <VendorAddProductFab
         label={commerceType === 'restaurant' ? 'Ajouter un plat' : 'Ajouter un produit'}
-        bottom={bottom}
+        bottom={fabBottom}
         onPress={() => router.push(VENDOR_HREF.addProduct)}
       />
     </ThemedView>
