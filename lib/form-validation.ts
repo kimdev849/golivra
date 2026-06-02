@@ -223,3 +223,86 @@ export function applyValidator(value: string, validator: (v: string) => Validati
   const r = validator(value);
   return r.ok ? { value: r.value, error: null } : { value, error: r.message };
 }
+
+/* --------------------- BLOC PROMO --------------------- */
+
+export type PromoField = 'prixPromo' | 'promoDebutAt' | 'promoFinAt';
+export type PromoBlockResult =
+  | { ok: true; prixPromo: string; debut: string; fin: string }
+  | { ok: false; field: PromoField; message: string };
+
+export type PromoBlockInput = {
+  prixNormal: number | string;
+  prixPromo: string;
+  promoDebutAt: string;
+  promoFinAt: string;
+};
+
+const MAX_PROMO_MONTHS = 12;
+
+/**
+ * Règles métier du bloc promo :
+ *   - prixPromo absent → dates forcément vides (pas de demi-promo)
+ *   - prixPromo doit être un prix valide ET strictement inférieur au prix normal
+ *   - dates début et fin obligatoires dès qu'un prix promo est saisi
+ *   - date début >= aujourd'hui (jamais dans le passé)
+ *   - date fin > date début
+ *   - durée <= 12 mois calendaires (start + 1 an)
+ * Retourne un résultat typé pour cibler le champ en erreur.
+ */
+export function validatePromoBlock(input: PromoBlockInput): PromoBlockResult {
+  const { prixNormal, prixPromo, promoDebutAt, promoFinAt } = input;
+  const normal = Number(prixNormal);
+  const hasPromo = prixPromo.trim().length > 0;
+
+  if (!hasPromo) {
+    if (promoDebutAt || promoFinAt) {
+      return { ok: false, field: 'prixPromo', message: 'Aucune promo en cours : retirez les dates.' };
+    }
+    return { ok: true, prixPromo: '', debut: '', fin: '' };
+  }
+
+  const priceCheck = validatePrice(prixPromo);
+  if (!priceCheck.ok) return { ok: false, field: 'prixPromo', message: priceCheck.message };
+  const promoNum = Number(priceCheck.value);
+
+  if (!Number.isFinite(normal) || normal <= 0) {
+    return { ok: false, field: 'prixPromo', message: 'Prix normal invalide.' };
+  }
+  if (promoNum >= normal) {
+    return { ok: false, field: 'prixPromo', message: 'Le prix promo doit être inférieur au prix normal.' };
+  }
+
+  if (!promoDebutAt) {
+    return { ok: false, field: 'promoDebutAt', message: 'Date de début de promo requise.' };
+  }
+  if (!promoFinAt) {
+    return { ok: false, field: 'promoFinAt', message: 'Date de fin de promo requise.' };
+  }
+
+  const start = new Date(`${promoDebutAt}T00:00:00`);
+  const end = new Date(`${promoFinAt}T00:00:00`);
+  if (Number.isNaN(start.getTime())) {
+    return { ok: false, field: 'promoDebutAt', message: 'Date de début invalide.' };
+  }
+  if (Number.isNaN(end.getTime())) {
+    return { ok: false, field: 'promoFinAt', message: 'Date de fin invalide.' };
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (start.getTime() < today.getTime()) {
+    return { ok: false, field: 'promoDebutAt', message: 'La date de début ne peut pas être dans le passé.' };
+  }
+  if (end.getTime() <= start.getTime()) {
+    return { ok: false, field: 'promoFinAt', message: 'La date de fin doit être après la date de début.' };
+  }
+
+  const oneYearLater = new Date(start);
+  oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+  if (end.getTime() > oneYearLater.getTime()) {
+    return { ok: false, field: 'promoFinAt', message: `La promo ne peut pas dépasser ${MAX_PROMO_MONTHS} mois.` };
+  }
+
+  return { ok: true, prixPromo: priceCheck.value, debut: promoDebutAt, fin: promoFinAt };
+}

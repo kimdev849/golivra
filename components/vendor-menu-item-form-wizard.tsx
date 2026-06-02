@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 
 import { CategoryPicker } from '@/components/category-picker';
+import { DateField } from '@/components/date-field';
 import { OptionGroupsEditor, pickVendorImageAsset } from '@/components/vendor-form-shared';
 import { ThemedText } from '@/components/themed-text';
 import { InlineFormError } from '@/components/inline-form-error';
@@ -40,7 +41,7 @@ import {
 } from '@/lib/vendor-api';
 import type { ArticleCategory } from '@/lib/vendor-product-types';
 import type { VendorProduct } from '@/lib/vendor-types';
-import { validateCommerceName, validateDescription, validatePrice, validateProductName, validateStock } from '@/lib/form-validation';
+import { validateCommerceName, validateDescription, validatePrice, validateProductName, validatePromoBlock, validateStock } from '@/lib/form-validation';
 
 type Props = {
   enterpriseId: string;
@@ -107,13 +108,14 @@ export function VendorMenuItemFormWizard({
     if (s === 1) {
       const e3 = validatePrice(values.prix);
       if (!e3.ok) return e3.message;
-      if (values.prixPromo.trim()) {
-        const e4 = validatePrice(values.prixPromo);
-        if (!e4.ok) return e4.message;
-        const prix = Number(values.prix);
-        const promo = Number(values.prixPromo);
-        if (promo >= prix) return 'Le prix promo doit être inférieur au prix normal.';
-      }
+      const prixNum = Number(values.prix);
+      const promoCheck = validatePromoBlock({
+        prixNormal: prixNum,
+        prixPromo: values.prixPromo,
+        promoDebutAt: values.promoDebutAt,
+        promoFinAt: values.promoFinAt,
+      });
+      if (!promoCheck.ok) return promoCheck.message;
     }
     if (s === 2) {
       if (!values.mainImageUri && !values.mainImageDataUrl) {
@@ -141,10 +143,13 @@ export function VendorMenuItemFormWizard({
       if (step === 1) {
         const e3 = validatePrice(values.prix);
         if (!e3.ok) fieldErrs.prix = e3.message;
-        if (values.prixPromo.trim()) {
-          const e4 = validatePrice(values.prixPromo);
-          if (!e4.ok) fieldErrs.prixPromo = e4.message;
-        }
+        const promoCheck = validatePromoBlock({
+          prixNormal: Number(values.prix),
+          prixPromo: values.prixPromo,
+          promoDebutAt: values.promoDebutAt,
+          promoFinAt: values.promoFinAt,
+        });
+        if (!promoCheck.ok) fieldErrs[promoCheck.field] = promoCheck.message;
       }
       if (step === 4 && values.limiterQuantite) {
         const e5 = validateStock(values.stock, true);
@@ -328,7 +333,7 @@ export function VendorMenuItemFormWizard({
             <TextInput
               style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
               value={values.prixPromo}
-              onChangeText={(t) => { patch({ prixPromo: t }); setStepErrors((s) => ({ ...s, prixPromo: null })); }}
+              onChangeText={(t) => { patch({ prixPromo: t }); setStepErrors((s) => ({ ...s, prixPromo: null, promoDebutAt: null, promoFinAt: null })); }}
               keyboardType="numeric"
               placeholder="Optionnel"
               placeholderTextColor={colors.placeholder}
@@ -336,22 +341,25 @@ export function VendorMenuItemFormWizard({
             <InlineFormError message={stepErrors.prixPromo} colors={colors} />
             {values.prixPromo.trim() ? (
               <>
-                <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Début promo (AAAA-MM-JJ)</ThemedText>
-                <TextInput
-                  style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
-                  value={values.promoDebutAt}
-                  onChangeText={(t) => patch({ promoDebutAt: t })}
-                  placeholder="2026-06-01"
-                  placeholderTextColor={colors.placeholder}
+                <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Début promo</ThemedText>
+                <DateField
+                  value={values.promoDebutAt || null}
+                  onChange={(v) => { patch({ promoDebutAt: v || '' }); setStepErrors((s) => ({ ...s, promoDebutAt: null, promoFinAt: null })); }}
+                  placeholder="Choisir la date de début"
+                  accent={palette.primary}
+                  colors={colors}
                 />
-                <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Fin promo (AAAA-MM-JJ)</ThemedText>
-                <TextInput
-                  style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
-                  value={values.promoFinAt}
-                  onChangeText={(t) => patch({ promoFinAt: t })}
-                  placeholder="2026-06-30"
-                  placeholderTextColor={colors.placeholder}
+                <InlineFormError message={stepErrors.promoDebutAt} colors={colors} />
+                <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Fin promo</ThemedText>
+                <DateField
+                  value={values.promoFinAt || null}
+                  onChange={(v) => { patch({ promoFinAt: v || '' }); setStepErrors((s) => ({ ...s, promoFinAt: null, promoDebutAt: null })); }}
+                  placeholder="Choisir la date de fin"
+                  minimumDate={values.promoDebutAt ? new Date(`${values.promoDebutAt}T00:00:00`) : new Date(new Date().setHours(0, 0, 0, 0))}
+                  accent={palette.primary}
+                  colors={colors}
                 />
+                <InlineFormError message={stepErrors.promoFinAt} colors={colors} />
               </>
             ) : null}
           </>
