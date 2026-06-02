@@ -18,13 +18,13 @@ import { ThemeModePicker } from '@/components/theme-mode-picker';
 import { BiometricLockToggle } from '@/components/biometric-lock-toggle';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useCourier } from '@/contexts/courier-context';
 import { apiFetch } from '@/lib/api';
 import { getSessionToken } from '@/lib/auth';
 import { useCourierPalette } from '@/lib/courier-theme';
 import { formatCgPhone, toCgE164 } from '@/lib/phone';
+import { validatePassword, validatePasswordConfirmation, validatePersonName, validatePhoneCg } from '@/lib/form-validation';
 
 type Me = { nom: string | null; telephone: string };
 
@@ -58,8 +58,14 @@ export default function CourierSettingsScreen() {
 
   const saveProfile = async () => {
     setError(null);
-    if (!nom.trim()) {
-      setError('Indiquez votre nom.');
+    const e1 = validatePersonName(nom);
+    if (!e1.ok) {
+      setError(e1.message);
+      return;
+    }
+    const e2 = validatePhoneCg(phoneDisplay);
+    if (!e2.ok) {
+      setError(e2.message);
       return;
     }
     if (!phoneE164) {
@@ -92,12 +98,14 @@ export default function CourierSettingsScreen() {
       setError('Mot de passe actuel requis.');
       return;
     }
-    if (newPassword.length < 6) {
-      setError('Le nouveau mot de passe : 6 caractères minimum.');
+    const e1 = validatePassword(newPassword);
+    if (!e1.ok) {
+      setError(e1.message);
       return;
     }
-    if (newPassword !== confirmPassword) {
-      setError('La confirmation ne correspond pas.');
+    const e2 = validatePasswordConfirmation(confirmPassword, newPassword);
+    if (!e2.ok) {
+      setError(e2.message);
       return;
     }
     setSavingPassword(true);
@@ -123,7 +131,7 @@ export default function CourierSettingsScreen() {
   };
 
   return (
-    <ThemedView style={styles.screen} lightColor={palette.bg} darkColor={palette.bg}>
+    <View style={[styles.screen, { backgroundColor: palette.bg }]}>
       <FeedbackOverlay />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={[styles.header, { paddingTop: Math.max(insets.top, 10), backgroundColor: palette.card, borderBottomColor: palette.border }]}>
@@ -136,6 +144,7 @@ export default function CourierSettingsScreen() {
 
         <ScrollView
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
           <AppContentWidth phonePadding={0}>
           <ThemeModePicker
@@ -201,7 +210,7 @@ export default function CourierSettingsScreen() {
           </AppContentWidth>
         </ScrollView>
       </KeyboardAvoidingView>
-    </ThemedView>
+    </View>
   );
 }
 

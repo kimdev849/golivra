@@ -12,15 +12,16 @@ import {
   ShoppingBag,
   ShoppingBasket,
   SlidersHorizontal,
+  Sparkles,
   Store,
   Tag,
   User,
   UtensilsCrossed,
+  Zap,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HomeActiveOrderWidget } from '@/components/home-active-order-widget';
-import { HomeHeroCarousel, type HomeHeroSlide } from '@/components/home-hero-carousel';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
@@ -65,17 +66,6 @@ const CATEGORY_ITEMS: { key: string; label: string; Icon: LucideIcon; type: 'res
   { key: 'autres', label: 'Autres', Icon: MoreHorizontal, type: 'all' },
 ];
 
-const HERO_SLIDES: HomeHeroSlide[] = [
-  {
-    image: require('@/assets/images/Image3.png'),
-    cta: 'Commander maintenant',
-  },
-  {
-    image: require('@/assets/images/Image2.png'),
-    cta: 'Voir le marketplace',
-  },
-];
-
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -85,7 +75,6 @@ export default function HomeScreen() {
 
   const [pricing, setPricing] = useState<PublicPricing | null>(null);
   const [search, setSearch] = useState('');
-  const [heroIndex, setHeroIndex] = useState(0);
   const [enterprises, setEnterprises] = useState<Enterprise[]>([]);
   const [me, setMe] = useState<Me | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
@@ -186,7 +175,7 @@ export default function HomeScreen() {
               <Bell size={21} color={colors.primaryDeep} strokeWidth={LUCIDE_STROKE} />
               {unreadCount > 0 ? (
                 <View style={[styles.notifDot, { backgroundColor: colors.primary, borderColor: colors.surface }]}>
-                  <ThemedText style={styles.notifDotText}>{unreadCount > 9 ? '9+' : unreadCount}</ThemedText>
+                  <ThemedText style={styles.notifDotText}>{unreadCount > 99 ? '99+' : unreadCount}</ThemedText>
                 </View>
               ) : null}
             </Pressable>
@@ -238,6 +227,19 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
+        <View style={[styles.shineBanner, { backgroundColor: colors.primaryDeep }]}>
+          <View style={[styles.shineIcon, { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
+            <Zap size={16} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} fill={colors.onPrimary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText style={[styles.shineTitle, { color: colors.onPrimary }]}>Livraison express</ThemedText>
+            <ThemedText style={[styles.shineSub, { color: colors.onPrimary }]}>
+              Commandez maintenant, livré en moins d'une heure
+            </ThemedText>
+          </View>
+          <Sparkles size={18} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
+        </View>
+
         {loadingOrders ? null : heroOrder ? (
           <HomeActiveOrderWidget
             order={heroOrder}
@@ -263,13 +265,6 @@ export default function HomeScreen() {
             </Pressable>
           ))}
         </ScrollView>
-
-        <HomeHeroCarousel
-          slides={HERO_SLIDES}
-          heroIndex={heroIndex}
-          onIndexChange={setHeroIndex}
-          onCta={() => goMarketplace()}
-        />
 
         <View style={styles.sectionHead}>
           <ThemedText type="subtitle" style={[styles.sectionTitle, { color: colors.text }]}>
@@ -563,4 +558,21 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   historyLinkText: { fontSize: 14, fontWeight: '600' },
+  shineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 16,
+    marginBottom: 8,
+  },
+  shineIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shineTitle: { fontSize: 14, fontWeight: '900', letterSpacing: -0.1 },
+  shineSub: { fontSize: 11, fontWeight: '500', opacity: 0.92, marginTop: 1 },
 });

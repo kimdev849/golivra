@@ -1,13 +1,12 @@
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { PlatformPressable } from '@react-navigation/elements';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ShoppingBag } from 'lucide-react-native';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { brandGradient3, GOLIVRA_BRAND_SHADOW, rgbaBrand } from '@/constants/app-palette';
+import { brandGradient3, GOLIVRA_BRAND_SHADOW } from '@/constants/app-palette';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useCart } from '@/contexts/cart-context';
 import { useAppColors } from '@/hooks/use-app-colors';
@@ -39,6 +38,10 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
 
   const focusedRouteName = state.routes[state.index]?.name;
 
+  const trackBg = isDark ? colors.surfaceElevated : '#FFFFFF';
+  const trackBorder = isDark ? colors.border : 'rgba(13,82,55,0.08)';
+  const fabRingColor = isDark ? colors.backgroundAlt : '#F6FAF7';
+
   const renderSideTab = (route: (typeof state.routes)[number]) => {
     const { options } = descriptors[route.key];
     const isFocused = focusedRouteName === route.name;
@@ -48,7 +51,7 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
         : typeof options.tabBarLabel === 'string'
         ? options.tabBarLabel
         : route.name;
-    const color = isFocused ? colors.primary : colors.tabInactive;
+    const color = isFocused ? colors.accent : colors.tabInactive;
     const Icon = options.tabBarIcon;
 
     const onPress = () => {
@@ -60,7 +63,6 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
       });
       if (event.defaultPrevented) return;
 
-      // Marketplace a une pile (liste → commerce) : toujours revenir à la liste.
       if (route.name === 'marketplace') {
         navigation.navigate('(tabs)', { screen: 'marketplace' });
         return;
@@ -106,39 +108,14 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
 
   return (
     <View style={[styles.root, styles.rootPointer, { paddingBottom: bottomPad }]}>
-      <LinearGradient
-        colors={
-          isDark
-            ? ['rgba(11,12,14,0)', 'rgba(11,12,14,0.88)', colors.backgroundAlt]
-            : ['rgba(255,255,255,0)', 'rgba(248,252,249,0.88)', colors.backgroundAlt]
-        }
-        locations={[0, 0.45, 1]}
-        style={[StyleSheet.absoluteFill, styles.noPointer]}
-      />
       <View style={[styles.barArea, styles.boxPointer]}>
         <View style={styles.track}>
-          <View style={[styles.trackInner, Platform.OS === 'ios' ? styles.trackShadowIos : styles.trackShadowAndroid]}>
-            <BlurView
-              intensity={Platform.OS === 'ios' ? 48 : 92}
-              tint={isDark ? 'dark' : 'light'}
-              style={[StyleSheet.absoluteFillObject, { borderRadius: 34 }]}
-            />
-            <LinearGradient
-              colors={
-                isDark
-                  ? ['rgba(21,23,26,0.85)', colors.surfaceElevated]
-                  : ['rgba(255,255,255,0.72)', colors.surface]
-              }
-              style={[StyleSheet.absoluteFillObject, { borderRadius: 34 }]}
-            />
-            <View
-              style={[
-                StyleSheet.absoluteFillObject,
-                styles.trackStroke,
-                { borderColor: isDark ? colors.border : rgbaBrand(0.14) },
-              ]}
-            />
-
+          <View
+            style={[
+              styles.trackInner,
+              { backgroundColor: trackBg, borderColor: trackBorder },
+              Platform.OS === 'ios' ? styles.trackShadowIos : styles.trackShadowAndroid,
+            ]}>
             <View style={styles.row}>
               <View style={styles.sideCluster}>{leftTabs.map(renderSideTab)}</View>
               <View style={styles.cartGap} />
@@ -166,7 +143,7 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
                 style={[
                   styles.fab,
                   cartFocused ? styles.fabFocused : styles.fabIdle,
-                  { borderColor: isDark ? colors.background : colors.surface },
+                  { borderColor: fabRingColor },
                 ]}>
                 <ShoppingBag size={26} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
                 {itemCount > 0 ? (
@@ -185,14 +162,12 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
 
 const styles = StyleSheet.create({
   root: {
-    backgroundColor: 'transparent',
     paddingTop: 4,
     overflow: 'visible',
     position: 'relative',
   },
   rootPointer: { pointerEvents: 'box-none' },
   boxPointer: { pointerEvents: 'box-none' },
-  noPointer: { pointerEvents: 'none' },
   barArea: {
     paddingHorizontal: 18,
     alignItems: 'center',
@@ -209,15 +184,9 @@ const styles = StyleSheet.create({
   trackInner: {
     width: '100%',
     borderRadius: 34,
-    overflow: 'hidden',
-    minHeight: 56,
+    borderWidth: 1,
+    minHeight: 58,
     justifyContent: 'center',
-  },
-  trackStroke: {
-    borderRadius: 34,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: rgbaBrand(0.14),
-    pointerEvents: 'none',
   },
   trackShadowIos: {
     shadowColor: GOLIVRA_BRAND_SHADOW,
@@ -226,7 +195,7 @@ const styles = StyleSheet.create({
     shadowRadius: 22,
   },
   trackShadowAndroid: {
-    elevation: 14,
+    elevation: 8,
     shadowColor: GOLIVRA_BRAND_SHADOW,
     shadowOpacity: 0.1,
     shadowRadius: 12,
@@ -238,7 +207,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 8,
     paddingHorizontal: 4,
-    zIndex: 2,
   },
   sideCluster: {
     flex: 1,
@@ -257,7 +225,7 @@ const styles = StyleSheet.create({
   sideLabel: {
     fontSize: 10,
     fontWeight: '700',
-    marginTop: 1,
+    marginTop: 2,
     letterSpacing: -0.1,
   },
   fabSlot: {
@@ -277,14 +245,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 4,
-    borderColor: 'transparent',
   },
   fabIdle: {
     shadowColor: GOLIVRA_BRAND_SHADOW,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.35,
     shadowRadius: 16,
-    elevation: 20,
+    elevation: 18,
     transform: [{ scale: 1 }],
   },
   fabFocused: {
@@ -292,7 +259,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.45,
     shadowRadius: 18,
-    elevation: 22,
+    elevation: 20,
     transform: [{ scale: 1.06 }],
   },
   cartBadge: {

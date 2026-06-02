@@ -1,12 +1,11 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { ArrowLeft, CheckCircle2, MapPin, Store } from 'lucide-react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ArrowLeft, CheckCircle2, MapPin, Phone, Store, User } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppContentWidth } from '@/components/app-content-width';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useCourier } from '@/contexts/courier-context';
 import {
@@ -28,7 +27,6 @@ export default function CourierMissionDetailScreen() {
   const { missions, refresh } = useCourier();
   const { showSuccess, showError, FeedbackOverlay } = useActionFeedback();
   const [mission, setMission] = useState<CourierMission | null>(null);
-  const [acting, setActing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -49,69 +47,63 @@ export default function CourierMissionDetailScreen() {
 
   const accept = async () => {
     if (!id) return;
-    const token = await getSessionToken();
-    if (!token) return;
-    setActing(true);
-    setError(null);
+    const previous = mission;
+    setMission((m) => (m ? { ...m, ouverte: false, statut: 'attribuee' as const } : m));
+    showSuccess('Course acceptée !', 'Vous pouvez récupérer la commande chez le commerce.');
     try {
+      const token = await getSessionToken();
+      if (!token) throw new Error('Session expirée');
       const updated = await acceptCourierMission(token, id);
       setMission({ ...updated, ouverte: false });
-      await refresh();
-      showSuccess('Course acceptée !', 'Vous pouvez récupérer la commande chez le commerce.');
+      void refresh();
     } catch (e) {
+      if (previous) setMission(previous);
       const msg = e instanceof Error ? e.message : 'Impossible d\'accepter la course.';
       setError(msg);
       showError('Acceptation impossible', msg);
-    } finally {
-      setActing(false);
     }
   };
 
   const advance = async () => {
     if (!id) return;
-    const token = await getSessionToken();
-    if (!token) return;
-    setActing(true);
-    setError(null);
+    const previous = mission;
+    setMission((m) => (m ? { ...m, statut: 'en_collecte' as const } : m));
+    showSuccess('Collecte enregistrée', 'Récupération confirmée chez le commerce.');
     try {
+      const token = await getSessionToken();
+      if (!token) throw new Error('Session expirée');
       const updated = await advanceCourierMission(token, id);
       setMission(updated);
-      await refresh();
-      showSuccess(
-        updated.statut === 'en_route' ? 'En route !' : 'Collecte enregistrée',
-        updated.statut === 'en_route' ? 'Direction le client.' : 'Récupération confirmée chez le commerce.',
-      );
+      void refresh();
     } catch (e) {
+      if (previous) setMission(previous);
       const msg = e instanceof Error ? e.message : 'Impossible de mettre à jour la course.';
       setError(msg);
       showError('Mise à jour impossible', msg);
-    } finally {
-      setActing(false);
     }
   };
 
   const complete = async () => {
     if (!id) return;
-    const token = await getSessionToken();
-    if (!token) return;
-    setActing(true);
-    setError(null);
+    const previous = mission;
+    setMission((m) => (m ? { ...m, statut: 'livree' as const } : m));
+    showSuccess('Livraison terminée !', 'Bonne course, merci.');
     try {
+      const token = await getSessionToken();
+      if (!token) throw new Error('Session expirée');
       const updated = await completeCourierMission(token, id);
       setMission(updated);
-      await refresh();
-      showSuccess('Livraison terminée !', 'Bonne course, merci.');
+      void refresh();
     } catch (e) {
+      if (previous) setMission(previous);
       const msg = e instanceof Error ? e.message : 'Impossible de valider la livraison.';
       setError(msg);
       showError('Finalisation impossible', msg);
-    } finally {
-      setActing(false);
     }
   };
 
   return (
-    <ThemedView style={styles.screen} lightColor={palette.bg} darkColor={palette.bg}>
+    <View style={[styles.screen, { backgroundColor: palette.bg }]}>
       <FeedbackOverlay />
       <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 8), backgroundColor: palette.card, borderBottomColor: palette.border }]}>
         <Pressable onPress={() => router.back()} style={[styles.back, { backgroundColor: palette.primarySoft }]} hitSlop={12}>
@@ -153,26 +145,43 @@ export default function CourierMissionDetailScreen() {
             <ThemedText style={[styles.blockText, { color: palette.textSecondary }]}>{mission.adresse_retrait || '—'}</ThemedText>
           </View>
 
-          {mission.type_livraison === 'externe' && mission.client_nom ? (
+          {mission.client_nom || mission.client_telephone ? (
             <View style={[styles.block, { backgroundColor: palette.card, borderColor: palette.border }]}>
-              <ThemedText style={[styles.blockTitle, { color: palette.primaryDeep }]}>Client</ThemedText>
-              <ThemedText style={[styles.blockText, { color: palette.textSecondary }]}>
-                {mission.client_nom}
-                {mission.client_telephone ? ` · ${mission.client_telephone}` : ''}
-              </ThemedText>
-              {mission.montant_total != null ? (
-                <ThemedText style={[styles.blockText, { color: palette.textSecondary }]}>Montant : {mission.montant_total} FCFA</ThemedText>
+              <View style={styles.blockHead}>
+                <User size={18} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
+                <ThemedText style={[styles.blockTitle, { color: palette.primaryDeep }]}>Client</ThemedText>
+              </View>
+              {mission.client_nom ? (
+                <ThemedText style={[styles.blockText, { color: palette.text }]}>
+                  {mission.client_nom}
+                </ThemedText>
               ) : null}
-              {mission.note ? <ThemedText style={[styles.hint, { color: palette.muted }]}>{mission.note}</ThemedText> : null}
+              {mission.client_telephone ? (
+                <Pressable
+                  onPress={() => Linking.openURL(`tel:${mission.client_telephone}`)}
+                  style={styles.phoneRow}
+                  hitSlop={8}>
+                  <Phone size={16} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
+                  <ThemedText style={[styles.phoneText, { color: palette.primary }]}>
+                    {mission.client_telephone}
+                  </ThemedText>
+                </Pressable>
+              ) : null}
             </View>
           ) : null}
 
           <View style={[styles.block, { backgroundColor: palette.card, borderColor: palette.border }]}>
             <View style={styles.blockHead}>
               <MapPin size={18} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
-              <ThemedText style={[styles.blockTitle, { color: palette.primaryDeep }]}>Adresse client</ThemedText>
+              <ThemedText style={[styles.blockTitle, { color: palette.primaryDeep }]}>Adresse de livraison</ThemedText>
             </View>
             <ThemedText style={[styles.blockText, { color: palette.textSecondary }]}>{mission.adresse_livraison || '—'}</ThemedText>
+            {mission.note ? (
+              <ThemedText style={[styles.hint, { color: palette.muted }]}>Note : {mission.note}</ThemedText>
+            ) : null}
+            {mission.montant_total != null ? (
+              <ThemedText style={[styles.hint, { color: palette.muted }]}>Montant à encaisser : {mission.montant_total} FCFA</ThemedText>
+            ) : null}
           </View>
 
           {error ? (
@@ -182,24 +191,23 @@ export default function CourierMissionDetailScreen() {
           ) : null}
 
           {canAccept ? (
-            <Pressable style={[styles.primaryBtn, { backgroundColor: palette.primary }, acting && styles.disabled]} disabled={acting} onPress={() => void accept()}>
-              <ThemedText style={styles.primaryBtnText}>{acting ? 'Acceptation…' : 'Accepter cette course'}</ThemedText>
+            <Pressable style={[styles.primaryBtn, { backgroundColor: palette.primary }]} onPress={() => void accept()}>
+              <ThemedText style={styles.primaryBtnText}>Accepter cette course</ThemedText>
             </Pressable>
           ) : null}
           {canAdvance ? (
             <Pressable
-              style={[styles.secondaryBtn, { borderColor: palette.primary }, acting && styles.disabled]}
-              disabled={acting}
+              style={[styles.secondaryBtn, { borderColor: palette.primary }]}
               onPress={() => void advance()}>
               <ThemedText style={[styles.secondaryBtnText, { color: palette.primary }]}>
-                {acting ? 'Mise à jour…' : advanceLabel}
+                {advanceLabel}
               </ThemedText>
             </Pressable>
           ) : null}
           {canComplete ? (
-            <Pressable style={[styles.primaryBtn, { backgroundColor: palette.primary }, acting && styles.disabled]} disabled={acting} onPress={() => void complete()}>
+            <Pressable style={[styles.primaryBtn, { backgroundColor: palette.primary }]} onPress={() => void complete()}>
               <CheckCircle2 size={20} color="#FFF" strokeWidth={LUCIDE_STROKE} />
-              <ThemedText style={styles.primaryBtnText}>{acting ? 'Validation…' : 'Marquer comme livrée'}</ThemedText>
+              <ThemedText style={styles.primaryBtnText}>Marquer comme livrée</ThemedText>
             </Pressable>
           ) : isDone ? (
             <ThemedText style={[styles.hint, { color: palette.muted }]}>Course terminée.</ThemedText>
@@ -209,7 +217,7 @@ export default function CourierMissionDetailScreen() {
           </AppContentWidth>
         </ScrollView>
       )}
-    </ThemedView>
+    </View>
   );
 }
 
@@ -284,4 +292,16 @@ const styles = StyleSheet.create({
   primaryBtnText: { color: '#FFF', fontWeight: '800', fontSize: 16 },
   disabled: { opacity: 0.65 },
   hint: { textAlign: 'center', fontSize: 13, marginTop: 8 },
+  phoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+    paddingVertical: 4,
+  },
+  phoneText: {
+    fontSize: 15,
+    fontWeight: '800',
+    textDecorationLine: 'underline',
+  },
 });

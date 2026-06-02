@@ -1,6 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { VendorScreenHeader } from '@/components/vendor-screen-header';
@@ -23,12 +22,11 @@ export default function VendorPreparationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { orders, refresh } = useVendor();
+  const { orders, refresh, setOrders } = useVendor();
   const colors = useAppColors();
   const { showSuccess, showError, FeedbackOverlay } = useActionFeedback();
   const styles = useThemedStyles(createVendorPreparationStyles);
   const { palette, labels } = useVendorTheme();
-  const [busy, setBusy] = useState(false);
   const o = orders.find((x) => x.id === (typeof id === 'string' ? id : ''));
 
   const activeIdx =
@@ -42,24 +40,27 @@ export default function VendorPreparationScreen() {
 
   const runStatus = async (statut: string, successMsg: string, goDeliveries?: boolean) => {
     if (!o) return;
-    const token = await getSessionToken();
-    if (!token) return;
-    setBusy(true);
+    const previousStatut = o.statut;
+    setOrders((prev) =>
+      prev.map((x) => (x.id === o.id ? { ...x, statut: statut as typeof x.statut } : x)),
+    );
+    if (goDeliveries) {
+      router.replace(VENDOR_HREF.deliveriesTab);
+      showSuccess('Commande prête !', successMsg, { primaryLabel: 'OK' });
+    } else {
+      router.back();
+      showSuccess('C’est enregistré', successMsg, { primaryLabel: 'OK' });
+    }
     try {
+      const token = await getSessionToken();
+      if (!token) throw new Error('Session expirée');
       await updateVendorOrderStatus(token, o.id, statut, o.sous_commande_id);
-      await refresh();
-      if (goDeliveries) {
-        showSuccess('Commande prête !', successMsg, {
-          primaryLabel: 'Suivre la livraison',
-          onPrimary: () => router.replace(VENDOR_HREF.deliveriesTab),
-        });
-      } else {
-        showSuccess('C’est enregistré', successMsg, { onPrimary: () => router.back() });
-      }
+      void refresh();
     } catch (e) {
+      setOrders((prev) =>
+        prev.map((x) => (x.id === o.id ? { ...x, statut: previousStatut } : x)),
+      );
       showError('Mise à jour impossible', e instanceof Error ? e.message : 'Réessayez.');
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -140,32 +141,25 @@ export default function VendorPreparationScreen() {
           </View>
         ))}
 
-        {o.statut === 'en_attente' ? (
+        {o.statut === 'en_attente' || o.statut === 'a_preparer' || o.statut === 'acceptee' ? (
           <Pressable
             style={[styles.primary, { backgroundColor: palette.primary }]}
-            disabled={busy}
-            onPress={() => void runStatus('acceptee', 'Commande acceptée.')}>
-            <ThemedText style={styles.primaryTxt}>Accepter la commande</ThemedText>
-          </Pressable>
-        ) : null}
-
-        {o.statut === 'a_preparer' || o.statut === 'acceptee' ? (
-          <Pressable
-            style={[styles.primary, { backgroundColor: palette.primary }]}
-            disabled={busy}
-            onPress={() => void runStatus('en_preparation', 'Préparation démarrée.')}>
-            {busy ? (
-              <ActivityIndicator color={colors.onPrimary} />
-            ) : (
-              <ThemedText style={styles.primaryTxt}>Commencer la préparation</ThemedText>
-            )}
+            onPress={() => {
+              const isFreshAccept = o.statut === 'en_attente' || o.statut === 'a_preparer';
+              void runStatus(
+                'en_preparation',
+                isFreshAccept
+                  ? 'Commande acceptée. Préparation démarrée.'
+                  : 'Préparation démarrée.',
+              );
+            }}>
+            <ThemedText style={styles.primaryTxt}>Accepter et commencer la préparation</ThemedText>
           </Pressable>
         ) : null}
 
         {o.statut === 'en_preparation' ? (
           <Pressable
             style={[styles.primary, { backgroundColor: palette.primaryDeep, marginTop: 10 }]}
-            disabled={busy}
             onPress={() =>
               void runStatus(
                 'prete',
@@ -173,11 +167,7 @@ export default function VendorPreparationScreen() {
                 true,
               )
             }>
-            {busy ? (
-              <ActivityIndicator color={colors.onPrimary} />
-            ) : (
-              <ThemedText style={styles.primaryTxt}>Commande prête — appeler un livreur GoLivra</ThemedText>
-            )}
+            <ThemedText style={styles.primaryTxt}>Commande prête — appeler un livreur GoLivra</ThemedText>
           </Pressable>
         ) : null}
 

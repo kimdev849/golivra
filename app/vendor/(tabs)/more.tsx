@@ -106,7 +106,7 @@ export default function VendorMoreTabScreen() {
         </View>
 
         <ThemedText style={[styles.sectionLabel, { color: colors.textMuted }]}>Raccourcis</ThemedText>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={[styles.card, { backgroundColor: colors.backgroundAlt, borderColor: colors.border }]}>
           {row(
             <BarChart3 size={20} color={palette.primary} strokeWidth={LUCIDE_STROKE} />,
             'Statistiques',
@@ -146,7 +146,7 @@ export default function VendorMoreTabScreen() {
         <ThemedText style={[styles.sectionLabel, { color: colors.textMuted }]}>
           {commerceType === 'restaurant' ? 'Restaurant' : 'Boutique'}
         </ThemedText>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={[styles.card, { backgroundColor: colors.backgroundAlt, borderColor: colors.border }]}>
           {row(
             <Building2 size={20} color={palette.primary} strokeWidth={LUCIDE_STROKE} />,
             commerceType === 'restaurant' ? 'Informations restaurant' : 'Informations boutique',
@@ -170,11 +170,11 @@ export default function VendorMoreTabScreen() {
         </View>
 
         <ThemedText style={[styles.sectionLabel, { color: colors.textMuted }]}>Compte de connexion</ThemedText>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={[styles.card, { backgroundColor: colors.backgroundAlt, borderColor: colors.border }]}>
           {row(
             <User size={20} color={palette.primary} strokeWidth={LUCIDE_STROKE} />,
             'Connexion & sécurité',
-            'Votre nom, téléphone et mot de passe (pas le nom du commerce)',
+            'Mot de passe et suppression du compte',
             () => router.push('/account-settings')
           )}
           <View style={[styles.divider, { backgroundColor: colors.border }]} />

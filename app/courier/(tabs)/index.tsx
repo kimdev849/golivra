@@ -7,7 +7,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppContentWidth } from '@/components/app-content-width';
 import { CourierHero } from '@/components/courier/courier-hero';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { COURIER_TAB_BAR_PADDING_BOTTOM } from '@/constants/courier-layout';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useCourier } from '@/contexts/courier-context';
@@ -71,7 +70,7 @@ export default function CourierHomeScreen() {
   const bottom = Math.max(insets.bottom, 12) + COURIER_TAB_BAR_PADDING_BOTTOM;
 
   return (
-    <ThemedView style={styles.screen} lightColor={palette.bg} darkColor={palette.bg}>
+    <View style={[styles.screen, { backgroundColor: palette.bg }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={palette.primary} />}
@@ -94,7 +93,7 @@ export default function CourierHomeScreen() {
             <Bell size={22} color={palette.primaryDeep} strokeWidth={LUCIDE_STROKE} />
             {unreadCount > 0 ? (
               <View style={[styles.notifBadge, { backgroundColor: palette.danger }]}>
-                <ThemedText style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</ThemedText>
+                <ThemedText style={styles.notifBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</ThemedText>
               </View>
             ) : null}
           </Pressable>
@@ -139,7 +138,10 @@ export default function CourierHomeScreen() {
               <ThemedText style={[styles.sectionLink, { color: palette.primary }]}>{openMissions.length} à accepter</ThemedText>
             </View>
             {openMissions.slice(0, 3).map((m) => (
-              <Pressable key={m.id} style={[styles.missionCard, styles.openCard]} onPress={() => router.push(hrefCourierMission(m.id))}>
+              <Pressable
+                key={m.id}
+                style={[styles.missionCard, { borderColor: palette.warning, backgroundColor: palette.warningSoft }]}
+                onPress={() => router.push(hrefCourierMission(m.id))}>
                 <View style={styles.missionTop}>
                   <ThemedText style={[styles.missionRef, { color: palette.text }]}>
                     {m.commerce_nom || m.commande?.numero || m.id.slice(0, 8).toUpperCase()}
@@ -194,7 +196,7 @@ export default function CourierHomeScreen() {
         )}
         </AppContentWidth>
       </ScrollView>
-    </ThemedView>
+    </View>
   );
 }
 

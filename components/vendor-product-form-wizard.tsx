@@ -2,7 +2,9 @@ import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +18,7 @@ import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react-native';
 import { CategoryPicker } from '@/components/category-picker';
 import { OptionGroupsEditor, pickVendorImageAsset } from '@/components/vendor-form-shared';
 import { ThemedText } from '@/components/themed-text';
+import { InlineFormError } from '@/components/inline-form-error';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
@@ -38,6 +41,7 @@ import {
   type VendorProductFormValues,
 } from '@/lib/vendor-product-types';
 import type { VendorProduct } from '@/lib/vendor-types';
+import { validateCommerceName, validateDescription, validatePrice, validateProductName, validateStock } from '@/lib/form-validation';
 
 const STEPS = ['Essentiel', 'Détails', 'Variantes', 'Publication'] as const;
 const MAX_GALLERY = 7;
@@ -114,6 +118,7 @@ export function VendorProductFormWizard({
   const [newCatOpen, setNewCatOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [saving, setSaving] = useState(false);
+  const [stepErrors, setStepErrors] = useState<Record<string, string | null>>({});
 
   const patch = (p: Partial<VendorProductFormValues>) => setValues((v) => ({ ...v, ...p }));
 
@@ -140,21 +145,27 @@ export function VendorProductFormWizard({
 
   const validateStep = (s: number): string | null => {
     if (s === 0) {
-      if (!values.nom.trim()) return 'Indiquez le nom du produit.';
-      const prix = Number(values.prix);
-      if (!prix || prix <= 0) return 'Indiquez un prix valide.';
+      const e1 = validateProductName(values.nom);
+      if (!e1.ok) return e1.message;
+      const e2 = validatePrice(values.prix);
+      if (!e2.ok) return e2.message;
       if (!values.mainImageUri && !values.mainImageDataUrl) {
         return 'Ajoutez au moins une photo principale.';
       }
     }
-    if (s === 1 && !values.stockIllimite) {
-      const q = Number(values.stock);
-      if (values.stock.trim() && (!Number.isFinite(q) || q < 0)) return 'Stock invalide.';
+    if (s === 1) {
+      const e3 = validateDescription(values.description, 500);
+      if (!e3.ok) return e3.message;
+      if (!values.stockIllimite) {
+        const e4 = validateStock(values.stock, false);
+        if (!e4.ok) return e4.message;
+      }
     }
     if (s === 3 && values.prixPromo.trim()) {
-      const promo = Number(values.prixPromo);
+      const e5 = validatePrice(values.prixPromo);
+      if (!e5.ok) return e5.message;
       const prix = Number(values.prix);
-      if (!promo || promo <= 0) return 'Prix promo invalide.';
+      const promo = Number(values.prixPromo);
       if (promo >= prix) return 'Le prix promo doit être inférieur au prix normal.';
     }
     return null;
@@ -164,8 +175,25 @@ export function VendorProductFormWizard({
     const err = validateStep(step);
     if (err) {
       showError('Champ manquant', err);
+      const fieldErrs: Record<string, string | null> = {};
+      if (step === 0) {
+        const e1 = validateProductName(values.nom);
+        if (!e1.ok) fieldErrs.nom = e1.message;
+        const e2 = validatePrice(values.prix);
+        if (!e2.ok) fieldErrs.prix = e2.message;
+      }
+      if (step === 1 && !values.stockIllimite) {
+        const e3 = validateStock(values.stock, false);
+        if (!e3.ok) fieldErrs.stock = e3.message;
+      }
+      if (step === 3 && values.prixPromo.trim()) {
+        const e4 = validatePrice(values.prixPromo);
+        if (!e4.ok) fieldErrs.prixPromo = e4.message;
+      }
+      setStepErrors(fieldErrs);
       return;
     }
+    setStepErrors({});
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
   };
 
@@ -227,7 +255,11 @@ export function VendorProductFormWizard({
   };
 
   const createCategory = async () => {
-    if (!newCatName.trim()) return;
+    const e = validateCommerceName(newCatName);
+    if (!e.ok) {
+      showError('Nom invalide', e.message);
+      return;
+    }
     try {
       const token = await getSessionToken();
       if (!token) throw new Error('Session expirée.');
@@ -263,9 +295,14 @@ export function VendorProductFormWizard({
         ))}
       </View>
 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}>
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: insets.bottom + 100 }}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag">
         {step === 0 ? (
           <>
             <ThemedText style={[styles.sectionTitle, { color: palette.primaryDeep }]}>Informations principales</ThemedText>
@@ -307,19 +344,21 @@ export function VendorProductFormWizard({
             <TextInput
               style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
               value={values.nom}
-              onChangeText={(t) => patch({ nom: t })}
+              onChangeText={(t) => { patch({ nom: t }); setStepErrors((s) => ({ ...s, nom: null })); }}
               placeholder="Ex. iPhone 13 Pro, Riz 25kg…"
               placeholderTextColor={colors.placeholder}
             />
+            <InlineFormError message={stepErrors.nom} colors={colors} />
             <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Prix (FCFA) *</ThemedText>
             <TextInput
               style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
               value={values.prix}
-              onChangeText={(t) => patch({ prix: t })}
+              onChangeText={(t) => { patch({ prix: t }); setStepErrors((s) => ({ ...s, prix: null })); }}
               keyboardType="numeric"
               placeholder="15000"
               placeholderTextColor={colors.placeholder}
             />
+            <InlineFormError message={stepErrors.prix} colors={colors} />
             <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Catégorie boutique</ThemedText>
             <Pressable style={[styles.selectCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]} onPress={() => setCatPickerOpen(true)} disabled={catLoading}>
               <ThemedText style={[styles.selectTxt, { color: colors.text }]}>
@@ -373,11 +412,12 @@ export function VendorProductFormWizard({
                 <TextInput
                   style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
                   value={values.stock}
-                  onChangeText={(t) => patch({ stock: t })}
+                  onChangeText={(t) => { patch({ stock: t }); setStepErrors((s) => ({ ...s, stock: null })); }}
                   keyboardType="numeric"
                   placeholder="20"
                   placeholderTextColor={colors.placeholder}
                 />
+                <InlineFormError message={stepErrors.stock} colors={colors} />
               </>
             ) : null}
             <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Référence / SKU</ThemedText>
@@ -469,11 +509,12 @@ export function VendorProductFormWizard({
             <TextInput
               style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
               value={values.prixPromo}
-              onChangeText={(t) => patch({ prixPromo: t })}
+              onChangeText={(t) => { patch({ prixPromo: t }); setStepErrors((s) => ({ ...s, prixPromo: null })); }}
               keyboardType="numeric"
               placeholder="Optionnel"
               placeholderTextColor={colors.placeholder}
             />
+            <InlineFormError message={stepErrors.prixPromo} colors={colors} />
             <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Début promo (AAAA-MM-JJ)</ThemedText>
             <TextInput
               style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
@@ -520,6 +561,7 @@ export function VendorProductFormWizard({
           </>
         ) : null}
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12), backgroundColor: colors.surface, borderTopColor: colors.border }]}>
         <Pressable style={styles.footerBack} onPress={goBack}>

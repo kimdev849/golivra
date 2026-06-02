@@ -56,3 +56,17 @@ export function stockDisplayLabel(p: ProductStockFields, ctx?: StockContext): st
   if (n <= 5) return `Plus que ${n} disponible${n > 1 ? 's' : ''}`;
   return null;
 }
+
+/**
+ * Libellé court pour le tableau de bord vendeur (toujours une chaîne).
+ * - Illimité / non suivi → « Illimité »
+ * - 0 → « Rupture »
+ * - sinon → nombre
+ */
+export function vendorStockLabel(p: ProductStockFields, ctx?: StockContext): string {
+  if (isPlatProduct(p, ctx)) return 'Illimité';
+  if (isStockUnlimited(p, ctx)) return 'Illimité';
+  const n = Math.floor(Number(p.stock));
+  if (!Number.isFinite(n) || n <= 0) return 'Rupture';
+  return String(n);
+}

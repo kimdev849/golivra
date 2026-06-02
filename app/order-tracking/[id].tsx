@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { ArrowLeft, Bike, MapPin, PhoneCall, Star } from 'lucide-react-native';
+import { ArrowLeft, Bike, MapPin, PhoneCall, Star, ExternalLink } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 
@@ -18,6 +18,8 @@ type OrderDetail = {
   id: string;
   statut: string;
   prix_total?: number;
+  livraisons?: { id: string; statut: string; type_livraison?: string }[];
+  livraison_id?: string | null;
   livreur?: {
     nom: string;
     telephone: string;
@@ -108,6 +110,9 @@ export default function OrderTrackingScreen() {
   }
 
   const steps = order?.timeline?.livraisons?.[0]?.timeline || order?.timeline?.commande || [];
+  const primaryDeliveryId =
+    order?.livraison_id ||
+    (Array.isArray(order?.livraisons) && order.livraisons.length > 0 ? order.livraisons[0].id : null);
 
   return (
     <ThemedView style={styles.screen} lightColor={colors.backgroundAlt} darkColor={colors.backgroundAlt}>
@@ -202,6 +207,27 @@ export default function OrderTrackingScreen() {
             </View>
             <EventTimeline steps={steps} title="" />
           </View>
+        ) : null}
+
+        {/* LIEN VERS LE DETAIL COMPLET DE LA LIVRAISON */}
+        {primaryDeliveryId ? (
+          <Pressable
+            onPress={() => router.push(`/delivery/${primaryDeliveryId}`)}
+            style={({ pressed }) => [
+              styles.deliveryLink,
+              { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 },
+            ]}>
+            <View style={[styles.deliveryLinkIcon, { backgroundColor: colors.primarySoft }]}>
+              <Bike size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText style={[styles.deliveryLinkTitle, { color: colors.text }]}>Détail de la livraison</ThemedText>
+              <ThemedText style={[styles.deliveryLinkSub, { color: colors.textMuted }]}>
+                Livreur, adresses, articles, paiement, étapes…
+              </ThemedText>
+            </View>
+            <ExternalLink size={18} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+          </Pressable>
         ) : null}
 
       </ScrollView>

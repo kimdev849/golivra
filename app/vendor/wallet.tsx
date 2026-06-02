@@ -20,6 +20,7 @@ import { useVendorTheme } from '@/hooks/use-vendor-theme';
 import { getSessionToken } from '@/lib/auth';
 import { formatFcfa } from '@/lib/format';
 import { fetchMyWallet, requestWithdrawal, type WalletDashboard } from '@/lib/wallet-api';
+import { validatePhoneCg } from '@/lib/form-validation';
 
 export default function VendorWalletScreen() {
   const insets = useSafeAreaInsets();
@@ -59,8 +60,9 @@ export default function VendorWalletScreen() {
       showError('Montant invalide', 'Minimum 1 000 FCFA.');
       return;
     }
-    if (!numero.trim()) {
-      showError('Numéro manquant', 'Indiquez votre numéro Mobile Money.');
+    const eNum = validatePhoneCg(numero);
+    if (!eNum.ok) {
+      showError('Numéro invalide', eNum.message);
       return;
     }
     setSubmitting(true);

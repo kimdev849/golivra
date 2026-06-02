@@ -11,7 +11,7 @@ import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { getSessionToken } from '@/lib/auth';
-import { fetchNotifications, markNotificationRead, type AppNotification } from '@/lib/notifications-api';
+import { fetchNotifications, markAllNotificationsRead, markNotificationRead, type AppNotification } from '@/lib/notifications-api';
 import { navigateFromNotification } from '@/lib/notification-navigation';
 
 type NotifIconKind = 'bag' | 'truck' | 'dollar' | 'alert' | 'star';
@@ -46,6 +46,7 @@ export default function VendorNotificationsScreen() {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const [items, setItems] = useState<AppNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -54,10 +55,12 @@ export default function VendorNotificationsScreen() {
       const token = await getSessionToken();
       if (!token) {
         setItems([]);
+        setUnreadCount(0);
         return;
       }
       const res = await fetchNotifications(token, { limit: 60 });
       setItems(res.items ?? []);
+      setUnreadCount(res.unread_count ?? 0);
     } catch {
       setItems([]);
     } finally {
@@ -77,6 +80,7 @@ export default function VendorNotificationsScreen() {
       try {
         await markNotificationRead(token, n.id);
         setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, est_lue: true } : x)));
+        setUnreadCount((c) => Math.max(0, c - 1));
       } catch {
         /* ignore */
       }
@@ -84,9 +88,38 @@ export default function VendorNotificationsScreen() {
     navigateFromNotification(router, n);
   };
 
+  const handleMarkAllRead = async () => {
+    const token = await getSessionToken();
+    if (!token) return;
+    try {
+      await markAllNotificationsRead(token);
+      setItems((prev) => prev.map((x) => ({ ...x, est_lue: true })));
+      setUnreadCount(0);
+      try {
+        const { loadExpoNotifications } = await import('@/lib/expo-notifications-module');
+        const Notifications = await loadExpoNotifications();
+        if (Notifications) await Notifications.setBadgeCountAsync(0);
+      } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
+  };
+
   return (
     <ThemedView style={styles.screen}>
-      <VendorScreenHeader title="NOTIFICATIONS" />
+      <VendorScreenHeader
+        title="NOTIFICATIONS"
+        right={
+          unreadCount > 0 ? (
+            <Pressable
+              onPress={() => void handleMarkAllRead()}
+              hitSlop={8}
+              style={[styles.markAllBtn, { borderColor: colors.primary }]}>
+              <ThemedText style={[styles.markAllText, { color: colors.primary }]}>Tout lire</ThemedText>
+            </Pressable>
+          ) : null
+        }
+      />
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 80, paddingHorizontal: 18, paddingTop: 8 }}>
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: 32 }} />
@@ -129,4 +162,14 @@ const styles = StyleSheet.create({
   },
   titre: { fontWeight: '700', fontSize: 15 },
   corps: { fontSize: 13, marginTop: 4 },
+  markAllBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  markAllText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
 });

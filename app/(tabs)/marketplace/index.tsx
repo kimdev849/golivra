@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   TextInput,
@@ -154,32 +156,6 @@ export default function MarketplaceListScreen() {
 
   const renderHeader = () => (
     <View style={{ paddingHorizontal: 20 }}>
-      {/* Barre de recherche */}
-      <View style={styles.searchRow}>
-        <View style={styles.searchBar}>
-          <Search size={20} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Restaurant, boutique, produit…"
-            placeholderTextColor={colors.placeholder}
-            value={query}
-            onChangeText={setQuery}
-            returnKeyType="search"
-          />
-        </View>
-        <Pressable
-          style={styles.filterBtn}
-          onPress={() =>
-            Alert.alert(
-              'Filtres',
-              'Choisissez une catégorie ci-dessous ou utilisez la barre de recherche pour affiner les résultats.'
-            )
-          }
-          hitSlop={8}>
-          <SlidersHorizontal size={22} color={colors.primaryDeep} strokeWidth={LUCIDE_STROKE} />
-        </Pressable>
-      </View>
-
       {/* Restaurants | Boutiques */}
       <View style={styles.segmentWrap}>
         <Pressable
@@ -414,17 +390,54 @@ export default function MarketplaceListScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <FlashList
-        data={filteredEnterprises.slice(0, 12)}
-        renderItem={renderEnterpriseItem}
-        estimatedItemSize={110}
-        ListHeaderComponent={renderHeader}
-        ListFooterComponent={renderFooter}
-        refreshing={isRefetching}
-        onRefresh={onRefresh}
-        contentContainerStyle={{ paddingTop: Math.max(insets.top, 12), paddingBottom: bottomPad }}
-        showsVerticalScrollIndicator={false}
-      />
+      {/* Barre de recherche fixe (toujours visible, jamais cachée par le clavier) */}
+      <View
+        style={[
+          styles.searchRow,
+          { paddingHorizontal: 20, paddingTop: Math.max(insets.top, 12) + 4, paddingBottom: 8 },
+        ]}>
+        <View style={styles.searchBar}>
+          <Search size={20} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Restaurant, boutique, produit…"
+            placeholderTextColor={colors.placeholder}
+            value={query}
+            onChangeText={setQuery}
+            returnKeyType="search"
+          />
+        </View>
+        <Pressable
+          style={styles.filterBtn}
+          onPress={() =>
+            Alert.alert(
+              'Filtres',
+              'Choisissez une catégorie ci-dessous ou utilisez la barre de recherche pour affiner les résultats.'
+            )
+          }
+          hitSlop={8}>
+          <SlidersHorizontal size={22} color={colors.primaryDeep} strokeWidth={LUCIDE_STROKE} />
+        </Pressable>
+      </View>
+
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}>
+        <FlashList
+          data={filteredEnterprises.slice(0, 12)}
+          renderItem={renderEnterpriseItem}
+          estimatedItemSize={110}
+          ListHeaderComponent={renderHeader}
+          ListFooterComponent={renderFooter}
+          refreshing={isRefetching}
+          onRefresh={onRefresh}
+          contentContainerStyle={{ paddingBottom: bottomPad }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        />
+      </KeyboardAvoidingView>
     </ThemedView>
   );
 }

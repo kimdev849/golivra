@@ -99,6 +99,21 @@ export async function logoutRemote(token: string): Promise<void> {
   });
 }
 
+export async function deleteAccountRemote(payload: {
+  token: string;
+  password: string;
+  reason?: string | null;
+}): Promise<{ message: string; supprime_at: string }> {
+  return apiFetch<{ message: string; supprime_at: string }>('/api/auth/delete-account', {
+    method: 'POST',
+    token: payload.token,
+    jsonBody: {
+      password: payload.password,
+      reason: payload.reason ?? null,
+    },
+  });
+}
+
 export async function resetPassword(payload: {
   telephone: string;
   otpCode: string;

@@ -8,35 +8,38 @@ import { useLogout } from '@/hooks/use-logout';
 
 type Props = {
   clearCart?: boolean;
-  variant?: 'filled' | 'ghost';
+  variant?: 'filled' | 'ghost' | 'link';
 };
 
-export function AppLogoutButton({ clearCart, variant = 'ghost' }: Props) {
+export function AppLogoutButton({ clearCart, variant = 'link' }: Props) {
   const colors = useAppColors();
   const { confirmLogout, loggingOut } = useLogout({ clearCart });
 
   const filled = variant === 'filled';
+  const link = variant === 'link';
 
   return (
     <Pressable
       onPress={confirmLogout}
       disabled={loggingOut}
       style={({ pressed }) => [
-        styles.btn,
-        filled
-          ? { backgroundColor: colors.errorSoft, borderColor: colors.error }
-          : { backgroundColor: colors.surface, borderColor: colors.border },
-        pressed && !loggingOut && { opacity: 0.88 },
+        link ? styles.link : styles.btn,
+        link
+          ? undefined
+          : filled
+            ? { backgroundColor: colors.errorSoft, borderColor: colors.error }
+            : { backgroundColor: colors.surface, borderColor: colors.border },
+        pressed && !loggingOut && (link ? styles.linkPressed : styles.btnPressed),
         loggingOut && styles.disabled,
       ]}
-      android_ripple={{ color: filled ? 'rgba(220,38,38,0.12)' : colors.primaryMuted }}>
-      <View style={styles.inner}>
+      android_ripple={link ? { color: colors.primaryMuted, borderless: true } : { color: filled ? 'rgba(220,38,38,0.12)' : colors.primaryMuted }}>
+      <View style={link ? styles.linkInner : styles.inner}>
         {loggingOut ? (
           <ActivityIndicator size="small" color={colors.error} />
         ) : (
-          <LogOut size={18} color={colors.error} strokeWidth={LUCIDE_STROKE} />
+          <LogOut size={link ? 16 : 18} color={colors.error} strokeWidth={LUCIDE_STROKE} />
         )}
-        <ThemedText style={[styles.label, { color: colors.error }]}>
+        <ThemedText style={[link ? styles.linkLabel : styles.label, { color: colors.error }]}>
           {loggingOut ? 'Déconnexion…' : 'Se déconnecter'}
         </ThemedText>
       </View>
@@ -52,6 +55,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginTop: 8,
   },
+  btnPressed: { opacity: 0.88 },
   inner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -61,6 +65,23 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 15,
     fontWeight: '800',
+  },
+  link: {
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+  },
+  linkPressed: { opacity: 0.6 },
+  linkInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  linkLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   disabled: {
     opacity: 0.65,

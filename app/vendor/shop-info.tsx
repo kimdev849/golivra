@@ -4,6 +4,8 @@ import { Camera } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DeliveryAddressForm, type DeliveryAddressFormValue } from '@/components/delivery-address-form';
+import { InlineFormError } from '@/components/inline-form-error';
 import { pickVendorImageAsset } from '@/components/vendor-form-shared';
 import { VendorScreenHeader } from '@/components/vendor-screen-header';
 import { ThemedText } from '@/components/themed-text';
@@ -24,9 +27,10 @@ import { useAppColors } from '@/hooks/use-app-colors';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
 import { getSessionToken } from '@/lib/auth';
 import { patchEnterprise } from '@/lib/enterprise';
-import { isDeliveryAddressComplete, quartierForForm } from '@/lib/format-address';
+import { deliveryAddressError, quartierForForm } from '@/lib/format-address';
 import { resolveRemoteImageUrl } from '@/lib/images';
 import { uploadImageBase64 } from '@/lib/uploads';
+import { validateCommerceName, validateDescription, validatePhoneCg } from '@/lib/form-validation';
 
 const emptyAddr = (): DeliveryAddressFormValue => ({
   quartier: '',
@@ -51,6 +55,7 @@ export default function VendorShopInfoScreen() {
   const [logoUri, setLogoUri] = useState<string | null>(null);
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     if (!shop) return;
@@ -78,21 +83,33 @@ export default function VendorShopInfoScreen() {
 
   const save = async () => {
     if (!shop?.id) return;
-    const trimmedNom = nom.trim();
-    const trimmedTel = telephone.trim();
-    if (!trimmedNom) {
-      showError('Nom manquant', 'Indiquez le nom du commerce.');
+    setFieldErrors({});
+    const next: Record<string, string | null> = {};
+    const e1 = validateCommerceName(nom);
+    if (!e1.ok) {
+      next.nom = e1.message;
+      setFieldErrors(next);
       return;
     }
-    if (!trimmedTel) {
-      showError('Téléphone manquant', 'Indiquez un numéro de contact.');
+    setNom(e1.value);
+    const e2 = validatePhoneCg(telephone);
+    if (!e2.ok) {
+      next.telephone = e2.message;
+      setFieldErrors(next);
       return;
     }
-    if (!isDeliveryAddressComplete(address)) {
-      showError(
-        'Adresse incomplète',
-        'Choisissez un arrondissement et décrivez l’adresse (au moins 4 caractères).',
-      );
+    setTelephone(e2.value);
+    const e3 = validateDescription(description, 500);
+    if (!e3.ok) {
+      next.description = e3.message;
+      setFieldErrors(next);
+      return;
+    }
+    setDescription(e3.value);
+    const e4 = deliveryAddressError(address);
+    if (e4) {
+      next.address = e4;
+      setFieldErrors(next);
       return;
     }
 
@@ -108,19 +125,18 @@ export default function VendorShopInfoScreen() {
       }
 
       await patchEnterprise(token, shop.id, {
-        nom: trimmedNom,
+        nom: nom,
         description: description.trim() || null,
-        telephone: trimmedTel,
+        telephone: telephone,
         adresse: address.ligne1.trim(),
         adresseQuartier: address.quartier.trim(),
         adresseVille: address.ville || 'Brazzaville',
         ...(imageUrl ? { imageUrl } : logoDataUrl ? { imageDataUrl: logoDataUrl } : {}),
       });
       setLogoDataUrl(null);
-      await refresh();
-      showSuccess('Enregistré !', 'Les informations du commerce ont été mises à jour.', {
-        onPrimary: () => router.back(),
-      });
+      router.back();
+      void refresh();
+      showSuccess('Enregistré !', 'Les informations du commerce ont été mises à jour.');
     } catch (e) {
       showError('Enregistrement impossible', e instanceof Error ? e.message : undefined);
     } finally {
@@ -136,7 +152,14 @@ export default function VendorShopInfoScreen() {
     <ThemedView style={styles.screen}>
       <FeedbackOverlay />
       <VendorScreenHeader title={infoTitle} />
-      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: insets.bottom + 24 }}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={{ padding: 18, paddingBottom: insets.bottom + 24 }}>
         <Pressable style={[styles.photoZone, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]} onPress={() => void pickLogo()}>
           {displayLogo ? (
             <Image source={{ uri: displayLogo }} style={styles.photoImg} contentFit="cover" />
@@ -150,6 +173,7 @@ export default function VendorShopInfoScreen() {
 
         <ThemedText style={[styles.lab, { color: colors.textSecondary }]}>{nomLabel}</ThemedText>
         <TextInput style={[styles.inp, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]} value={nom} onChangeText={setNom} placeholderTextColor={colors.placeholder} />
+        <InlineFormError message={fieldErrors.nom} colors={colors} />
         <ThemedText style={[styles.lab, { color: colors.textSecondary }]}>Description</ThemedText>
         <TextInput
           style={[styles.inp, styles.area, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
@@ -159,11 +183,14 @@ export default function VendorShopInfoScreen() {
           textAlignVertical="top"
           placeholderTextColor={colors.placeholder}
         />
+        <InlineFormError message={fieldErrors.description} colors={colors} />
         <ThemedText style={[styles.lab, { color: colors.textSecondary }]}>Téléphone</ThemedText>
         <TextInput style={[styles.inp, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]} value={telephone} onChangeText={setTelephone} keyboardType="phone-pad" placeholderTextColor={colors.placeholder} />
+        <InlineFormError message={fieldErrors.telephone} colors={colors} />
 
         <ThemedText style={[styles.sectionHead, { color: colors.textSecondary }]}>Adresse du commerce</ThemedText>
         <DeliveryAddressForm value={address} onChange={setAddress} accentColor={palette.primary} />
+        <InlineFormError message={fieldErrors.address} colors={colors} />
 
         <View style={[styles.deliveryCard, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}>
           <ThemedText type="defaultSemiBold" style={[styles.deliveryTitle, { color: colors.text }]}>
@@ -186,6 +213,7 @@ export default function VendorShopInfoScreen() {
           )}
         </Pressable>
       </ScrollView>
+      </KeyboardAvoidingView>
     </ThemedView>
   );
 }

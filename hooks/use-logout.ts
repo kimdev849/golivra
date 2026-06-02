@@ -51,21 +51,36 @@ export function useLogout(options: Options = { clearCart: true }) {
     try {
       hapticSuccess();
 
-      // Désinscrire le token push avant de se déconnecter
-      try {
-        const { getExpoPushToken } = await import('@/lib/notifications-service');
-        const { unregisterPushToken } = await import('@/lib/push-token-api');
-        const token = await getExpoPushToken();
-        if (token) await unregisterPushToken(token);
-      } catch {
-        // Non bloquant — le token expirera de toute façon
-      }
-
-      await logoutLocal();
-      if (options.clearCart !== false) {
-        await saveCart(null);
-      }
       navigateToAuthAfterLogout();
+
+      try {
+        const { loadExpoNotifications } = await import('@/lib/expo-notifications-module');
+        const Notifications = await loadExpoNotifications();
+        if (Notifications) await Notifications.setBadgeCountAsync(0);
+      } catch { /* ignore */ }
+
+      void (async () => {
+        try {
+          const { getExpoPushToken } = await import('@/lib/notifications-service');
+          const { unregisterPushToken } = await import('@/lib/push-token-api');
+          const token = await getExpoPushToken();
+          if (token) await unregisterPushToken(token);
+        } catch {
+          // Non bloquant
+        }
+        try {
+          await logoutLocal();
+        } catch {
+          // Non bloquant
+        }
+        if (options.clearCart !== false) {
+          try {
+            await saveCart(null);
+          } catch {
+            // Non bloquant
+          }
+        }
+      })();
     } catch {
       hapticLight();
       if (Platform.OS === 'web') {

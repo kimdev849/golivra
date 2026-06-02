@@ -1,7 +1,14 @@
 import { apiFetch } from '@/lib/api';
 import type { DeliveryAddressFields } from '@/lib/format-address';
 import type { ArticleCategory, ProductOptionGroup } from '@/lib/vendor-product-types';
-import type { VendorOrder, VendorOrderStatus, VendorProduct } from '@/lib/vendor-types';
+import type {
+  VendorEngagementInput,
+  VendorOrder,
+  VendorOrderStatus,
+  VendorProduct,
+} from '@/lib/vendor-types';
+
+export type { VendorEngagementInput } from '@/lib/vendor-types';
 
 type ApiProduct = {
   id: string;
@@ -131,6 +138,29 @@ export async function deleteVendorProduct(
     method: 'DELETE',
     token,
   });
+}
+
+export type EnterpriseStatsResponse = {
+  enterprise?: { id: string; nom: string; type?: string };
+  orders?: unknown;
+  revenue?: unknown;
+  engagement?: VendorEngagementInput;
+  [key: string]: unknown;
+};
+
+/**
+ * Récupère les stats du commerce courant (vues/clics/top produits/etc.).
+ * Rétrocompatible : `engagement` peut être absent tant que la migration SQL n'est pas appliquée.
+ */
+export async function fetchMyEnterpriseStats(
+  token: string,
+  enterpriseId: string,
+): Promise<EnterpriseStatsResponse> {
+  const data = await apiFetch<EnterpriseStatsResponse>(
+    `/api/enterprises/${enterpriseId}/stats`,
+    { method: 'GET', token },
+  );
+  return data ?? {};
 }
 
 export async function fetchArticleCategories(token: string, enterpriseId: string): Promise<ArticleCategory[]> {

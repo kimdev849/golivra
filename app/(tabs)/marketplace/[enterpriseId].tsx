@@ -1,6 +1,6 @@
 import { useNavigation } from '@react-navigation/native';
 import { useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import {
@@ -26,7 +26,12 @@ import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import type { EnterprisePublic, ProductPublic } from '@/lib/catalog';
-import { fetchEnterpriseById, fetchProductsForEnterprise } from '@/lib/catalog';
+import {
+  fetchEnterpriseById,
+  fetchProductsForEnterprise,
+  trackEnterpriseView,
+  trackProductClick,
+} from '@/lib/catalog';
 import { peekEnterpriseById, peekProductsForEnterprise } from '@/lib/client-data';
 import { addProductToCartPrompt } from '@/lib/cart-local';
 import { getEffectiveUnitPrice } from '@/lib/product-promo';
@@ -149,6 +154,7 @@ export default function EnterpriseDetailScreen() {
     if (!enterprise) return;
     const prix = getEffectiveUnitPrice(p);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    trackProductClick(enterprise.id, p.id);
     addProductToCartPrompt({
       enterpriseId: enterprise.id,
       enterpriseNom: enterprise.nom ?? 'Commerce',
@@ -160,6 +166,17 @@ export default function EnterpriseDetailScreen() {
       onDone: () => {},
     });
   };
+
+  const viewTrackedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!enterprise || products.length === 0) return;
+    if (viewTrackedFor.current === enterprise.id) return;
+    viewTrackedFor.current = enterprise.id;
+    trackEnterpriseView(
+      enterprise.id,
+      products.map((p) => p.id),
+    );
+  }, [enterprise, products]);
 
   if (!id) {
     return (

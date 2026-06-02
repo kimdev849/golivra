@@ -18,13 +18,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BiometricLockToggle } from '@/components/biometric-lock-toggle';
+import { DeleteAccountSection } from '@/components/delete-account-section';
+import { InlineFormError } from '@/components/inline-form-error';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { pickVendorImageAsset } from '@/components/vendor-form-shared';
 import { apiFetch } from '@/lib/api';
 import { getSessionToken } from '@/lib/auth';
 import { resolveRemoteImageUrl } from '@/lib/images';
 import { formatCgPhone, toCgE164 } from '@/lib/phone';
+import { isMerchantRole } from '@/lib/roles';
 import { uploadImageBase64 } from '@/lib/uploads';
+import { validatePassword, validatePasswordConfirmation, validatePersonName, validatePhoneCg } from '@/lib/form-validation';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -32,6 +36,7 @@ type Me = {
   id: string;
   nom: string | null;
   telephone: string;
+  role?: string | null;
   image_url?: string | null;
   imageUrl?: string | null;
   cree_le?: string | null;
@@ -44,6 +49,8 @@ export default function AccountSettingsScreen() {
   const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(true);
+  const [role, setRole] = useState<string | null>(null);
+  const isMerchant = isMerchantRole(role);
   const [nom, setNom] = useState('');
   const [phoneDisplay, setPhoneDisplay] = useState(() => formatCgPhone(''));
   const [currentPassword, setCurrentPassword] = useState('');
@@ -61,6 +68,7 @@ export default function AccountSettingsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [profileOk, setProfileOk] = useState<string | null>(null);
   const [passwordOk, setPasswordOk] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
 
   const load = useCallback(async () => {
     setError(null);
@@ -71,6 +79,7 @@ export default function AccountSettingsScreen() {
       const token = await getSessionToken();
       if (!token) throw new Error('Session expirée.');
       const data = await apiFetch<Me>('/api/auth/me', { method: 'GET', token });
+      setRole(data.role ?? null);
       setNom(data.nom?.trim() ?? '');
       setPhoneDisplay(formatCgPhone(data.telephone ?? ''));
       setAvatarUri(resolveRemoteImageUrl(data.imageUrl ?? data.image_url));
@@ -119,13 +128,25 @@ export default function AccountSettingsScreen() {
   const saveProfile = async () => {
     setError(null);
     setProfileOk(null);
-    const trimmedNom = nom.trim();
-    if (!trimmedNom) {
-      setError('Indiquez votre nom.');
+    setFieldErrors({});
+    const next: Record<string, string | null> = {};
+    const e1 = validatePersonName(nom);
+    if (!e1.ok) {
+      next.nom = e1.message;
+      setFieldErrors(next);
+      return;
+    }
+    const cleanedNom = e1.value;
+    setNom(cleanedNom);
+    const e2 = validatePhoneCg(phoneDisplay);
+    if (!e2.ok) {
+      next.phone = e2.message;
+      setFieldErrors(next);
       return;
     }
     if (!phoneE164) {
-      setError('Numéro de téléphone invalide.');
+      next.phone = 'Numéro de téléphone invalide.';
+      setFieldErrors(next);
       return;
     }
 
@@ -136,7 +157,7 @@ export default function AccountSettingsScreen() {
       await apiFetch<Me>('/api/auth/me', {
         method: 'PATCH',
         token,
-        jsonBody: { nom: trimmedNom, telephone: phoneE164 },
+        jsonBody: { nom: cleanedNom, telephone: phoneE164 },
       });
       setError(null);
       setProfileOk('Informations enregistrées.');
@@ -150,16 +171,19 @@ export default function AccountSettingsScreen() {
   const savePassword = async () => {
     setError(null);
     setPasswordOk(null);
+    setFieldErrors({});
     if (!currentPassword) {
-      setError('Saisissez votre mot de passe actuel.');
+      setFieldErrors({ currentPassword: 'Saisissez votre mot de passe actuel.' });
       return;
     }
-    if (!newPassword || newPassword.length < 6) {
-      setError('Le nouveau mot de passe doit contenir au moins 6 caractères.');
+    const e1 = validatePassword(newPassword);
+    if (!e1.ok) {
+      setFieldErrors({ newPassword: e1.message });
       return;
     }
-    if (newPassword !== confirmPassword) {
-      setError('La confirmation ne correspond pas au nouveau mot de passe.');
+    const e2 = validatePasswordConfirmation(confirmPassword, newPassword);
+    if (!e2.ok) {
+      setFieldErrors({ confirmPassword: e2.message });
       return;
     }
 
@@ -205,7 +229,7 @@ export default function AccountSettingsScreen() {
             <ChevronLeft size={26} color={isDark ? colors.primaryBright : colors.primaryDeep} strokeWidth={LUCIDE_STROKE} />
           </Pressable>
           <ThemedText type="subtitle" style={[styles.headerTitle, { color: colors.text }]}>
-            Connexion & sécurité
+            {isMerchant ? 'Connexion & sécurité' : 'Connexion & sécurité'}
           </ThemedText>
           <View style={styles.headerSpacer} />
         </View>
@@ -222,10 +246,6 @@ export default function AccountSettingsScreen() {
             </View>
           ) : (
             <>
-              <ThemedText style={[styles.muted, { color: colors.textMuted, marginBottom: 12 }]}>
-                Compte personnel de connexion — pour le nom, la photo et l’adresse affichés aux clients, utilisez
-                « Informations restaurant / boutique » dans l’onglet Plus.
-              </ThemedText>
               {error ? (
                 <View style={[styles.bannerErr, { backgroundColor: colors.errorSoft, borderColor: colors.border }]}>
                   <ThemedText style={[styles.bannerErrText, { color: colors.error }]}>{error}</ThemedText>
@@ -242,79 +262,85 @@ export default function AccountSettingsScreen() {
                 </View>
               ) : null}
 
-              <ThemedText style={[styles.sectionHeader, { color: colors.textMuted }]}>Photo de profil</ThemedText>
-              <View style={styles.avatarBlock}>
-                <Pressable style={[styles.avatarCircle, { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong }]} onPress={() => void pickPhoto()}>
-                  {avatarUri ? (
-                    <Image source={{ uri: avatarUri }} style={styles.avatarImg} contentFit="cover" />
-                  ) : (
-                    <User size={32} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-                  )}
-                  <View style={[styles.avatarCam, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <Camera size={16} color={colors.textSecondary} strokeWidth={LUCIDE_STROKE} />
+              {!isMerchant ? (
+                <>
+                  <ThemedText style={[styles.sectionHeader, { color: colors.textMuted }]}>Photo de profil</ThemedText>
+                  <View style={styles.avatarBlock}>
+                    <Pressable style={[styles.avatarCircle, { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong }]} onPress={() => void pickPhoto()}>
+                      {avatarUri ? (
+                        <Image source={{ uri: avatarUri }} style={styles.avatarImg} contentFit="cover" />
+                      ) : (
+                        <User size={32} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+                      )}
+                      <View style={[styles.avatarCam, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                        <Camera size={16} color={colors.textSecondary} strokeWidth={LUCIDE_STROKE} />
+                      </View>
+                    </Pressable>
+                    {avatarDataUrl ? (
+                      <Pressable
+                        style={[styles.photoSaveBtn, { backgroundColor: colors.primary }, savingPhoto && styles.btnDisabled]}
+                        onPress={() => void savePhoto()}
+                        disabled={savingPhoto}>
+                        {savingPhoto ? (
+                          <ActivityIndicator color="#FFF" size="small" />
+                        ) : (
+                          <ThemedText style={styles.photoSaveTxt}>Enregistrer la photo</ThemedText>
+                        )}
+                      </Pressable>
+                    ) : null}
                   </View>
-                </Pressable>
-                {avatarDataUrl ? (
+
+                  <ThemedText style={[styles.sectionHeader, { color: colors.textMuted }]}>Informations personnelles</ThemedText>
+                  <View style={[styles.groupCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <View style={styles.cell}>
+                      <View style={[styles.cellIcon, { backgroundColor: colors.primarySoft }]}>
+                        <User size={18} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+                      </View>
+                      <View style={styles.cellBody}>
+                        <ThemedText style={[styles.cellLabel, { color: colors.textMuted }]}>Nom</ThemedText>
+                        <TextInput
+                          style={[styles.cellInput, { color: colors.text }]}
+                          value={nom}
+                          onChangeText={setNom}
+                          placeholder="Votre nom"
+                          placeholderTextColor={colors.placeholder}
+                          autoCapitalize="words"
+                        />
+                        <InlineFormError message={fieldErrors.nom} colors={colors} />
+                      </View>
+                    </View>
+                    <View style={[styles.insetSep, { backgroundColor: colors.border }]} />
+                    <View style={styles.cell}>
+                      <View style={[styles.cellIcon, { backgroundColor: colors.primarySoft }]}>
+                        <Smartphone size={18} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+                      </View>
+                      <View style={styles.cellBody}>
+                        <ThemedText style={[styles.cellLabel, { color: colors.textMuted }]}>Téléphone</ThemedText>
+                        <TextInput
+                          style={[styles.cellInput, { color: colors.text }]}
+                          value={phoneDisplay}
+                          onChangeText={(t) => setPhoneDisplay(formatCgPhone(t))}
+                          placeholder="+242 …"
+                          placeholderTextColor={colors.placeholder}
+                          keyboardType="phone-pad"
+                        />
+                        <InlineFormError message={fieldErrors.phone} colors={colors} />
+                      </View>
+                    </View>
+                  </View>
+
                   <Pressable
-                    style={[styles.photoSaveBtn, { backgroundColor: colors.primary }, savingPhoto && styles.btnDisabled]}
-                    onPress={() => void savePhoto()}
-                    disabled={savingPhoto}>
-                    {savingPhoto ? (
-                      <ActivityIndicator color="#FFF" size="small" />
+                    style={[styles.primaryBtn, { backgroundColor: colors.primary }, savingProfile && styles.btnDisabled]}
+                    onPress={() => void saveProfile()}
+                    disabled={savingProfile}>
+                    {savingProfile ? (
+                      <ActivityIndicator color="#FFFFFF" />
                     ) : (
-                      <ThemedText style={styles.photoSaveTxt}>Enregistrer la photo</ThemedText>
+                      <ThemedText style={styles.primaryBtnText}>Enregistrer</ThemedText>
                     )}
                   </Pressable>
-                ) : null}
-              </View>
-
-              <ThemedText style={[styles.sectionHeader, { color: colors.textMuted }]}>Informations personnelles</ThemedText>
-              <View style={[styles.groupCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <View style={styles.cell}>
-                  <View style={[styles.cellIcon, { backgroundColor: colors.primarySoft }]}>
-                    <User size={18} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-                  </View>
-                  <View style={styles.cellBody}>
-                    <ThemedText style={[styles.cellLabel, { color: colors.textMuted }]}>Nom</ThemedText>
-                    <TextInput
-                      style={[styles.cellInput, { color: colors.text }]}
-                      value={nom}
-                      onChangeText={setNom}
-                      placeholder="Votre nom"
-                      placeholderTextColor={colors.placeholder}
-                      autoCapitalize="words"
-                    />
-                  </View>
-                </View>
-                <View style={[styles.insetSep, { backgroundColor: colors.border }]} />
-                <View style={styles.cell}>
-                  <View style={[styles.cellIcon, { backgroundColor: colors.primarySoft }]}>
-                    <Smartphone size={18} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-                  </View>
-                  <View style={styles.cellBody}>
-                    <ThemedText style={[styles.cellLabel, { color: colors.textMuted }]}>Téléphone</ThemedText>
-                    <TextInput
-                      style={[styles.cellInput, { color: colors.text }]}
-                      value={phoneDisplay}
-                      onChangeText={(t) => setPhoneDisplay(formatCgPhone(t))}
-                      placeholder="+242 …"
-                      placeholderTextColor={colors.placeholder}
-                      keyboardType="phone-pad"
-                    />
-                  </View>
-                </View>
-              </View>
-
-              <Pressable
-                style={[styles.primaryBtn, { backgroundColor: colors.primary }, savingProfile && styles.btnDisabled]}
-                onPress={() => void saveProfile()}
-                disabled={savingProfile}>
-                {savingProfile ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <ThemedText style={styles.primaryBtnText}>Enregistrer</ThemedText>
-                )}
-              </Pressable>
+                </>
+              ) : null}
 
               <ThemedText style={[styles.sectionHeader, { color: colors.textMuted }, styles.sectionSpaced]}>Sécurité</ThemedText>
               <BiometricLockToggle
@@ -349,6 +375,7 @@ export default function AccountSettingsScreen() {
                         )}
                       </Pressable>
                     </View>
+                    <InlineFormError message={fieldErrors.currentPassword} colors={colors} />
                   </View>
                 </View>
                 <View style={[styles.insetSep, { backgroundColor: colors.border }]} />
@@ -375,6 +402,7 @@ export default function AccountSettingsScreen() {
                         )}
                       </Pressable>
                     </View>
+                    <InlineFormError message={fieldErrors.newPassword} colors={colors} />
                   </View>
                 </View>
                 <View style={[styles.insetSep, { backgroundColor: colors.border }]} />
@@ -401,6 +429,7 @@ export default function AccountSettingsScreen() {
                         )}
                       </Pressable>
                     </View>
+                    <InlineFormError message={fieldErrors.confirmPassword} colors={colors} />
                   </View>
                 </View>
               </View>
@@ -415,6 +444,8 @@ export default function AccountSettingsScreen() {
                   <ThemedText style={[styles.secondaryBtnText, { color: isDark ? colors.primaryBright : colors.primaryDeep }]}>Mettre à jour le mot de passe</ThemedText>
                 )}
               </Pressable>
+
+              <DeleteAccountSection />
             </>
           )}
         </ScrollView>

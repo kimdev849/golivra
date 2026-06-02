@@ -20,6 +20,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { resetPassword } from '@/lib/auth';
 import { requestOtp } from '@/lib/otp';
 import { formatCgPhone, toCgE164 } from '@/lib/phone';
+import { validateOtp, validatePassword, validatePasswordConfirmation, validatePhoneCg } from '@/lib/form-validation';
 
 type Step = 'phone' | 'otp' | 'done';
 
@@ -44,6 +45,11 @@ export default function ForgotPasswordScreen() {
 
   const handleRequestOtp = async () => {
     setError(null);
+    const e = validatePhoneCg(phone);
+    if (!e.ok) {
+      setError(e.message);
+      return;
+    }
     if (!phoneE164) {
       setError('Numéro invalide.');
       return;
@@ -66,16 +72,19 @@ export default function ForgotPasswordScreen() {
       setError('Numéro invalide.');
       return;
     }
-    if (!otpCode.trim()) {
-      setError('Saisissez le code reçu par SMS.');
+    const e1 = validateOtp(otpCode);
+    if (!e1.ok) {
+      setError(e1.message);
       return;
     }
-    if (newPassword.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caractères.');
+    const e2 = validatePassword(newPassword);
+    if (!e2.ok) {
+      setError(e2.message);
       return;
     }
-    if (newPassword !== confirmPassword) {
-      setError('Les mots de passe ne correspondent pas.');
+    const e3 = validatePasswordConfirmation(confirmPassword, newPassword);
+    if (!e3.ok) {
+      setError(e3.message);
       return;
     }
     setLoading(true);

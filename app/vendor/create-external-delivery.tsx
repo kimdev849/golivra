@@ -21,10 +21,11 @@ import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
 import { getSessionToken } from '@/lib/auth';
-import { isDeliveryAddressComplete, snapshotFromFields } from '@/lib/format-address';
+import { deliveryAddressError, snapshotFromFields } from '@/lib/format-address';
 import { formatCgPhone } from '@/lib/phone';
 import { createVendorExternalDelivery } from '@/lib/vendor-api';
 import { VENDOR_HREF } from '@/lib/vendor-nav';
+import { validatePersonName, validatePhoneCg } from '@/lib/form-validation';
 
 const emptyAddr = (): DeliveryAddressFormValue => ({
   quartier: '',
@@ -55,16 +56,19 @@ export default function VendorCreateDirectDeliveryScreen() {
     }
     const nom = clientNom.trim();
     const tel = formatCgPhone(clientPhone);
-    if (!nom) {
-      showError('Client manquant', 'Indiquez le nom du destinataire.');
+    const e1 = validatePersonName(nom);
+    if (!e1.ok) {
+      showError('Nom du destinataire invalide', e1.message);
       return;
     }
-    if (!tel) {
-      showError('Téléphone invalide', 'Indiquez un numéro valide (+242 …).');
+    const e2 = validatePhoneCg(clientPhone);
+    if (!e2.ok || !tel) {
+      showError('Téléphone invalide', e2.ok ? 'Indiquez un numéro valide (+242 …).' : e2.message);
       return;
     }
-    if (!isDeliveryAddressComplete(address)) {
-      showError('Adresse incomplète', 'Quartier et adresse détaillée sont obligatoires.');
+    const e3 = deliveryAddressError(address);
+    if (e3) {
+      showError('Adresse invalide', e3);
       return;
     }
 
@@ -80,13 +84,11 @@ export default function VendorCreateDirectDeliveryScreen() {
         adresse: snapshotFromFields(address),
         note: description.trim() || undefined,
       });
+      router.replace(VENDOR_HREF.deliveriesTab);
       showSuccess(
         'Livraison créée !',
         'Un livreur GoLivra sera assigné automatiquement. Suivez le statut dans l’onglet Livraisons.',
-        {
-          primaryLabel: 'Voir mes livraisons',
-          onPrimary: () => router.replace(VENDOR_HREF.deliveriesTab),
-        },
+        { primaryLabel: 'OK' },
       );
     } catch (e) {
       showError('Création impossible', e instanceof Error ? e.message : 'Réessayez plus tard.');

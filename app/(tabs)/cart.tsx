@@ -37,7 +37,7 @@ import {
   type CartState,
 } from '@/lib/cart-local';
 import { fetchUserAddresses } from '@/lib/addresses';
-import { formatDeliveryAddressText, isDeliveryAddressComplete, snapshotFromFields } from '@/lib/format-address';
+import { deliveryAddressError, formatDeliveryAddressText, snapshotFromFields } from '@/lib/format-address';
 import { formatFcfa } from '@/lib/format';
 import { CLIENT_PAYMENT_METHODS, type ClientPaymentMethodId } from '@/lib/payment-methods';
 import { resolveRemoteImageUrl } from '@/lib/images';
@@ -239,8 +239,9 @@ export default function CartScreen() {
   const submitOrder = async () => {
     if (!cart || cart.segments.length === 0) return;
     if (orderInFlight.current || submitting) return;
-    if (!isDeliveryAddressComplete(address)) {
-      showError('Adresse incomplète', 'Choisissez un arrondissement et décrivez où livrer.');
+    const addrErr = deliveryAddressError(address);
+    if (addrErr) {
+      showError('Adresse invalide', addrErr);
       return;
     }
     const adressePayload = snapshotFromFields(address);
@@ -327,7 +328,7 @@ export default function CartScreen() {
   const bottomPad = Math.max(insets.bottom, 12) + TAB_BAR_CONTENT_PADDING_BOTTOM;
 
   const hasItems = cart && cart.segments.some((s) => s.lines.length > 0);
-  const addressOk = isDeliveryAddressComplete(address);
+  const addressOk = !deliveryAddressError(address);
 
   return (
     <ThemedView style={styles.screen}>

@@ -37,8 +37,8 @@ export default function VendorAddProductScreen() {
           onCancel={() => router.back()}
           onSaved={async (created) => {
             setProducts((prev) => [...prev, created]);
-            await refresh();
             router.replace(VENDOR_HREF.productsTab);
+            void refresh();
           }}
         />
       </ThemedView>
@@ -56,8 +56,8 @@ export default function VendorAddProductScreen() {
           onCancel={() => router.back()}
           onSaved={async (created) => {
             setProducts((prev) => [...prev, created]);
-            await refresh();
             router.replace(VENDOR_HREF.productsTab);
+            void refresh();
           }}
         />
       </View>

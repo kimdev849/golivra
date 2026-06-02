@@ -61,7 +61,16 @@ export default function NotificationsScreen() {
   const handleMarkAllRead = async () => {
     const token = await getSessionToken();
     if (!token) return;
-    try { await markAllNotificationsRead(token); setItems((prev) => prev.map((x) => ({ ...x, est_lue: true }))); setUnreadCount(0); } catch { /* ignore */ }
+    try {
+      await markAllNotificationsRead(token);
+      setItems((prev) => prev.map((x) => ({ ...x, est_lue: true })));
+      setUnreadCount(0);
+      try {
+        const { loadExpoNotifications } = await import('@/lib/expo-notifications-module');
+        const Notifications = await loadExpoNotifications();
+        if (Notifications) await Notifications.setBadgeCountAsync(0);
+      } catch { /* ignore */ }
+    } catch { /* ignore */ }
   };
 
   return (

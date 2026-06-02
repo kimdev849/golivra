@@ -88,11 +88,11 @@ export default function SettingsScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[localStyles.scroll, { paddingBottom: bottomPad }]}>
-        <ThemedText type="muted" style={localStyles.intro}>
-          Apparence et notifications. Le mode sombre utilise un fond noir profond et des accents vert
-          lumineux (style premium).
-          {saving ? ' Enregistrement…' : ''}
-        </ThemedText>
+        {saving ? (
+          <ThemedText type="muted" style={localStyles.intro}>
+            Enregistrement…
+          </ThemedText>
+        ) : null}
 
         <ThemedText style={localStyles.sectionLabel}>Apparence</ThemedText>
         <View style={localStyles.menuCard}>

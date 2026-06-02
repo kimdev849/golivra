@@ -10,7 +10,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState } from 'react';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { COURIER_TAB_BAR_PADDING_BOTTOM } from '@/constants/courier-layout';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useCourier } from '@/contexts/courier-context';
@@ -40,7 +39,7 @@ export default function CourierProfileScreen() {
   };
 
   return (
-    <ThemedView style={styles.screen} lightColor={palette.bg} darkColor={palette.bg}>
+    <View style={[styles.screen, { backgroundColor: palette.bg }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scroll, { paddingTop: Math.max(insets.top, 12), paddingBottom: bottom }]}>
@@ -103,7 +102,7 @@ export default function CourierProfileScreen() {
         <AppLogoutButton clearCart={false} />
         </AppContentWidth>
       </ScrollView>
-    </ThemedView>
+    </View>
   );
 }
 

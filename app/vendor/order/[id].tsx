@@ -102,10 +102,10 @@ export default function VendorOrderDetailScreen() {
     setActing(true);
     try {
       await updateVendorOrderStatus(token, o.id, statut, o.sous_commande_id, raisonRefus);
-      await refresh();
       const updated = await fetchVendorOrder(token, o.id);
       setO(updated);
       showSuccess('C’est enregistré', msg);
+      void refresh();
     } catch (e) {
       showError('Mise à jour impossible', e instanceof Error ? e.message : undefined);
     } finally {

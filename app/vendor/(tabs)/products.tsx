@@ -1,7 +1,8 @@
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { VendorAddProductFab } from '@/components/vendor-add-product-fab';
@@ -15,16 +16,23 @@ import { useAppColors } from '@/hooks/use-app-colors';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
 import { getSessionToken } from '@/lib/auth';
 import { formatFcfa } from '@/lib/format';
+import { vendorStockLabel } from '@/lib/product-stock';
 import { resolveRemoteImageUrl } from '@/lib/images';
-import { updateVendorProduct } from '@/lib/vendor-api';
+import { deleteVendorProduct, updateVendorProduct } from '@/lib/vendor-api';
 import { hrefVendorStock, VENDOR_HREF } from '@/lib/vendor-nav';
+
+function triggerHaptic() {
+  if (process.env.EXPO_OS === 'ios') {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }
+}
 
 export default function VendorProductsTabScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
-  const { showError, FeedbackOverlay } = useActionFeedback();
-  const { shop, products, setProducts } = useVendor();
+  const { showError, showSuccess, FeedbackOverlay } = useActionFeedback();
+  const { shop, products, setProducts, refresh } = useVendor();
   const { palette, labels, commerceType } = useVendorTheme();
   const [tab, setTab] = useState<'all' | 'on' | 'off'>('all');
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -58,10 +66,43 @@ export default function VendorProductsTabScreen() {
       setProducts((p) => p.map((x) => (x.id === id ? updated : x)));
     } catch (e) {
       setProducts(prev);
-      Alert.alert('Erreur', e instanceof Error ? e.message : 'Mise à jour impossible.');
+      showError('Erreur', e instanceof Error ? e.message : 'Mise à jour impossible.');
     } finally {
       setBusyId(null);
     }
+  };
+
+  const confirmDelete = (id: string, nom: string) => {
+    if (!shop?.id) return;
+    triggerHaptic();
+    Alert.alert(
+      'Supprimer',
+      `Supprimer définitivement « ${nom} » ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            const prev = products;
+            setProducts((p) => p.filter((x) => x.id !== id));
+            setBusyId(id);
+            try {
+              const token = await getSessionToken();
+              if (!token) throw new Error('Session expirée');
+              await deleteVendorProduct(token, shop.id, id);
+              void refresh();
+              showSuccess('Produit supprimé', `« ${nom} » a été retiré du catalogue.`);
+            } catch (e) {
+              setProducts(prev);
+              showError('Erreur', e instanceof Error ? e.message : 'Suppression impossible.');
+            } finally {
+              setBusyId(null);
+            }
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -101,6 +142,8 @@ export default function VendorProductsTabScreen() {
                   key={p.id}
                   style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}
                   onPress={() => router.push(hrefVendorStock(p.id))}
+                  onLongPress={() => confirmDelete(p.id, p.nom)}
+                  delayLongPress={450}
                   android_ripple={{ color: colors.primarySoft }}>
                   {img ? (
                     <Image source={{ uri: img }} style={styles.thumb} contentFit="cover" />
@@ -113,7 +156,7 @@ export default function VendorProductsTabScreen() {
                     </ThemedText>
                     <ThemedText style={[styles.meta, { color: colors.textMuted }]}>
                       {formatFcfa(p.prix)} · {commerceType === 'restaurant' ? 'Dispo.' : 'Stock'}:{' '}
-                      {commerceType === 'restaurant' ? (p.enLigne ? 'Oui' : 'Non') : p.stock}
+                      {commerceType === 'restaurant' ? (p.enLigne ? 'Oui' : 'Non') : vendorStockLabel(p, { enterpriseType: 'boutique' })}
                     </ThemedText>
                   </View>
                   {busyId === p.id ? (

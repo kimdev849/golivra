@@ -16,6 +16,7 @@ type VendorStore = {
   pendingModeration: boolean;
   refresh: () => Promise<void>;
   setProducts: (updater: VendorProduct[] | ((prev: VendorProduct[]) => VendorProduct[])) => void;
+  setOrders: (updater: VendorOrder[] | ((prev: VendorOrder[]) => VendorOrder[])) => void;
 };
 
 function mapEnterpriseToShop(e: EnterpriseCreated): VendorShop {
@@ -83,6 +84,11 @@ export const useVendor = create<VendorStore>((set) => ({
   setProducts: (updater) => {
     set((state) => ({
       products: typeof updater === 'function' ? updater(state.products) : updater,
+    }));
+  },
+  setOrders: (updater) => {
+    set((state) => ({
+      orders: typeof updater === 'function' ? updater(state.orders) : updater,
     }));
   },
 }));

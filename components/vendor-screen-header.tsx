@@ -27,21 +27,22 @@ export function VendorScreenHeader({ title, subtitle, right, onBack }: Props) {
       style={[
         styles.row,
         {
-          paddingTop: Math.max(insets.top, 10),
+          paddingTop: Math.max(insets.top, 10) + 12,
+          paddingBottom: 14,
           borderBottomColor: colors.border,
           backgroundColor: colors.surface,
         },
       ]}>
       <Pressable
-        style={[styles.backBtn, { backgroundColor: colors.primarySoft, borderColor: colors.border }]}
+        style={[styles.backBtn, { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong }]}
         onPress={() => {
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           (onBack ?? (() => router.back()))();
         }}
-        hitSlop={10}
+        hitSlop={12}
         accessibilityRole="button"
         accessibilityLabel="Retour">
-        <ChevronLeft size={22} color={palette.primaryDeep} strokeWidth={LUCIDE_STROKE} />
+        <ChevronLeft size={26} color={palette.primaryDeep} strokeWidth={LUCIDE_STROKE} />
       </Pressable>
       <View style={styles.titleWrap}>
         <ThemedText type="defaultSemiBold" style={[styles.title, { color: colors.text }]} numberOfLines={1}>
@@ -62,23 +63,22 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingBottom: 12,
+    paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    minHeight: 52,
-    gap: 10,
+    minHeight: 60,
+    gap: 12,
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
   },
   backSpacer: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
   },
   titleWrap: {
     flex: 1,

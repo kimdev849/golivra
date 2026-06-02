@@ -9,6 +9,20 @@ import { ThemedView } from '@/components/themed-view';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
+type Role = {
+  href: '/signup/client' | '/signup/boutique' | '/signup/restaurant';
+  icon: 'person' | 'storefront' | 'restaurant';
+  title: string;
+  subtitle: string;
+  iconBg: 'primary' | 'accent';
+};
+
+const ROLES: Role[] = [
+  { href: '/signup/client', icon: 'person', title: 'Client', subtitle: 'Je commande, on me livre.', iconBg: 'primary' },
+  { href: '/signup/boutique', icon: 'storefront', title: 'Boutique', subtitle: 'Je vends mes produits en ligne.', iconBg: 'primary' },
+  { href: '/signup/restaurant', icon: 'restaurant', title: 'Restaurant', subtitle: 'Je sers mes plats et GoLivra les livre.', iconBg: 'primary' },
+];
+
 export default function SignupChooseScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -20,7 +34,7 @@ export default function SignupChooseScreen() {
   return (
     <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.heroGlowTop, { backgroundColor: colors.heroGlow }]} />
-      <View style={[styles.heroGlowBottom, { backgroundColor: colors.warningSoft }]} />
+      <View style={[styles.heroGlowBottom, { backgroundColor: colors.heroGlow }]} />
       <View style={[styles.page, { paddingBottom: Math.max(insets.bottom + 12, 18) }]}>
         <View style={styles.topRow}>
           <Pressable style={styles.backButton} onPress={() => router.replace('/auth')}>
@@ -36,44 +50,53 @@ export default function SignupChooseScreen() {
           </View>
 
           <View style={[styles.choices, { width: cardWidth }]}>
-            <Pressable
-              style={({ pressed }) => [styles.choiceCard, { borderColor: colors.border, backgroundColor: colors.surface }, pressed ? styles.pressed : undefined]}
-              onPress={() => router.push('/signup/client')}>
-              <View style={[styles.choiceIconWrap, { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong }]}>
-                <MaterialIcons name="person" size={22} color={colors.primary} />
-              </View>
-              <View style={styles.choiceText}>
-                <ThemedText style={[styles.choiceTitle, { color: isDark ? colors.primaryBright : colors.primaryDeep }]}>Client</ThemedText>
-                <ThemedText style={[styles.choiceSubtitle, { color: colors.textMuted }]}>Commander et se faire livrer facilement.</ThemedText>
-              </View>
-              <MaterialIcons name="chevron-right" size={22} color={colors.textMuted} />
-            </Pressable>
-
-            <Pressable
-              style={({ pressed }) => [styles.choiceCard, { borderColor: colors.border, backgroundColor: colors.surface }, pressed ? styles.pressed : undefined]}
-              onPress={() => router.push('/signup/boutique')}>
-              <View style={[styles.choiceIconWrap, { backgroundColor: colors.warningSoft, borderColor: colors.border }]}>
-                <MaterialIcons name="storefront" size={22} color={colors.primary} />
-              </View>
-              <View style={styles.choiceText}>
-                <ThemedText style={[styles.choiceTitle, { color: isDark ? colors.primaryBright : colors.primaryDeep }]}>Boutique</ThemedText>
-                <ThemedText style={[styles.choiceSubtitle, { color: colors.textMuted }]}>Vendre vos produits et toucher plus de clients.</ThemedText>
-              </View>
-              <MaterialIcons name="chevron-right" size={22} color={colors.textMuted} />
-            </Pressable>
-
-            <Pressable
-              style={({ pressed }) => [styles.choiceCard, { borderColor: colors.border, backgroundColor: colors.surface }, pressed ? styles.pressed : undefined]}
-              onPress={() => router.push('/signup/restaurant')}>
-              <View style={[styles.choiceIconWrap, { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong }]}>
-                <MaterialIcons name="restaurant" size={22} color={colors.primary} />
-              </View>
-              <View style={styles.choiceText}>
-                <ThemedText style={[styles.choiceTitle, { color: isDark ? colors.primaryBright : colors.primaryDeep }]}>Restaurant</ThemedText>
-                <ThemedText style={[styles.choiceSubtitle, { color: colors.textMuted }]}>Développer vos ventes et gérer vos livraisons.</ThemedText>
-              </View>
-              <MaterialIcons name="chevron-right" size={22} color={colors.textMuted} />
-            </Pressable>
+            {ROLES.map((r) => {
+              const isAccent = r.iconBg === 'accent';
+              return (
+                <Pressable
+                  key={r.href}
+                  style={({ pressed }) => [
+                    styles.choiceCard,
+                    {
+                      borderColor: colors.border,
+                      backgroundColor: colors.surface,
+                    },
+                    pressed ? styles.pressed : undefined,
+                  ]}
+                  onPress={() => router.push(r.href)}>
+                  <View
+                    style={[
+                      styles.choiceIconWrap,
+                      isAccent
+                        ? { backgroundColor: colors.accentSoft, borderColor: colors.accent }
+                        : { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong },
+                    ]}>
+                    <MaterialIcons
+                      name={r.icon}
+                      size={22}
+                      color={isAccent ? colors.accentDeep : colors.primary}
+                    />
+                  </View>
+                  <View style={styles.choiceText}>
+                    <ThemedText
+                      style={[
+                        styles.choiceTitle,
+                        { color: isDark ? colors.primaryBright : colors.primaryDeep },
+                      ]}>
+                      {r.title}
+                    </ThemedText>
+                    <ThemedText style={[styles.choiceSubtitle, { color: colors.textMuted }]}>
+                      {r.subtitle}
+                    </ThemedText>
+                  </View>
+                  <MaterialIcons
+                    name="chevron-right"
+                    size={22}
+                    color={colors.textMuted}
+                  />
+                </Pressable>
+              );
+            })}
           </View>
 
           <ThemedView style={styles.footerInline} lightColor="transparent" darkColor="transparent">
@@ -106,7 +129,7 @@ const styles = StyleSheet.create({
     width: 520,
     height: 520,
     borderRadius: 320,
-    opacity: 0.35,
+    opacity: 0.5,
   },
   page: {
     flex: 1,
@@ -134,16 +157,27 @@ const styles = StyleSheet.create({
   description: { opacity: 0.75, textAlign: 'center', maxWidth: 360 },
   choices: { alignSelf: 'center', gap: 12, marginTop: 6, marginBottom: 0 },
   choiceCard: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 16,
     paddingHorizontal: 14,
     gap: 12,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderRadius: 22,
     boxShadow: '0px 14px 26px rgba(10,58,40,0.10)',
     elevation: 10,
   },
+  popularBadgeWrap: { position: 'absolute', top: -10, right: 12 },
+  popularBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  popularBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900', letterSpacing: 0.4 },
   choiceIconWrap: {
     width: 46,
     height: 46,

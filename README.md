@@ -412,7 +412,7 @@ client → paiement → GoLivra → commission → vendeur + livreur
 
 ## Méthodes :
 
-* cash
+
 * mobile money
 * wallet interne
 

@@ -12,12 +12,15 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as ImagePicker from 'expo-image-picker';
 
 import { CategoryPicker } from '@/components/category-picker';
+import { InlineFormError } from '@/components/inline-form-error';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { brandGradient3 } from '@/constants/app-palette';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -28,6 +31,7 @@ import { formatCgPhone, toCgE164 } from '@/lib/phone';
 import { uploadImageForSignup } from '@/lib/uploads';
 import { VENDOR_HREF } from '@/lib/vendor-nav';
 import { UX_ERRORS, friendlyErrorMessage } from '@/lib/ux-copy';
+import { validateAddress, validateCommerceName, validateDescription, validateOtp, validatePassword, validatePersonName, validatePhoneCg } from '@/lib/form-validation';
 
 type Profile = 'client' | 'vendeur';
 type CommerceKind = 'restaurant' | 'boutique';
@@ -46,7 +50,7 @@ function commerceCopy(kind: CommerceKind) {
   return {
     screenTitle: 'Votre boutique', lead: 'Renseignez une fiche simple et claire pour que les clients vous trouvent vite.',
     nameLabel: 'Nom de la boutique', namePlaceholder: 'Ex. : Mode & Co', phoneLabel: 'Téléphone de la boutique',
-    addressLabel: 'Adresse', addressPlaceholder: 'Quartier, rue, point de repère…', descriptionPlaceholder: 'Univers, produits phares, services…',
+    addressLabel: 'Adresse (optionnelle)', addressPlaceholder: 'Laissez vide pour une boutique en ligne', descriptionPlaceholder: 'Univers, produits phares, services…',
     detailsLabel: 'Catégorie de la boutique', detailsPlaceholder: 'Choisissez une catégorie', imageLabel: 'Photo de la boutique (optionnel)',
   };
 }
@@ -88,6 +92,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
   const [testOtpCode, setTestOtpCode] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
   const formWidth = Math.min(width - 40, 460);
   const phoneE164 = toCgE164(phone);
 
@@ -117,15 +122,36 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
   const selectedCategory = categories.find((c) => c.id === businessCategoryId) ?? null;
 
   const validateAccountForOtp = (): string | null => {
-    if (profile === 'client' && !fullName.trim()) return 'Indiquez votre nom complet.';
-    if (!phoneE164) return 'Indiquez un numéro valide (+242 suivi de 9 chiffres).';
-    if (!password || password.length < 6) return 'Le mot de passe doit contenir au moins 6 caractères.';
+    const next: Record<string, string | null> = {};
+    if (profile === 'client') {
+      const e1 = validatePersonName(fullName);
+      if (!e1.ok) { next.fullName = e1.message; setFieldErrors(next); return e1.message; }
+    } else {
+      next.fullName = null;
+    }
+    const e2 = validatePhoneCg(phone);
+    if (!e2.ok) { next.phone = e2.message; setFieldErrors(next); return e2.message; }
+    if (!phoneE164) { next.phone = 'Numéro invalide.'; setFieldErrors(next); return 'Numéro invalide.'; }
+    next.phone = null;
+    const e3 = validatePassword(password);
+    if (!e3.ok) { next.password = e3.message; setFieldErrors(next); return e3.message; }
+    next.password = null;
     if (profile === 'vendeur' && !commerceKind) return 'Choisissez restaurant ou boutique.';
     if (profile === 'vendeur') {
-      if (!businessName.trim()) return 'Indiquez le nom de votre commerce.';
+      const e4 = validateCommerceName(businessName);
+      if (!e4.ok) { next.businessName = e4.message; setFieldErrors(next); return e4.message; }
+      next.businessName = null;
       if (!businessCategoryId) return 'Sélectionnez une catégorie.';
-      if (!businessAddress.trim()) return 'Indiquez la localisation.';
+      if (commerceKind === 'restaurant') {
+        const e5 = validateAddress(businessAddress, true);
+        if (!e5.ok) { next.businessAddress = e5.message; setFieldErrors(next); return e5.message; }
+      }
+      next.businessAddress = null;
+      const e6 = validateDescription(businessDescription, 500);
+      if (!e6.ok) { next.businessDescription = e6.message; setFieldErrors(next); return e6.message; }
+      next.businessDescription = null;
     }
+    setFieldErrors({});
     return null;
   };
 
@@ -163,7 +189,8 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
   const handleVerifyAndRegister = async () => {
     setError(null);
     if (!otpSent) { setError('Demandez d’abord le code par SMS.'); return; }
-    if (!otp.trim() || otp.trim().length < 4) { setError(UX_ERRORS.otp); return; }
+    const otpCheck = validateOtp(otp);
+    if (!otpCheck.ok) { setError(otpCheck.message); return; }
     const v = validateAccountForOtp();
     if (v) { setError(v); return; }
     setIsSubmitting(true);
@@ -250,6 +277,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
                   <View style={styles.inputBody}>
                     <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Nom complet</ThemedText>
                     <TextInput style={[styles.inputField, { color: colors.text }]} placeholder="Ex. : Jean Claude" placeholderTextColor={colors.placeholder} selectionColor={colors.primary} value={fullName} editable={!otpSent} onChangeText={setFullName} />
+                    <InlineFormError message={fieldErrors.fullName} colors={colors} />
                   </View>
                 </View>
               ) : null}
@@ -261,6 +289,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
                 <View style={styles.inputBody}>
                   <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Numéro de téléphone</ThemedText>
                   <TextInput style={[styles.inputField, { color: colors.text }]} placeholder="+242 06 XXX XX XX" keyboardType="phone-pad" placeholderTextColor={colors.placeholder} selectionColor={colors.primary} value={phone} editable={!otpSent} autoCapitalize="none" autoCorrect={false} onChangeText={(text) => setPhone(formatCgPhone(text))} />
+                  <InlineFormError message={fieldErrors.phone} colors={colors} />
                 </View>
               </View>
 
@@ -277,6 +306,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
                       <View style={styles.inputBody}>
                         <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>{commerceKind === 'restaurant' ? 'Nom du restaurant' : 'Nom du business'}</ThemedText>
                         <TextInput style={[styles.inputField, { color: colors.text }]} placeholder={c.namePlaceholder} placeholderTextColor={colors.placeholder} selectionColor={colors.primary} value={businessName} editable={!otpSent} onChangeText={setBusinessName} />
+                        <InlineFormError message={fieldErrors.businessName} colors={colors} />
                       </View>
                     </View>
 
@@ -302,6 +332,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
                       <View style={styles.inputBody}>
                         <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Description (optionnel)</ThemedText>
                         <TextInput style={[styles.inputField, { color: colors.text }]} placeholder={c.descriptionPlaceholder} placeholderTextColor={colors.placeholder} selectionColor={colors.primary} value={businessDescription} editable={!otpSent} onChangeText={setBusinessDescription} multiline />
+                        <InlineFormError message={fieldErrors.businessDescription} colors={colors} />
                       </View>
                     </View>
 
@@ -310,8 +341,11 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
                         <MaterialIcons name="place" size={18} color={colors.primary} />
                       </View>
                       <View style={styles.inputBody}>
-                        <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Localisation</ThemedText>
+                        <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>
+                          Localisation {commerceKind === 'boutique' ? '(optionnelle — e-commerce)' : ''}
+                        </ThemedText>
                         <TextInput style={[styles.inputField, { color: colors.text }]} placeholder={c.addressPlaceholder} placeholderTextColor={colors.placeholder} selectionColor={colors.primary} value={businessAddress} editable={!otpSent} onChangeText={setBusinessAddress} />
+                        <InlineFormError message={fieldErrors.businessAddress} colors={colors} />
                       </View>
                     </View>
 
@@ -341,6 +375,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
                 <View style={styles.inputBody}>
                   <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Mot de passe</ThemedText>
                   <TextInput style={[styles.inputField, { color: colors.text }]} placeholder="Minimum 6 caractères" secureTextEntry={!passwordVisible} placeholderTextColor={colors.placeholder} selectionColor={colors.primary} autoCapitalize="none" autoCorrect={false} textContentType="newPassword" value={password} editable={!otpSent} onChangeText={setPassword} />
+                  <InlineFormError message={fieldErrors.password} colors={colors} />
                 </View>
                 <Pressable style={styles.eyeButton} onPress={() => setPasswordVisible((v) => !v)} hitSlop={10}>
                   <MaterialIcons name={passwordVisible ? 'visibility-off' : 'visibility'} size={20} color={colors.textMuted} />
@@ -379,6 +414,12 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
                     </View>
                   </View>
                   <Pressable style={({ pressed }) => [styles.submitButton, { backgroundColor: colors.primary }, pressed ? styles.buttonPressed : undefined, isSubmitting ? styles.buttonDisabled : undefined]} disabled={!canVerifyOtp} onPress={handleVerifyAndRegister}>
+                    <LinearGradient
+                      colors={canVerifyOtp && !isSubmitting ? brandGradient3(colors) : [colors.primaryMuted, colors.primaryMuted]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={StyleSheet.absoluteFill}
+                    />
                     <ThemedText style={styles.submitButtonText}>{isSubmitting ? 'Création du compte…' : 'Valider et créer le compte'}</ThemedText>
                   </Pressable>
                   <Pressable style={({ pressed }) => [styles.secondaryButton, { backgroundColor: colors.primarySoft }, pressed ? styles.buttonPressed : undefined]} onPress={resetOtpFlow}>
@@ -387,6 +428,12 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
                 </>
               ) : (
                 <Pressable style={({ pressed }) => [styles.submitButton, { backgroundColor: colors.primary }, pressed ? styles.buttonPressed : undefined, isSubmitting ? styles.buttonDisabled : undefined, !canSendOtp ? styles.buttonDisabled : undefined]} disabled={!canSendOtp} onPress={handleSendOtp}>
+                  <LinearGradient
+                    colors={canSendOtp && !isSubmitting ? brandGradient3(colors) : [colors.primaryMuted, colors.primaryMuted]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
                   <ThemedText style={styles.submitButtonText}>{isSubmitting ? 'Envoi en cours…' : 'Recevoir le code par SMS'}</ThemedText>
                 </Pressable>
               )}
@@ -448,7 +495,7 @@ const styles = StyleSheet.create({
   sectionTitle: { marginTop: 10, fontSize: 14, fontWeight: '800', letterSpacing: 0.35, textTransform: 'uppercase' },
   buttonDisabled: { opacity: 0.65 },
   buttonPressed: { opacity: 0.88, transform: [{ scale: 0.995 }] },
-  submitButton: { marginTop: 10, borderRadius: 16, paddingVertical: 15, alignItems: 'center', elevation: 6 },
+  submitButton: { marginTop: 10, borderRadius: 16, paddingVertical: 15, alignItems: 'center', elevation: 6, overflow: 'hidden', shadowColor: '#0C4F36', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 14 },
   submitButtonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 16 },
   secondaryButton: { marginTop: 8, borderRadius: 16, paddingVertical: 14, alignItems: 'center' },
   secondaryButtonText: { fontWeight: '700', fontSize: 15 },

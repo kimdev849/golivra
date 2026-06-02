@@ -8,6 +8,8 @@ function courierFromApp(p: typeof AppPaletteLight) {
     primaryMuted: p.primaryMuted,
     primarySoft: p.primarySoft,
     accent: p.warning,
+    warning: p.warning,
+    warningSoft: p.warningSoft,
     bg: p.backgroundAlt,
     card: p.surface,
     surfaceElevated: p.surfaceElevated,

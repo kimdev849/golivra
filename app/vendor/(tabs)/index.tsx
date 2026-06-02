@@ -1,16 +1,18 @@
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronRight, Truck } from 'lucide-react-native';
+import { Bell, ChevronRight, Truck } from 'lucide-react-native';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { GOLIVRA_BRAND_SHADOW } from '@/constants/app-palette';
+import { LUCIDE_STROKE } from '@/constants/icons';
 import { VENDOR_TAB_BAR_PADDING_BOTTOM } from '@/constants/vendor-layout';
 import { useVendor } from '@/contexts/vendor-context';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useUnreadNotifications } from '@/hooks/use-unread-notifications';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
 import { formatFcfa } from '@/lib/format';
 import type { VendorPalette } from '@/lib/vendor-theme';
@@ -47,6 +49,7 @@ export default function VendorDashboardScreen() {
   const colorScheme = useColorScheme();
   const { shop, orders } = useVendor();
   const { palette, labels, commerceType } = useVendorTheme();
+  const { unreadCount } = useUnreadNotifications();
   const recent = orders.slice(0, 4);
   const bottom = Math.max(insets.bottom, 10) + VENDOR_TAB_BAR_PADDING_BOTTOM;
 
@@ -71,6 +74,18 @@ export default function VendorDashboardScreen() {
           <ThemedText type="title" style={[styles.greeting, { color: colors.text }]} numberOfLines={2}>
             Bonjour {shopName} 👋
           </ThemedText>
+          <View style={styles.topActions}>
+            <Pressable
+              style={[styles.notifBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              onPress={() => router.push(VENDOR_HREF.notifications)}
+              hitSlop={10}>
+              <Bell size={20} color={colors.primaryDeep} strokeWidth={LUCIDE_STROKE} />
+              {unreadCount > 0 ? (
+                <View style={[styles.notifBadge, { backgroundColor: colors.primary, borderColor: colors.surface }]}>
+                  <ThemedText style={styles.notifBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</ThemedText>
+                </View>
+              ) : null}
+            </Pressable>
             <View
               style={[
                 styles.onlinePill,
@@ -81,8 +96,9 @@ export default function VendorDashboardScreen() {
               ]}>
               <View style={[styles.onlineDot, { backgroundColor: isOnline ? colors.success : colors.textMuted }]} />
               <ThemedText style={[styles.onlineText, { color: isOnline ? colors.success : colors.textMuted }]}>
-              {isOnline ? 'En ligne' : 'Hors ligne'}
-            </ThemedText>
+                {isOnline ? 'En ligne' : 'Hors ligne'}
+              </ThemedText>
+            </View>
           </View>
         </View>
 
@@ -116,10 +132,10 @@ export default function VendorDashboardScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <ThemedText type="defaultSemiBold" style={[styles.deliveryTitle, { color: palette.primaryDeep }]}>
-              Gérer les livraisons
+              Vos livraisons en cours
             </ThemedText>
             <ThemedText style={[styles.deliverySub, { color: colors.textMuted }]}>
-              Livraisons internes + externes — un seul réseau GoLivra
+              Internes (commandes client) et externes (créées par vous). Livreur GoLivra assigné automatiquement.
             </ThemedText>
           </View>
           <ChevronRight size={22} color={palette.primary} />
@@ -203,7 +219,38 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 18,
   },
+  topActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   greeting: { flex: 1, fontSize: 22, fontWeight: '800', lineHeight: 28 },
+  notifBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+  },
+  notifBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+    lineHeight: 12,
+  },
   onlinePill: {
     flexDirection: 'row',
     alignItems: 'center',

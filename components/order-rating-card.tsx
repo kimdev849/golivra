@@ -7,6 +7,7 @@ import type { AppPalette } from '@/constants/app-palette';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { getSessionToken } from '@/lib/auth';
 import { submitEnterpriseReview } from '@/lib/reviews';
+import { validateDescription } from '@/lib/form-validation';
 
 type Props = {
   sousCommandeId: string;
@@ -97,11 +98,16 @@ export function OrderRatingCard({ sousCommandeId, merchantName, onRated }: Props
   const submit = async () => {
     if (note < 1 || submitting || done) return;
     setError(null);
+    const commentCheck = validateDescription(commentaire, 500);
+    if (!commentCheck.ok) {
+      setError(commentCheck.message);
+      return;
+    }
     setSubmitting(true);
     try {
       const token = await getSessionToken();
       if (!token) throw new Error('Session expirée.');
-      await submitEnterpriseReview(token, sousCommandeId, note, commentaire);
+      await submitEnterpriseReview(token, sousCommandeId, note, commentaire.trim());
       setDone(true);
       onRated();
     } catch (e) {

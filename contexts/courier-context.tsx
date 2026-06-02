@@ -28,6 +28,7 @@ type CourierStore = {
   error: string | null;
   refresh: () => Promise<void>;
   setDisponible: (value: boolean) => Promise<void>;
+  setMissions: (updater: CourierMission[] | ((prev: CourierMission[]) => CourierMission[])) => void;
 };
 
 /** Évite d’afficher plusieurs livraisons en double pour la même sous-commande. */
@@ -137,6 +138,11 @@ export const useCourier = create<CourierStore>((set, get) => ({
             livreur: { ...state.profile.livreur, est_disponible: value },
           }
         : state.profile,
+    }));
+  },
+  setMissions: (updater) => {
+    set((state) => ({
+      missions: typeof updater === 'function' ? updater(state.missions) : updater,
     }));
   },
 }));

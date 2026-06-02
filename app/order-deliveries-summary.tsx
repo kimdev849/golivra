@@ -120,7 +120,7 @@ export default function OrderDeliveriesSummaryScreen() {
         </View>
 
         <ThemedText style={[styles.hint, { color: colors.textMuted }]}>
-          Vous recevrez des notifications quand chaque commerce acceptera et expédiera sa partie.
+          Vous êtes informé en temps réel dès qu’un commerce accepte ou prépare votre commande.
         </ThemedText>
 
         <Pressable

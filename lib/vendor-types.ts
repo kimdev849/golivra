@@ -105,6 +105,24 @@ export type VendorStats = {
   produitsVendus: number;
   produitsTrend: string;
   topProduits: { nom: string; ventes: number }[];
+  engagement?: {
+    totalVues: number;
+    totalClics: number;
+    totalVentes: number;
+    tauxConversionPct: number;
+    topVus: { id: string; nom: string; vues: number }[];
+    topCliques: { id: string; nom: string; clics: number }[];
+  };
+};
+
+export type VendorEngagementInput = {
+  total_vues?: number;
+  total_clics?: number;
+  total_ventes?: number;
+  taux_conversion_pct?: number;
+  taux_achat_pct?: number;
+  top_vus?: { id?: string; produit_id?: string; nom?: string; vues?: number }[];
+  top_cliques?: { id?: string; produit_id?: string; nom?: string; clics?: number }[];
 };
 
 export function countsFromOrders(orders: VendorOrder[]) {
@@ -131,6 +149,7 @@ export function computeVendorStats(
   orders: VendorOrder[],
   products: VendorProduct[],
   periodDays = 7,
+  engagement?: VendorEngagementInput | null,
 ): VendorStats {
   const now = Date.now();
   const since = now - periodDays * 24 * 60 * 60 * 1000;
@@ -161,7 +180,7 @@ export function computeVendorStats(
   const lowStock = products.filter((p) => p.stock <= 5).length;
   void lowStock;
 
-  return {
+  const out: VendorStats = {
     revenus7j,
     revenusTrend: recent.length > 0 ? `${recent.length} cmd. (${periodLabel})` : `— (${periodLabel})`,
     commandes: recent.length,
@@ -170,4 +189,25 @@ export function computeVendorStats(
     produitsTrend: `${products.filter((p) => p.enLigne).length} en ligne`,
     topProduits,
   };
+
+  if (engagement) {
+    out.engagement = {
+      totalVues: engagement.total_vues ?? 0,
+      totalClics: engagement.total_clics ?? 0,
+      totalVentes: engagement.total_ventes ?? 0,
+      tauxConversionPct: engagement.taux_conversion_pct ?? engagement.taux_achat_pct ?? 0,
+      topVus: (engagement.top_vus ?? []).map((t) => ({
+        id: t.id ?? t.produit_id ?? '',
+        nom: t.nom ?? 'Produit',
+        vues: t.vues ?? 0,
+      })),
+      topCliques: (engagement.top_cliques ?? []).map((t) => ({
+        id: t.id ?? t.produit_id ?? '',
+        nom: t.nom ?? 'Produit',
+        clics: t.clics ?? 0,
+      })),
+    };
+  }
+
+  return out;
 }

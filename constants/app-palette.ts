@@ -1,5 +1,9 @@
 /**
- * Palette GoLivra — clair + sombre (inspiré Supabase : fond noir/gris, accents vert lumineux).
+ * Palette GoLivra — clair + sombre.
+ * Deux couleurs marque issues du logo :
+ *   - vert profond (`GOLIVRA_GREEN`) →identité principale
+ *   - jaune/orange chaud (`GOLIVRA_YELLOW`) →accent & call-to-action secondaire
+ * Les fonds clairs utilisent des neutres légèrement teintés vert pour rester cohérents.
  */
 
 export type ColorSchemeName = 'light' | 'dark';
@@ -22,6 +26,13 @@ export type AppPalette = {
   primarySoft: string;
   primaryMuted: string;
   onPrimary: string;
+  /** Jaune/orange du logo — utilisé pour accents, badges, gradients, CTA secondaires. */
+  accent: string;
+  accentBright: string;
+  accentDeep: string;
+  accentSoft: string;
+  accentMuted: string;
+  onAccent: string;
   success: string;
   successSoft: string;
   error: string;
@@ -39,9 +50,14 @@ export type AppPalette = {
   statusBar: 'light' | 'dark';
 };
 
-/** Vert marque GoLivra — unique référence pour toute l’application. */
+/** Vert marque GoLivra — référence principale de l'identité. */
 export const GOLIVRA_GREEN = '#0B6B45';
 export const GOLIVRA_GREEN_DEEP = '#0C4F36';
+
+/** Jaune/orange du logo (évoque la couleur "LIVRA" et le teardrop du pin). */
+export const GOLIVRA_YELLOW = '#F5A524';
+export const GOLIVRA_YELLOW_DEEP = '#D27A09';
+export const GOLIVRA_YELLOW_BRIGHT = '#FFB940';
 
 /** Ombre / halo associés au vert (pas une autre teinte de vert). */
 export const GOLIVRA_BRAND_SHADOW = '#0C3020';
@@ -50,9 +66,21 @@ export function rgbaBrand(alpha: number): string {
   return `rgba(11, 107, 69, ${alpha})`;
 }
 
-/** Dégradé FAB / bannières : uniquement la famille du vert marque. */
+export function rgbaAccent(alpha: number): string {
+  return `rgba(245, 165, 36, ${alpha})`;
+}
+
+/**
+ * Dégradé marque "vitesse + énergie" : vert → jaune → vert.
+ * Utilisé sur le hero, le FAB, les bannières, les boutons primaires premium.
+ */
 export function brandGradient3(colors: AppPalette): readonly [string, string, string] {
-  return [colors.primaryDeep, colors.primary, colors.primaryDeep] as const;
+  return [colors.primaryDeep, colors.accent, colors.primary] as const;
+}
+
+/** Dégradé purement jaune pour accents (boutons promo, badges "nouveau", etc.). */
+export function accentGradient2(colors: AppPalette): readonly [string, string] {
+  return [colors.accent, colors.accentDeep] as const;
 }
 
 export const AppPaletteLight: AppPalette = {
@@ -73,13 +101,19 @@ export const AppPaletteLight: AppPalette = {
   primarySoft: '#EAF4EE',
   primaryMuted: rgbaBrand(0.12),
   onPrimary: '#FFFFFF',
+  accent: GOLIVRA_YELLOW,
+  accentBright: GOLIVRA_YELLOW_BRIGHT,
+  accentDeep: GOLIVRA_YELLOW_DEEP,
+  accentSoft: '#FFF5E0',
+  accentMuted: rgbaAccent(0.18),
+  onAccent: '#1A1A1A',
   success: GOLIVRA_GREEN,
   successSoft: '#ECFDF3',
   error: '#B42318',
   errorSoft: '#FEF3F2',
-  warning: '#9A6B2E',
-  warningSoft: '#FFF6D8',
-  tabBarBg: 'rgba(255,255,255,0.92)',
+  warning: GOLIVRA_YELLOW_DEEP,
+  warningSoft: '#FFF5D6',
+  tabBarBg: 'rgba(255,255,255,0.94)',
   tabBarBorder: '#E8F2EC',
   tabInactive: '#6A8075',
   inputBg: '#FFFFFF',
@@ -108,12 +142,18 @@ export const AppPaletteDark: AppPalette = {
   primarySoft: rgbaBrand(0.15),
   primaryMuted: rgbaBrand(0.2),
   onPrimary: '#FFFFFF',
+  accent: GOLIVRA_YELLOW,
+  accentBright: GOLIVRA_YELLOW_BRIGHT,
+  accentDeep: GOLIVRA_YELLOW_DEEP,
+  accentSoft: 'rgba(245, 165, 36, 0.14)',
+  accentMuted: 'rgba(245, 165, 36, 0.22)',
+  onAccent: '#0B0C0E',
   success: GOLIVRA_GREEN,
   successSoft: rgbaBrand(0.12),
   error: '#F87171',
   errorSoft: 'rgba(248, 113, 113, 0.12)',
-  warning: '#FBBF24',
-  warningSoft: 'rgba(251, 191, 36, 0.12)',
+  warning: GOLIVRA_YELLOW_BRIGHT,
+  warningSoft: rgbaAccent(0.15),
   tabBarBg: 'rgba(15, 17, 20, 0.94)',
   tabBarBorder: '#2A2F36',
   tabInactive: '#7A848E',

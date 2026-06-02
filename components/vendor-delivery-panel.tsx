@@ -127,17 +127,12 @@ export function VendorDeliveryPanel({ embedded }: { embedded?: boolean }) {
 
 
       <View style={[styles.infoBanner, { backgroundColor: palette.primarySoft, borderColor: palette.onlinePillBorder }]}>
-
         <Truck size={20} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
-
         <ThemedText style={[styles.infoTxt, { color: palette.primaryDeep }]}>
-
-          <ThemedText type="defaultSemiBold">Un seul réseau GoLivra</ThemedText> : livraisons internes (commandes
-
-          client) et externes (créées par vous). Livreur assigné automatiquement — vous payez les livraisons externes.
-
+          <ThemedText type="defaultSemiBold">Gérez vos livraisons facilement.</ThemedText> Les commandes de vos
+          clients sont livrées automatiquement par nos livreurs. Vous pouvez aussi créer vos propres livraisons quand
+          vous en avez besoin. Les livreurs sont assignés automatiquement.
         </ThemedText>
-
       </View>
 
 

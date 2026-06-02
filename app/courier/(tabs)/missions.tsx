@@ -6,7 +6,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppContentWidth } from '@/components/app-content-width';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { COURIER_TAB_BAR_PADDING_BOTTOM } from '@/constants/courier-layout';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useCourier } from '@/contexts/courier-context';
@@ -32,7 +31,7 @@ export default function CourierMissionsScreen() {
   const bottom = Math.max(insets.bottom, 12) + COURIER_TAB_BAR_PADDING_BOTTOM;
 
   return (
-    <ThemedView style={styles.screen} lightColor={palette.bg} darkColor={palette.bg}>
+    <View style={[styles.screen, { backgroundColor: palette.bg }]}>
       <ScrollView
         refreshControl={
           <RefreshControl
@@ -81,7 +80,7 @@ export default function CourierMissionsScreen() {
         )}
         </AppContentWidth>
       </ScrollView>
-    </ThemedView>
+    </View>
   );
 }
 
@@ -100,13 +99,41 @@ function MissionCard({
   onPress: () => void;
   palette: ReturnType<typeof useCourierPalette>;
 }) {
+  const zone = (mission.adresse_livraison || '').split(',').slice(-1)[0]?.trim() || '—';
+  const date = new Date(mission.livree_at ?? mission.created_at);
+  const dateLabel = date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+
+  if (muted) {
+    return (
+      <Pressable
+        style={[styles.card, styles.cardMuted, { backgroundColor: palette.card, borderColor: palette.border }]}
+        onPress={onPress}>
+        <View style={styles.cardTop}>
+          <ThemedText style={[styles.ref, { color: palette.muted }]}>
+            {mission.commande?.numero || mission.id.slice(0, 8).toUpperCase()}
+          </ThemedText>
+          <ThemedText style={[styles.statut, { color: palette.muted }]}>
+            {missionStatutLabel(mission.statut)}
+          </ThemedText>
+        </View>
+        <View style={styles.line}>
+          <MapPin size={14} color={palette.muted} strokeWidth={LUCIDE_STROKE} />
+          <ThemedText style={[styles.lineText, { color: palette.muted }]} numberOfLines={1}>
+            {zone}
+          </ThemedText>
+          <ThemedText style={[styles.dateLabel, { color: palette.muted }]}>{dateLabel}</ThemedText>
+        </View>
+      </Pressable>
+    );
+  }
+
   return (
-    <Pressable style={[styles.card, muted ? styles.cardMuted : undefined, { backgroundColor: palette.card, borderColor: palette.border }]} onPress={onPress}>
+    <Pressable style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]} onPress={onPress}>
       <View style={styles.cardTop}>
-        <ThemedText style={[styles.ref, { color: muted ? palette.muted : palette.text }]}>
+        <ThemedText style={[styles.ref, { color: palette.text }]}>
           {mission.commerce_nom || mission.commande?.numero || mission.id.slice(0, 8).toUpperCase()}
         </ThemedText>
-        <ThemedText style={[styles.statut, muted ? styles.statutMuted : undefined, { color: muted ? palette.muted : palette.primary }]}>
+        <ThemedText style={[styles.statut, { color: palette.primary }]}>
           {missionStatutLabel(mission.statut)}
         </ThemedText>
       </View>
@@ -154,4 +181,5 @@ const styles = StyleSheet.create({
   statutMuted: {},
   line: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   lineText: { flex: 1, fontSize: 13, lineHeight: 18 },
+  dateLabel: { fontSize: 12, fontWeight: '700', marginLeft: 4 },
 });

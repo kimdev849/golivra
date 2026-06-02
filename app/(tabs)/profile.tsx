@@ -24,6 +24,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'reac
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
+import { brandGradient3 } from '@/constants/app-palette';
 import { AppLogoutButton } from '@/components/app-logout-button';
 import { getSessionToken } from '@/lib/auth';
 import { fetchAuthMe, peekAuthMe, type AuthMe } from '@/lib/client-data';
@@ -129,13 +130,13 @@ export default function ProfileScreen() {
         ) : (
           <View style={styles.heroShell}>
             <LinearGradient
-              colors={[colors.primary, colors.primaryDeep, colors.primaryDeep]}
+              colors={brandGradient3(colors)}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.heroGradient}>
               <Sparkles size={20} color="rgba(255,255,255,0.9)" strokeWidth={LUCIDE_STROKE} />
-              <ThemedText style={styles.heroGradientTitle}></ThemedText>
-              <ThemedText style={styles.heroGradientSub}>Mes informations</ThemedText>
+              <ThemedText style={styles.heroGradientTitle}>Mon espace GoLivra</ThemedText>
+              <ThemedText style={styles.heroGradientSub}>Profil, paiements et préférences</ThemedText>
             </LinearGradient>
             <View style={[styles.heroCard, { backgroundColor: colors.surface }]}>
               {isLoading ? (
@@ -190,7 +191,7 @@ export default function ProfileScreen() {
           {menuRow(MapPin, 'Mes adresses', 'Arrondissement et adresse détaillée', () => router.push('/my-addresses'))}
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           {menuRow(CreditCard, 'Paiement', 'Airtel Money et MTN Mobile Money', () =>
-            router.push('/payment-methods')
+            router.push('/payment-methods'),
           )}
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           {menuRow(Heart, 'Mes favoris', 'Restaurants et boutiques enregistrés', () =>
@@ -203,7 +204,7 @@ export default function ProfileScreen() {
         <ThemedText style={[styles.sectionLabel, styles.sectionSupport, { color: colors.primaryDeep }]}>Support</ThemedText>
         <View style={[styles.menuCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
           {menuRow(HelpCircle, "Centre d'aide", 'Questions et contact', () =>
-            showInfo('Centre d’aide', 'Contactez le support GoLivra depuis votre espace web ou par téléphone.')
+            showInfo('Centre d’aide', 'Contactez le support GoLivra depuis votre espace web ou par téléphone.'),
           )}
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           {menuRow(Gavel, 'Conditions et confidentialité', 'Informations légales', () =>

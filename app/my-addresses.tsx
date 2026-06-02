@@ -13,7 +13,7 @@ import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { createUserAddress, deleteUserAddress, fetchUserAddresses, setPrincipalAddress, type UserAddress } from '@/lib/addresses';
 import { getSessionToken } from '@/lib/auth';
-import { formatDeliveryAddressText, isDeliveryAddressComplete } from '@/lib/format-address';
+import { deliveryAddressError, formatDeliveryAddressText } from '@/lib/format-address';
 
 const emptyForm = (): DeliveryAddressFormValue => ({ quartier: '', ligne1: '', instructions: '', point_reperes: '', ville: 'Brazzaville', pays: 'Congo' });
 
@@ -43,7 +43,8 @@ export default function MyAddressesScreen() {
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const saveNew = async () => {
-    if (!isDeliveryAddressComplete(form)) { Alert.alert('Adresse', 'Quartier et description obligatoires.'); return; }
+    const e = deliveryAddressError(form);
+    if (e) { Alert.alert('Adresse invalide', e); return; }
     setSaving(true);
     try {
       const token = await getSessionToken();

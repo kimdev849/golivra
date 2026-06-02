@@ -34,8 +34,8 @@ export default function VendorStockScreen() {
         insets={insets}
         onSaved={async (updated) => {
           setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-          await refresh();
           router.replace(VENDOR_HREF.productsTab);
+          void refresh();
         }}
         onDelete={async (): Promise<void> => {
           const token = await getSessionToken();
@@ -57,8 +57,8 @@ export default function VendorStockScreen() {
         insets={insets}
         onSaved={async (updated) => {
           setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-          await refresh();
           router.replace(VENDOR_HREF.productsTab);
+          void refresh();
         }}
         onDelete={async (): Promise<void> => {
           const token = await getSessionToken();

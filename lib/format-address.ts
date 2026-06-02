@@ -22,10 +22,25 @@ export function formatDeliveryAddressText(fields: DeliveryAddressFields): string
   return parts.join(' · ');
 }
 
+const NUMERIC_ONLY_REGEX = /^[0-9\s]+$/;
+
 export function isDeliveryAddressComplete(fields: Partial<DeliveryAddressFields>): boolean {
   const q = String(fields.quartier || '').trim();
   const l = String(fields.ligne1 || '').trim();
-  return Boolean(q) && l.length >= 4;
+  if (!q) return false;
+  if (l.length < 4) return false;
+  if (NUMERIC_ONLY_REGEX.test(l)) return false;
+  return true;
+}
+
+export function deliveryAddressError(fields: Partial<DeliveryAddressFields>): string | null {
+  const q = String(fields.quartier || '').trim();
+  const l = String(fields.ligne1 || '').trim();
+  if (!q) return 'Choisissez un arrondissement.';
+  if (!l) return 'Indiquez une adresse détaillée.';
+  if (l.length < 4) return 'Adresse trop courte (4 caractères minimum).';
+  if (NUMERIC_ONLY_REGEX.test(l)) return 'Adresse invalide (pas uniquement des chiffres).';
+  return null;
 }
 
 /** Reprend un quartier existant ou propose « Autre » si seule l’adresse texte est connue. */

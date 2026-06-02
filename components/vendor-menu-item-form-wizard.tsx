@@ -2,7 +2,9 @@ import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +18,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { CategoryPicker } from '@/components/category-picker';
 import { OptionGroupsEditor, pickVendorImageAsset } from '@/components/vendor-form-shared';
 import { ThemedText } from '@/components/themed-text';
+import { InlineFormError } from '@/components/inline-form-error';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
@@ -37,6 +40,7 @@ import {
 } from '@/lib/vendor-api';
 import type { ArticleCategory } from '@/lib/vendor-product-types';
 import type { VendorProduct } from '@/lib/vendor-types';
+import { validateCommerceName, validateDescription, validatePrice, validateProductName, validateStock } from '@/lib/form-validation';
 
 type Props = {
   enterpriseId: string;
@@ -68,6 +72,7 @@ export function VendorMenuItemFormWizard({
   const [newCatOpen, setNewCatOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [saving, setSaving] = useState(false);
+  const [stepErrors, setStepErrors] = useState<Record<string, string | null>>({});
 
   const patch = (p: Partial<MenuItemFormValues>) => setValues((v) => ({ ...v, ...p }));
 
@@ -94,14 +99,19 @@ export function VendorMenuItemFormWizard({
 
   const validateStep = (s: number): string | null => {
     if (s === 0) {
-      if (!values.nom.trim()) return 'Indiquez le nom du plat.';
+      const e1 = validateProductName(values.nom);
+      if (!e1.ok) return e1.message;
+      const e2 = validateDescription(values.description, 500);
+      if (!e2.ok) return e2.message;
     }
     if (s === 1) {
-      const prix = Number(values.prix);
-      if (!prix || prix <= 0) return 'Indiquez un prix valide.';
+      const e3 = validatePrice(values.prix);
+      if (!e3.ok) return e3.message;
       if (values.prixPromo.trim()) {
+        const e4 = validatePrice(values.prixPromo);
+        if (!e4.ok) return e4.message;
+        const prix = Number(values.prix);
         const promo = Number(values.prixPromo);
-        if (!promo || promo <= 0) return 'Prix promo invalide.';
         if (promo >= prix) return 'Le prix promo doit être inférieur au prix normal.';
       }
     }
@@ -111,10 +121,8 @@ export function VendorMenuItemFormWizard({
       }
     }
     if (s === 4 && values.limiterQuantite) {
-      const q = Number(values.stock);
-      if (!values.stock.trim() || !Number.isFinite(q) || q < 0) {
-        return 'Indiquez une quantité disponible ou désactivez la limite.';
-      }
+      const e5 = validateStock(values.stock, true);
+      if (!e5.ok) return e5.message;
     }
     return null;
   };
@@ -123,8 +131,29 @@ export function VendorMenuItemFormWizard({
     const err = validateStep(step);
     if (err) {
       showError('Champ manquant', err);
+      const fieldErrs: Record<string, string | null> = {};
+      if (step === 0) {
+        const e1 = validateProductName(values.nom);
+        if (!e1.ok) fieldErrs.nom = e1.message;
+        const e2 = validateDescription(values.description, 500);
+        if (!e2.ok) fieldErrs.description = e2.message;
+      }
+      if (step === 1) {
+        const e3 = validatePrice(values.prix);
+        if (!e3.ok) fieldErrs.prix = e3.message;
+        if (values.prixPromo.trim()) {
+          const e4 = validatePrice(values.prixPromo);
+          if (!e4.ok) fieldErrs.prixPromo = e4.message;
+        }
+      }
+      if (step === 4 && values.limiterQuantite) {
+        const e5 = validateStock(values.stock, true);
+        if (!e5.ok) fieldErrs.stock = e5.message;
+      }
+      setStepErrors(fieldErrs);
       return;
     }
+    setStepErrors({});
     setStep((s) => Math.min(s + 1, MENU_ITEM_STEPS.length - 1));
   };
 
@@ -182,7 +211,11 @@ export function VendorMenuItemFormWizard({
   };
 
   const createCategory = async () => {
-    if (!newCatName.trim()) return;
+    const e = validateCommerceName(newCatName);
+    if (!e.ok) {
+      showError('Nom invalide', e.message);
+      return;
+    }
     try {
       const token = await getSessionToken();
       if (!token) throw new Error('Session expirée.');
@@ -236,9 +269,14 @@ export function VendorMenuItemFormWizard({
         ))}
       </View>
 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}>
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: insets.bottom + 100 }}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag">
         {step === 0 ? (
           <>
             <ThemedText style={[styles.sectionTitle, { color: palette.primaryDeep }]}>Identité du plat</ThemedText>
@@ -246,19 +284,21 @@ export function VendorMenuItemFormWizard({
             <TextInput
               style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
               value={values.nom}
-              onChangeText={(t) => patch({ nom: t })}
+              onChangeText={(t) => { patch({ nom: t }); setStepErrors((s) => ({ ...s, nom: null })); }}
               placeholder="Ex. Poulet braisé"
               placeholderTextColor={colors.placeholder}
             />
+            <InlineFormError message={stepErrors.nom} colors={colors} />
             <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Description</ThemedText>
             <TextInput
               style={[styles.input, styles.area, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
               value={values.description}
-              onChangeText={(t) => patch({ description: t })}
+              onChangeText={(t) => { patch({ description: t }); setStepErrors((s) => ({ ...s, description: null })); }}
               multiline
               placeholder="Ingrédients, accompagnements…"
               placeholderTextColor={colors.placeholder}
             />
+            <InlineFormError message={stepErrors.description} colors={colors} />
             <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Catégorie du menu</ThemedText>
             <Pressable style={[styles.selectCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]} onPress={() => setCatPickerOpen(true)} disabled={catLoading}>
               <ThemedText style={[styles.selectTxt, { color: colors.text }]}>
@@ -278,20 +318,22 @@ export function VendorMenuItemFormWizard({
             <TextInput
               style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
               value={values.prix}
-              onChangeText={(t) => patch({ prix: t })}
+              onChangeText={(t) => { patch({ prix: t }); setStepErrors((s) => ({ ...s, prix: null })); }}
               keyboardType="numeric"
               placeholder="2500"
               placeholderTextColor={colors.placeholder}
             />
+            <InlineFormError message={stepErrors.prix} colors={colors} />
             <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Prix promo (FCFA)</ThemedText>
             <TextInput
               style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
               value={values.prixPromo}
-              onChangeText={(t) => patch({ prixPromo: t })}
+              onChangeText={(t) => { patch({ prixPromo: t }); setStepErrors((s) => ({ ...s, prixPromo: null })); }}
               keyboardType="numeric"
               placeholder="Optionnel"
               placeholderTextColor={colors.placeholder}
             />
+            <InlineFormError message={stepErrors.prixPromo} colors={colors} />
             {values.prixPromo.trim() ? (
               <>
                 <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Début promo (AAAA-MM-JJ)</ThemedText>
@@ -384,11 +426,12 @@ export function VendorMenuItemFormWizard({
                 <TextInput
                   style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
                   value={values.stock}
-                  onChangeText={(t) => patch({ stock: t })}
+                  onChangeText={(t) => { patch({ stock: t }); setStepErrors((s) => ({ ...s, stock: null })); }}
                   keyboardType="numeric"
                   placeholder="20"
                   placeholderTextColor={colors.placeholder}
                 />
+                <InlineFormError message={stepErrors.stock} colors={colors} />
               </>
             ) : (
               <ThemedText style={[styles.stockHint, { color: colors.textMuted }]}>
@@ -477,6 +520,7 @@ export function VendorMenuItemFormWizard({
           </>
         ) : null}
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12), backgroundColor: colors.surface, borderTopColor: colors.border }]}>
         <Pressable style={styles.footerBack} onPress={goBack}>
