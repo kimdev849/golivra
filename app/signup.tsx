@@ -25,8 +25,8 @@ import { brandGradient3 } from '@/constants/app-palette';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { registerAccount, persistAuthSession } from '@/lib/auth';
-import { createEnterpriseRemote, fetchEnterpriseCategories, type EnterpriseCreated, type EnterpriseCategory } from '@/lib/enterprise';
+import { registerAccount, registerVendorAccount, persistAuthSession } from '@/lib/auth';
+import { fetchEnterpriseCategories, type EnterpriseCategory } from '@/lib/enterprise';
 import { requestOtp, verifyOtp } from '@/lib/otp';
 import { formatCgPhone, toCgE164 } from '@/lib/phone';
 import { uploadImageForSignup } from '@/lib/uploads';
@@ -205,35 +205,38 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
         try { finalBusinessImageUrl = await uploadImageForSignup(null, { dataUrl: businessImageDataUrl, folder: 'enterprises' }); }
         catch { finalBusinessImageUrl = null; }
       }
-      const session = await registerAccount({
-        nom: userNom, telephone: phoneE164!, motDePasse: password, otpCode: otp.trim(), imageUrl: finalProfileImageUrl || null,
-        role: profile === 'vendeur' ? commerceKind === 'restaurant' ? 'restaurateur' : commerceKind === 'boutique' ? 'commercant' : 'client' : 'client',
-      });
-      await persistAuthSession(session);
-      if (profile === 'client' && profileImageDataUrl && !finalProfileImageUrl) { finalProfileImageUrl = await uploadImageForSignup(session.token, { dataUrl: profileImageDataUrl, folder: 'profiles' }); }
-      if (profile === 'vendeur' && businessImageDataUrl && !finalBusinessImageUrl) {
-        try { finalBusinessImageUrl = await uploadImageForSignup(session.token, { dataUrl: businessImageDataUrl, folder: 'enterprises' }); }
-        catch { finalBusinessImageUrl = null; }
-      }
-      if (profile === 'client') { await new Promise<void>((r) => setTimeout(r, 0)); router.replace('/(tabs)'); return; }
-      if (!commerceKind) { setError("Type de commerce introuvable."); return; }
-      const enterprise = await createEnterpriseRemote(session.token, {
-        nom: businessName.trim(),
-        type: commerceKind,
-        categorieId: businessCategoryId!,
-        description: businessDescription.trim() || null,
-        telephone: phoneE164!,
-        ...(commerceKind === 'restaurant'
-          ? { adresse: businessAddress.trim() }
-          : businessAddress.trim()
-            ? { adresse: businessAddress.trim() }
-            : {}),
-        imageUrl: finalBusinessImageUrl || null,
-        imageDataUrl: !finalBusinessImageUrl && businessImageDataUrl ? businessImageDataUrl : undefined,
-      });
-      await new Promise<void>((r) => setTimeout(r, 0));
-      const ent = enterprise as EnterpriseCreated;
-      if (ent.statut_moderation === 'en_attente') {
+
+      // VENDEUR : un SEUL appel atomique qui crée user + commerce ensemble.
+      // En cas d'échec d'un côté, le backend rollback l'autre → on ne se
+      // retrouve JAMAIS avec un utilisateur orphelin (ou inversement).
+      if (profile === 'vendeur') {
+        if (!commerceKind) { setError("Type de commerce introuvable."); return; }
+        const trimmedAddress = businessAddress.trim();
+        const result = await registerVendorAccount({
+          nom: userNom,
+          telephone: phoneE164!,
+          motDePasse: password,
+          otpCode: otp.trim(),
+          role: commerceKind === 'restaurant' ? 'restaurateur' : 'commercant',
+          imageUrl: finalProfileImageUrl || null,
+          enterprise: {
+            type: commerceKind,
+            nom: businessName.trim(),
+            telephone: phoneE164!,
+            categorieId: businessCategoryId!,
+            description: businessDescription.trim() || null,
+            ...(commerceKind === 'restaurant' || trimmedAddress ? { adresse: trimmedAddress } : {}),
+            imageUrl: finalBusinessImageUrl || null,
+            imageDataUrl: !finalBusinessImageUrl && businessImageDataUrl ? businessImageDataUrl : undefined,
+          },
+        });
+        const { enterprise: _ent, ...session } = result;
+        await persistAuthSession(session);
+        // L'upload de l'image de profil peut se faire après (non-bloquant)
+        if (profileImageDataUrl && !finalProfileImageUrl) {
+          void uploadImageForSignup(session.token, { dataUrl: profileImageDataUrl, folder: 'profiles' })
+            .catch(() => undefined);
+        }
         showSuccess(
           'Compte créé',
           'Votre commerce est en attente de validation. Vous pouvez préparer votre menu ou vos produits. Les clients le verront dès qu’il sera activé.',
@@ -241,15 +244,22 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
         );
         return;
       }
-      router.replace(VENDOR_HREF.root);
+
+      // CLIENT : inscription simple (pas de commerce)
+      const session = await registerAccount({
+        nom: userNom, telephone: phoneE164!, motDePasse: password, otpCode: otp.trim(), imageUrl: finalProfileImageUrl || null,
+        role: 'client',
+      });
+      await persistAuthSession(session);
+      if (profileImageDataUrl && !finalProfileImageUrl) {
+        void uploadImageForSignup(session.token, { dataUrl: profileImageDataUrl, folder: 'profiles' })
+          .catch(() => undefined);
+      }
+      router.replace('/(tabs)');
     } catch (e) {
       const reqId = (e as { requestId?: string })?.requestId;
       const msg = friendlyErrorMessage(e, 'La création du compte a échoué.');
-      if (reqId) {
-        console.warn('[signup] échec création commerce', { reqId, message: msg });
-      } else {
-        console.warn('[signup] échec création commerce', e);
-      }
+      console.warn('[signup] échec inscription', { reqId, message: msg });
       setError(reqId ? `${msg} (ref. ${reqId.slice(0, 8)})` : msg);
     }
     finally { setIsSubmitting(false); }

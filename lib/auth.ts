@@ -81,6 +81,44 @@ export async function registerAccount(payload: {
   });
 }
 
+export type RegisterVendorPayload = {
+  nom: string;
+  telephone: string;
+  motDePasse: string;
+  otpCode: string;
+  role: 'restaurateur' | 'commercant';
+  imageUrl?: string | null;
+  enterprise: {
+    type: 'restaurant' | 'boutique';
+    nom: string;
+    telephone: string;
+    categorieId: string;
+    description?: string | null;
+    /** Requise pour restaurant, OPTIONNELLE pour boutique. */
+    adresse?: string;
+    imageUrl?: string | null;
+    /** Secours si l'upload Storage échoue (BYTEA côté API). */
+    imageDataUrl?: string | null;
+  };
+};
+
+export type RegisterVendorResult = AuthSession & {
+  enterprise: Record<string, unknown>;
+};
+
+/**
+ * Inscription ATOMIQUE d'un vendeur : crée l'utilisateur ET son commerce
+ * (restaurant ou boutique) en une seule requête HTTP. En cas d'échec d'un
+ * des deux côtés, le backend ROLLBACK l'autre → l'utilisateur n'est JAMAIS
+ * créé si son commerce ne peut pas l'être (et inversement).
+ */
+export async function registerVendorAccount(payload: RegisterVendorPayload): Promise<RegisterVendorResult> {
+  return apiFetch<RegisterVendorResult>('/api/auth/register-vendor', {
+    method: 'POST',
+    jsonBody: payload,
+  });
+}
+
 export async function loginAccount(payload: {
   telephone: string;
   motDePasse: string;
