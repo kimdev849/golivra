@@ -35,6 +35,7 @@ export type MenuItemFormValues = {
   optionGroups: ProductOptionGroup[];
   mainImageUri: string | null;
   mainImageDataUrl: string | null;
+  gallery: { uri: string; dataUrl: string }[];
 };
 
 export const DEFAULT_MENU_ITEM_FORM: MenuItemFormValues = {
@@ -54,4 +55,5 @@ export const DEFAULT_MENU_ITEM_FORM: MenuItemFormValues = {
   optionGroups: [],
   mainImageUri: null,
   mainImageDataUrl: null,
+  gallery: [],
 };

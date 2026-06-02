@@ -3,6 +3,7 @@ import { tagsToText } from '@/lib/vendor-product-types';
 import { DEFAULT_MENU_ITEM_FORM, type MenuItemFormValues } from '@/lib/vendor-menu-item-types';
 
 export function menuItemToFormValues(product: VendorProduct): MenuItemFormValues {
+  const existing = Array.isArray(product.imagesUrls) ? product.imagesUrls : [];
   return {
     ...DEFAULT_MENU_ITEM_FORM,
     nom: product.nom,
@@ -21,5 +22,6 @@ export function menuItemToFormValues(product: VendorProduct): MenuItemFormValues
     optionGroups: product.optionGroups?.length ? product.optionGroups : [],
     mainImageUri: product.imageUrl ?? null,
     mainImageDataUrl: null,
+    gallery: existing.map((uri) => ({ uri, dataUrl: '' })),
   };
 }

@@ -6,7 +6,22 @@ import { ThemedText } from '@/components/themed-text';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { emptyOptionGroup, type ProductOptionGroup } from '@/lib/vendor-product-types';
 
-export async function pickVendorImageAsset(): Promise<{ uri: string; dataUrl: string } | null> {
+export const MAX_GALLERY_PHOTOS = 8;
+
+type VendorImageAsset = { uri: string; dataUrl: string };
+
+function dataUrlFromAsset(asset: ImagePicker.ImagePickerAsset): VendorImageAsset | null {
+  if (!asset?.base64) return null;
+  const mime = asset.mimeType || 'image/jpeg';
+  return { uri: asset.uri, dataUrl: `data:${mime};base64,${asset.base64}` };
+}
+
+/**
+ * Sélection unique d'une photo (principale, logo, avatar).
+ * AUCUNE retouche : pas de recadrage, pas d'aspect forcé, pas de recompression.
+ * L'image est uploadée telle quelle sortie du téléphone.
+ */
+export async function pickVendorImageAsset(): Promise<VendorImageAsset | null> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) {
     Alert.alert('Permission', 'Accès aux photos requis.');
@@ -14,16 +29,39 @@ export async function pickVendorImageAsset(): Promise<{ uri: string; dataUrl: st
   }
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
-    quality: 0.72,
+    quality: 1,
     base64: true,
-    allowsEditing: true,
-    aspect: [1, 1],
+    allowsEditing: false,
+    selectionLimit: 1,
   });
   if (result.canceled) return null;
   const asset = result.assets?.[0];
-  if (!asset?.base64) return null;
-  const mime = asset.mimeType || 'image/jpeg';
-  return { uri: asset.uri, dataUrl: `data:${mime};base64,${asset.base64}` };
+  if (!asset) return null;
+  return dataUrlFromAsset(asset);
+}
+
+/**
+ * Sélection multiple d'images (galerie produit, max 8).
+ * Vidéos exclues via `mediaTypes: ['images']`. Pas de retouche.
+ * @param max limite absolue (par défaut MAX_GALLERY_PHOTOS).
+ */
+export async function pickMultipleVendorImages(max: number = MAX_GALLERY_PHOTOS): Promise<VendorImageAsset[]> {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!permission.granted) {
+    Alert.alert('Permission', 'Accès aux photos requis.');
+    return [];
+  }
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    quality: 1,
+    base64: true,
+    allowsEditing: false,
+    selectionLimit: max,
+  });
+  if (result.canceled) return [];
+  return (result.assets || [])
+    .map(dataUrlFromAsset)
+    .filter((a): a is VendorImageAsset => a !== null);
 }
 
 export function OptionGroupsEditor({

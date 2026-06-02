@@ -36,6 +36,8 @@ export type ProductPublic = {
   stock_illimite?: boolean;
   est_disponible?: boolean;
   image_url?: string | null;
+  /** Galerie complémentaire (jusqu'à 8 URLs). La 1re entrée est identique à `image_url`. */
+  images_urls?: string[] | null;
   kind?: 'plat' | 'article' | string;
   /** Compteurs d'engagement renvoyés par l'API (engagement produit). */
   nb_vues?: number;

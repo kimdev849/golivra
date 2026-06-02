@@ -7,6 +7,7 @@ import {
 
 export function productToFormValues(product: VendorProduct): VendorProductFormValues {
   const dims = product.dimensions;
+  const existing = Array.isArray(product.imagesUrls) ? product.imagesUrls : [];
   return {
     ...DEFAULT_PRODUCT_FORM,
     nom: product.nom,
@@ -33,6 +34,7 @@ export function productToFormValues(product: VendorProduct): VendorProductFormVa
     optionGroups: product.optionGroups?.length ? product.optionGroups : [],
     mainImageUri: product.imageUrl ?? null,
     mainImageDataUrl: null,
-    gallery: [],
+    // Pré-remplir avec les URLs déjà uploadées (dataUrl vide = déjà sur le serveur).
+    gallery: existing.map((uri) => ({ uri, dataUrl: '' })),
   };
 }

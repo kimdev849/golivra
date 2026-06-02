@@ -177,7 +177,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) { setError('Autorisation refusée: accès aux photos requis.'); return null; }
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.82, base64: true, allowsEditing: true, aspect: [1, 1] });
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1, base64: true, allowsEditing: false, selectionLimit: 1 });
       if (result.canceled) return null;
       const asset = result.assets?.[0];
       if (!asset?.base64) { setError("Impossible de lire l'image sélectionnée."); return null; }

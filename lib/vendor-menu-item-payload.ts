@@ -21,10 +21,15 @@ function cleanOptionGroups(groups: ProductOptionGroup[]): ProductOptionGroup[] |
 
 export function buildMenuItemApiBody(
   values: MenuItemFormValues,
-  uploaded: { mainUrl?: string },
+  uploaded: { mainUrl?: string; galleryUrls?: string[] },
 ): VendorProductWriteBody {
   const prix = Number(values.prix);
   const prixPromo = values.prixPromo.trim() ? Number(values.prixPromo) : null;
+  const gallery = uploaded.galleryUrls ?? [];
+  const allUrls = [
+    ...(uploaded.mainUrl ? [uploaded.mainUrl] : []),
+    ...gallery.filter((u) => u !== uploaded.mainUrl),
+  ];
 
   return {
     nom: values.nom.trim(),
@@ -36,6 +41,7 @@ export function buildMenuItemApiBody(
       ? Math.max(0, Math.floor(Number(values.stock)))
       : null,
     imageUrl: uploaded.mainUrl,
+    imagesUrls: allUrls.length ? allUrls : undefined,
     categorieId: values.categorieId,
     estEnVedette: values.enVedette,
     estDisponible: values.estDisponible,

@@ -17,7 +17,7 @@ import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react-native';
 
 import { CategoryPicker } from '@/components/category-picker';
 import { DateField } from '@/components/date-field';
-import { OptionGroupsEditor, pickVendorImageAsset } from '@/components/vendor-form-shared';
+import { MAX_GALLERY_PHOTOS, OptionGroupsEditor, pickMultipleVendorImages, pickVendorImageAsset } from '@/components/vendor-form-shared';
 import { ThemedText } from '@/components/themed-text';
 import { InlineFormError } from '@/components/inline-form-error';
 import { LUCIDE_STROKE } from '@/constants/icons';
@@ -45,7 +45,6 @@ import type { VendorProduct } from '@/lib/vendor-types';
 import { validateCommerceName, validateDescription, validatePrice, validateProductName, validatePromoBlock, validateStock } from '@/lib/form-validation';
 
 const STEPS = ['Essentiel', 'Détails', 'Variantes', 'Publication'] as const;
-const MAX_GALLERY = 7;
 
 const TYPE_CHOICES: { key: ProductTypeKind; label: string }[] = [
   { key: 'physique', label: 'Physique' },
@@ -327,28 +326,45 @@ export function VendorProductFormWizard({
                 <ThemedText style={[styles.photoHint, { color: colors.textMuted }]}>+ Photo principale *</ThemedText>
               )}
             </Pressable>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.galleryRow}>
-              {values.gallery.map((g, i) => (
-                <View key={i} style={styles.thumbWrap}>
-                  <Image source={{ uri: g.uri }} style={styles.thumb} contentFit="cover" />
-                  <Pressable
-                    style={styles.thumbRemove}
-                    onPress={() => patch({ gallery: values.gallery.filter((_, j) => j !== i) })}>
-                    <X size={14} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
-                  </Pressable>
-                </View>
-              ))}
-              {values.gallery.length < MAX_GALLERY ? (
-                  <Pressable
-                    style={[styles.thumbAdd, { borderColor: colors.border }]}
-                    onPress={async () => {
-                      const img = await pickVendorImageAsset();
-                      if (img) patch({ gallery: [...values.gallery, img] });
-                    }}>
-                    <Plus size={22} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
-                  </Pressable>
+            <View style={styles.galleryHeader}>
+              <ThemedText style={[styles.galleryLabel, { color: colors.textSecondary }]}>
+                Galerie ({values.gallery.length}/{MAX_GALLERY_PHOTOS})
+              </ThemedText>
+              {values.gallery.length < MAX_GALLERY_PHOTOS ? (
+                <Pressable
+                  style={[styles.galleryAddBtn, { borderColor: palette.primary, backgroundColor: colors.surface }]}
+                  onPress={async () => {
+                    const remaining = MAX_GALLERY_PHOTOS - values.gallery.length;
+                    const picked = await pickMultipleVendorImages(remaining);
+                    if (picked.length) {
+                      patch({ gallery: [...values.gallery, ...picked] });
+                    }
+                  }}>
+                  <Plus size={16} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
+                  <ThemedText style={[styles.galleryAddTxt, { color: palette.primary }]}>
+                    {values.gallery.length === 0 ? 'Ajouter des photos' : 'Compléter'}
+                  </ThemedText>
+                </Pressable>
               ) : null}
-            </ScrollView>
+            </View>
+            {values.gallery.length > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.galleryRow}>
+                {values.gallery.map((g, i) => (
+                  <View key={`${i}-${g.uri}`} style={styles.thumbWrap}>
+                    <Image source={{ uri: g.uri }} style={styles.thumb} contentFit="cover" />
+                    <Pressable
+                      style={styles.thumbRemove}
+                      onPress={() => patch({ gallery: values.gallery.filter((_, j) => j !== i) })}>
+                      <X size={14} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
+                    </Pressable>
+                  </View>
+                ))}
+              </ScrollView>
+            ) : (
+              <ThemedText style={[styles.galleryEmpty, { color: colors.textMuted }]}>
+                Aucune photo complémentaire. Vous pouvez en ajouter jusqu'à {MAX_GALLERY_PHOTOS} en une fois.
+              </ThemedText>
+            )}
             <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Nom du produit *</ThemedText>
             <TextInput
               style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
@@ -697,6 +713,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  galleryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  galleryLabel: { fontSize: 13, fontWeight: '800', letterSpacing: 0.3 },
+  galleryAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1.2,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  galleryAddTxt: { fontSize: 13, fontWeight: '800' },
+  galleryEmpty: { fontSize: 12, lineHeight: 17, marginBottom: 8, fontStyle: 'italic' },
   selectCard: {
     borderWidth: 1,
     borderRadius: 12,

@@ -7,6 +7,7 @@ import {
   Building2,
   Clock,
   Heart,
+  Images,
   MapPin,
   Package,
   Phone,
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react-native';
 import { Image } from 'expo-image';
 
+import { GalleryViewer } from '@/components/gallery-viewer';
 import { ProductPrice } from '@/components/product-price';
 import { ScreenEmptyState, ScreenLoadState } from '@/components/screen-load-state';
 import { ThemedText } from '@/components/themed-text';
@@ -58,6 +60,7 @@ export default function EnterpriseDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [token, setToken] = useState<string | null>(null);
+  const [galleryState, setGalleryState] = useState<{ images: string[]; index: number } | null>(null);
 
   const reload = useCallback(async (force = false) => {
     if (!id) return;
@@ -277,11 +280,26 @@ export default function EnterpriseDetailScreen() {
         ) : (
           products.map((p) => {
             const img = resolveRemoteImageUrl(p.image_url);
+            const allImages = (() => {
+              const list = Array.isArray(p.images_urls) ? p.images_urls.filter((u) => u && u.length > 0) : [];
+              if (img && !list.includes(img)) list.unshift(img);
+              return list.map((u) => resolveRemoteImageUrl(u) ?? u).filter((u): u is string => Boolean(u));
+            })();
             const disabled = !isProductOrderable(p, { enterpriseType: enterprise.type });
             const stockLabel = stockDisplayLabel(p, { enterpriseType: enterprise.type });
+            const openGallery = () => {
+              if (!allImages.length) return;
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setGalleryState({ images: allImages, index: 0 });
+            };
             return (
               <View key={p.id} style={styles.productCard}>
-                <View style={styles.productThumb}>
+                <Pressable
+                  style={styles.productThumb}
+                  accessibilityRole="button"
+                  accessibilityLabel={allImages.length > 1 ? `Voir les ${allImages.length} photos` : 'Voir la photo'}
+                  onPress={openGallery}
+                  disabled={!img}>
                   {img ? (
                     <Image source={{ uri: img }} style={styles.productImg} contentFit="cover" />
                   ) : (
@@ -289,7 +307,13 @@ export default function EnterpriseDetailScreen() {
                       <ShoppingBasket size={28} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
                     </View>
                   )}
-                </View>
+                  {allImages.length > 1 ? (
+                    <View style={styles.galleryBadge}>
+                      <Images size={12} color="#FFF" strokeWidth={LUCIDE_STROKE} />
+                      <ThemedText style={styles.galleryBadgeTxt}>{allImages.length}</ThemedText>
+                    </View>
+                  ) : null}
+                </Pressable>
                 <View style={{ flex: 1 }}>
                   <ThemedText type="defaultSemiBold" style={styles.productName}>
                     {p.nom ?? 'Produit'}
@@ -319,6 +343,13 @@ export default function EnterpriseDetailScreen() {
         )}
         <View style={{ height: 32 }} />
       </ScrollView>
+      <GalleryViewer
+        visible={Boolean(galleryState)}
+        images={galleryState?.images ?? []}
+        initialIndex={galleryState?.index ?? 0}
+        onClose={() => setGalleryState(null)}
+        colors={colors}
+      />
     </ThemedView>
   );
 }
