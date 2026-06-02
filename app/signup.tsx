@@ -242,7 +242,16 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
         return;
       }
       router.replace(VENDOR_HREF.root);
-    } catch (e) { setError(friendlyErrorMessage(e, 'La création du compte a échoué.')); }
+    } catch (e) {
+      const reqId = (e as { requestId?: string })?.requestId;
+      const msg = friendlyErrorMessage(e, 'La création du compte a échoué.');
+      if (reqId) {
+        console.warn('[signup] échec création commerce', { reqId, message: msg });
+      } else {
+        console.warn('[signup] échec création commerce', e);
+      }
+      setError(reqId ? `${msg} (ref. ${reqId.slice(0, 8)})` : msg);
+    }
     finally { setIsSubmitting(false); }
   };
 

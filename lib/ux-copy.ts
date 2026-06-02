@@ -140,7 +140,7 @@ export function friendlyErrorMessage(raw: unknown, fallback: string = UX_ERRORS.
   if (/mot de passe|credentials|identifiant|403 forbidden/i.test(lower) && /incorrect|invalide|refus/i.test(lower)) {
     return UX_ERRORS.auth;
   }
-  if (/otp|code.*sms|vérification/i.test(lower) && /invalide|expir/i.test(lower)) {
+  if (/otp|code.*sms|vérification/i.test(lower) && (/invalide|expir|introuvable|incorrect/i.test(lower))) {
     return UX_ERRORS.otp;
   }
   if (/sous-commande|sous_commande/i.test(lower)) {
@@ -154,11 +154,15 @@ export function friendlyErrorMessage(raw: unknown, fallback: string = UX_ERRORS.
     if (lower.includes(needle)) return replacement;
   }
 
-  if (/^[a-z]+(_[a-z]+)+$/.test(lower)) {
-    return fallback;
+  // Identifiant technique type snake_case (ex. "enterprise_already_exists") : on le montre tel quel
+  // pour que le dev puisse le tracer, plutôt que de masquer derrière le générique.
+  if (/^[a-z][a-z0-9]*(_[a-z0-9]+)+$/.test(lower)) {
+    return trimmed;
   }
 
-  if (trimmed.length > 120) return fallback;
+  if (trimmed.length > 180) {
+    return trimmed.slice(0, 177) + '…';
+  }
 
   return trimmed;
 }
