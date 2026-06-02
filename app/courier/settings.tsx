@@ -18,6 +18,7 @@ import { ThemeModePicker } from '@/components/theme-mode-picker';
 import { BiometricLockToggle } from '@/components/biometric-lock-toggle';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { ThemedText } from '@/components/themed-text';
+import { FormErrorBanner } from '@/components/form-error-banner';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useCourier } from '@/contexts/courier-context';
 import { apiFetch } from '@/lib/api';
@@ -153,11 +154,12 @@ export default function CourierSettingsScreen() {
             hint="L’apparence s’applique à tout l’espace livreur."
           />
 
-          {error ? (
-            <View style={[styles.err, { borderColor: palette.border }]}>
-              <ThemedText style={[styles.errText, { color: palette.danger }]}>{error}</ThemedText>
-            </View>
-          ) : null}
+          <FormErrorBanner
+            message={error}
+            colors={{ error: palette.danger, errorSoft: palette.dangerBg }}
+            title="Mise à jour impossible"
+            onDismiss={() => setError(null)}
+          />
           <ThemedText style={[styles.section, { color: palette.primaryDeep }]}>Informations</ThemedText>
           <View style={[styles.group, { backgroundColor: palette.card, borderColor: palette.border }]}>
             <Field icon={<User size={18} color={palette.primary} />} label="Nom" value={nom} onChangeText={setNom} palette={palette} />
@@ -344,8 +346,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   secondaryBtnText: { fontWeight: '800' },
-  err: { padding: 12, borderRadius: 12, borderWidth: 1 },
-  errText: { fontWeight: '600' },
   ok: { padding: 12, borderRadius: 12, borderWidth: 1 },
   okText: { fontWeight: '600' },
 });

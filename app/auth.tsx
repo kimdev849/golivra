@@ -17,6 +17,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { FormErrorBanner } from '@/components/form-error-banner';
 import type { AppPalette } from '@/constants/app-palette';
 import { brandGradient3 } from '@/constants/app-palette';
 import { useAppColors } from '@/hooks/use-app-colors';
@@ -119,7 +120,12 @@ export default function AuthScreen() {
           </View>
 
           <View style={[styles.formWrapper, { width }]}>
-            {error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
+            <FormErrorBanner
+              message={error}
+              colors={colors}
+              title="Connexion impossible"
+              onDismiss={() => setError(null)}
+            />
 
             <ThemedView style={styles.inputCard}>
               <View style={styles.inputIcon}>
@@ -302,17 +308,6 @@ function makeAuthStyles(c: AppPalette) {
     inputLabel: { fontSize: 12, fontWeight: '800', color: c.textSecondary },
     inputField: { paddingVertical: 0, fontSize: 16, color: c.text, minHeight: 22 },
     eyeButton: { paddingHorizontal: 4, paddingVertical: 6 },
-    errorText: {
-      color: c.error,
-      fontWeight: '700',
-      backgroundColor: c.errorSoft,
-      borderWidth: 1,
-      borderColor: c.error,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      borderRadius: 14,
-      width: '100%',
-    },
     buttonPressed: {
       opacity: 0.88,
       transform: [{ scale: 0.995 }],

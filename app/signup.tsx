@@ -17,6 +17,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as ImagePicker from 'expo-image-picker';
 
 import { CategoryPicker } from '@/components/category-picker';
+import { FormErrorBanner } from '@/components/form-error-banner';
 import { InlineFormError } from '@/components/inline-form-error';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -263,11 +264,12 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
           <View style={[styles.formPage, { width }]}>
             <View style={[styles.formCard, { width: formWidth, borderColor: colors.border, backgroundColor: colors.surface }]}>
               <View style={[styles.cardAccent, { backgroundColor: colors.primary }]} />
-              {error ? (
-                <View style={[styles.errorText, { backgroundColor: colors.errorSoft, borderColor: colors.border }]}>
-                  <ThemedText style={{ color: colors.error, fontWeight: '700' }}>{error}</ThemedText>
-                </View>
-              ) : null}
+              <FormErrorBanner
+                message={error}
+                colors={colors}
+                title="Inscription impossible"
+                onDismiss={() => setError(null)}
+              />
 
               {profile === 'client' ? (
                 <View style={[styles.inputCard, { borderColor: colors.inputBorder, backgroundColor: colors.inputBg }]}>
@@ -491,7 +493,6 @@ const styles = StyleSheet.create({
   imagePickRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   imagePickHint: { fontSize: 12, lineHeight: 16 },
   imageThumb: { width: 34, height: 34, borderRadius: 10, borderWidth: 1 },
-  errorText: { fontWeight: '700', borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14 },
   sectionTitle: { marginTop: 10, fontSize: 14, fontWeight: '800', letterSpacing: 0.35, textTransform: 'uppercase' },
   buttonDisabled: { opacity: 0.65 },
   buttonPressed: { opacity: 0.88, transform: [{ scale: 0.995 }] },

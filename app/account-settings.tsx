@@ -17,6 +17,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { FormErrorBanner } from '@/components/form-error-banner';
+import { FormSuccessBanner } from '@/components/form-success-banner';
 import { BiometricLockToggle } from '@/components/biometric-lock-toggle';
 import { DeleteAccountSection } from '@/components/delete-account-section';
 import { InlineFormError } from '@/components/inline-form-error';
@@ -246,21 +248,24 @@ export default function AccountSettingsScreen() {
             </View>
           ) : (
             <>
-              {error ? (
-                <View style={[styles.bannerErr, { backgroundColor: colors.errorSoft, borderColor: colors.border }]}>
-                  <ThemedText style={[styles.bannerErrText, { color: colors.error }]}>{error}</ThemedText>
-                </View>
-              ) : null}
-              {profileOk ? (
-                <View style={[styles.bannerOk, { backgroundColor: colors.successSoft, borderColor: colors.border }]}>
-                  <ThemedText style={[styles.bannerOkText, { color: colors.success }]}>{profileOk}</ThemedText>
-                </View>
-              ) : null}
-              {passwordOk ? (
-                <View style={[styles.bannerOk, { backgroundColor: colors.successSoft, borderColor: colors.border }]}>
-                  <ThemedText style={[styles.bannerOkText, { color: colors.success }]}>{passwordOk}</ThemedText>
-                </View>
-              ) : null}
+              <FormErrorBanner
+                message={error}
+                colors={colors}
+                title="Mise à jour impossible"
+                onDismiss={() => setError(null)}
+              />
+              <FormSuccessBanner
+                message={profileOk}
+                colors={colors}
+                title="Profil mis à jour"
+                onDismiss={() => setProfileOk(null)}
+              />
+              <FormSuccessBanner
+                message={passwordOk}
+                colors={colors}
+                title="Sécurité renforcée"
+                onDismiss={() => setPasswordOk(null)}
+              />
 
               {!isMerchant ? (
                 <>
@@ -482,20 +487,6 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 16, paddingTop: 12 },
   loader: { alignItems: 'center', paddingVertical: 40, gap: 12 },
   muted: { fontSize: 14 },
-  bannerErr: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-  },
-  bannerErrText: { fontWeight: '600', fontSize: 14 },
-  bannerOk: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-  },
-  bannerOkText: { fontWeight: '600', fontSize: 14 },
   sectionHeader: {
     fontSize: 13,
     fontWeight: '600',

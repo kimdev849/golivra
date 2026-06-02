@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { FormErrorBanner } from '@/components/form-error-banner';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { resetPassword } from '@/lib/auth';
@@ -121,11 +122,12 @@ export default function ForgotPasswordScreen() {
                 : 'Votre mot de passe a été mis à jour.'}
           </ThemedText>
 
-          {error ? (
-            <ThemedText style={[styles.errorText, { color: colors.error, backgroundColor: colors.errorSoft, borderColor: colors.border }]}>
-              {error}
-            </ThemedText>
-          ) : null}
+          <FormErrorBanner
+            message={error}
+            colors={colors}
+            title="Action impossible"
+            onDismiss={() => setError(null)}
+          />
           {testOtp ? (
             <ThemedText style={[styles.hint, { color: colors.warning }]}>Code test (dev) : {testOtp}</ThemedText>
           ) : null}
@@ -236,14 +238,6 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.65 },
   btnText: { color: '#FFF', fontWeight: '800', fontSize: 16 },
-  errorText: {
-    fontWeight: '700',
-    borderWidth: 1,
-    padding: 10,
-    borderRadius: 12,
-    marginBottom: 8,
-    maxWidth: 400,
-  },
   hint: { fontWeight: '700', marginBottom: 8 },
   backLink: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 20 },
   backText: { fontWeight: '800' },
