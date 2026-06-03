@@ -222,8 +222,12 @@ export function VendorProductFormWizard({
     }
 
     for (const item of values.gallery) {
-      const up = await uploadImageBase64(token, { dataUrl: item.dataUrl, folder: 'products' });
-      galleryUrls.push(up.url);
+      if (item.dataUrl) {
+        const up = await uploadImageBase64(token, { dataUrl: item.dataUrl, folder: 'products' });
+        galleryUrls.push(up.url);
+      } else if (item.uri.startsWith('http')) {
+        galleryUrls.push(item.uri);
+      }
     }
 
     return { mainUrl, galleryUrls };
