@@ -266,22 +266,35 @@ export function VendorMenuItemFormWizard({
         </View>
       </View>
       <View style={styles.stepBar}>
-        {MENU_ITEM_STEPS.map((label, i) => (
-          <View key={label} style={styles.stepItem}>
-            <View
-              style={[
-                styles.stepDot,
-                { backgroundColor: colors.border },
-                i <= step && { backgroundColor: palette.primary },
-                i === step && { borderWidth: 2, borderColor: colors.success, transform: [{ scale: 1.25 }] },
-              ]}>
-              <ThemedText style={[styles.stepNum, i <= step && { color: colors.onPrimary }]}>{i + 1}</ThemedText>
-            </View>
-            <ThemedText style={[styles.stepLabel, i === step && { color: colors.text, fontWeight: '800' }]}>
-              {label}
-            </ThemedText>
-          </View>
-        ))}
+        {MENU_ITEM_STEPS.map((label, i) => {
+          const reached = i <= step;
+          const current = i === step;
+          return (
+            <Pressable
+              key={label}
+              accessibilityRole="button"
+              accessibilityLabel={`Aller à l'étape ${i + 1} : ${label}`}
+              onPress={() => {
+                if (i === step) return;
+                setStepErrors({});
+                setStep(i);
+              }}
+              style={({ pressed }) => [styles.stepItem, pressed && { opacity: 0.6 }]}>
+              <View
+                style={[
+                  styles.stepDot,
+                  { backgroundColor: colors.border },
+                  reached && { backgroundColor: palette.primary },
+                  current && { borderWidth: 2, borderColor: colors.success, transform: [{ scale: 1.25 }] },
+                ]}>
+                <ThemedText style={[styles.stepNum, reached && { color: colors.onPrimary }]}>{i + 1}</ThemedText>
+              </View>
+              <ThemedText style={[styles.stepLabel, current && { color: colors.text, fontWeight: '800' }]}>
+                {label}
+              </ThemedText>
+            </Pressable>
+          );
+        })}
       </View>
 
       <KeyboardAvoidingView
@@ -586,10 +599,25 @@ export function VendorMenuItemFormWizard({
           </ThemedText>
         </Pressable>
         {step < MENU_ITEM_STEPS.length - 1 ? (
-          <Pressable style={[styles.footerNext, { backgroundColor: palette.primary }]} onPress={goNext}>
-            <ThemedText style={styles.footerNextTxt}>Suivant</ThemedText>
-            <ChevronRight size={20} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
-          </Pressable>
+          <View style={styles.footerRightCluster}>
+            {mode === 'edit' ? (
+              <Pressable
+                style={[styles.footerSaveNow, { borderColor: palette.primary }]}
+                onPress={() => void submit()}
+                disabled={saving}
+                accessibilityLabel="Enregistrer maintenant">
+                {saving ? (
+                  <ActivityIndicator color={palette.primary} />
+                ) : (
+                  <ThemedText style={[styles.footerSaveNowTxt, { color: palette.primary }]}>Enregistrer</ThemedText>
+                )}
+              </Pressable>
+            ) : null}
+            <Pressable style={[styles.footerNext, { backgroundColor: palette.primary }]} onPress={goNext}>
+              <ThemedText style={styles.footerNextTxt}>Suivant</ThemedText>
+              <ChevronRight size={20} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
+            </Pressable>
+          </View>
         ) : (
           <Pressable
             style={[styles.footerNext, { backgroundColor: palette.primaryDeep, opacity: saving ? 0.7 : 1 }]}
@@ -775,6 +803,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   footerBack: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 12 },
+  footerRightCluster: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   footerNext: {
     flex: 1,
     flexDirection: 'row',
@@ -785,6 +814,16 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
   },
   footerNextTxt: { fontWeight: '800', fontSize: 15 },
+  footerSaveNow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+  },
+  footerSaveNowTxt: { fontWeight: '800', fontSize: 14 },
   modalBg: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',
