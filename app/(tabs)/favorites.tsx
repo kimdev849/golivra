@@ -1,189 +1,434 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
-import { ChevronRight, Heart, LayoutGrid, Store, UtensilsCrossed } from 'lucide-react-native';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  View,
+} from 'react-native';
+import {
+  ChevronRight,
+  Heart,
+  Store,
+  UtensilsCrossed,
+} from 'lucide-react-native';
 import { Image } from 'expo-image';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { TAB_BAR_CONTENT_PADDING_BOTTOM } from '@/constants/layout';
-import type { EnterprisePublic } from '@/lib/catalog';
+import type { EnterprisePublic, ProductPublic } from '@/lib/catalog';
 import { fetchAllEnterprises, peekAllEnterprises } from '@/lib/client-data';
-import { getFavoriteEnterpriseIds } from '@/lib/favorites';
+import { fetchProductFeed } from '@/lib/catalog';
+import { formatFcfa } from '@/lib/format';
+import { getEffectiveUnitPrice } from '@/lib/product-promo';
+import {
+  getFavoriteEnterpriseIds,
+  getFavoriteProducts,
+  toggleFavoriteProduct,
+  type FavoriteProductRef,
+} from '@/lib/favorites';
 import { resolveRemoteImageUrl } from '@/lib/images';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppColors } from '@/hooks/use-app-colors';
+
+type TabKey = 'commerces' | 'produits';
 
 export default function FavoritesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
-  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+  const [tab, setTab] = useState<TabKey>('commerces');
+
+  // Commerces
   const [enterprises, setEnterprises] = useState<EnterprisePublic[]>([]);
-  const [loading, setLoading] = useState(() => !peekAllEnterprises()?.length);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loadingEnt, setLoadingEnt] = useState(true);
+  const [refreshingEnt, setRefreshingEnt] = useState(false);
+  const [errorEnt, setErrorEnt] = useState<string | null>(null);
+  const [favoriteEntIds, setFavoriteEntIds] = useState<string[]>([]);
+
+  // Produits
+  const [favProductRefs, setFavProductRefs] = useState<FavoriteProductRef[]>([]);
+  const [favProducts, setFavProducts] = useState<ProductPublic[]>([]);
+  const [loadingProd, setLoadingProd] = useState(true);
+  const [refreshingProd, setRefreshingProd] = useState(false);
+  const [errorProd, setErrorProd] = useState<string | null>(null);
 
   const bottomPad = Math.max(insets.bottom, 16) + TAB_BAR_CONTENT_PADDING_BOTTOM;
 
-  const applyFavorites = useCallback((ids: string[], list: EnterprisePublic[]) => {
-    const idSet = new Set(ids);
-    setEnterprises(list.filter((e) => idSet.has(e.id)));
-  }, []);
-
-  const load = useCallback(async (force = false) => {
-    setError(null);
+  const loadEnterprises = useCallback(async (force = false) => {
+    setErrorEnt(null);
     try {
       const ids = await getFavoriteEnterpriseIds();
-      setFavoriteIds(ids);
+      setFavoriteEntIds(ids);
       if (ids.length === 0) {
         setEnterprises([]);
         return;
       }
       const cached = peekAllEnterprises();
-      if (cached?.length) applyFavorites(ids, cached);
+      if (cached?.length) {
+        const idSet = new Set(ids);
+        setEnterprises(cached.filter((e) => idSet.has(e.id)));
+      }
       const data = await fetchAllEnterprises(force);
-      applyFavorites(ids, data);
+      const idSet = new Set(ids);
+      setEnterprises(data.filter((e) => idSet.has(e.id)));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Impossible de charger les favoris.');
+      setErrorEnt(e instanceof Error ? e.message : 'Impossible de charger les favoris.');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      setLoadingEnt(false);
+      setRefreshingEnt(false);
     }
-  }, [applyFavorites]);
+  }, []);
+
+  const loadProducts = useCallback(async (force = false) => {
+    setErrorProd(null);
+    try {
+      const refs = await getFavoriteProducts();
+      setFavProductRefs(refs);
+      if (refs.length === 0) {
+        setFavProducts([]);
+        return;
+      }
+      // Charge les 2 feeds en parallele.
+      const [plats, articles] = await Promise.all([
+        fetchProductFeed({ type: 'plat', limit: 100, offset: 0 }),
+        fetchProductFeed({ type: 'article', limit: 100, offset: 0 }),
+      ]);
+      const refSet = new Set(refs.map((r) => `${r.produit_kind}:${r.produit_id}`));
+      const merged = [...plats, ...articles].filter((p) => {
+        const kind: 'plat' | 'article' = p.kind === 'article' ? 'article' : 'plat';
+        return refSet.has(`${kind}:${p.id}`);
+      });
+      // Tri par date de favoris (created_at) si possible, sinon ordre d'origine.
+      const orderMap = new Map(refs.map((r, i) => [`${r.produit_kind}:${r.produit_id}`, i]));
+      merged.sort((a, b) => {
+        const ka = `${a.kind === 'article' ? 'article' : 'plat'}:${a.id}`;
+        const kb = `${b.kind === 'article' ? 'article' : 'plat'}:${b.id}`;
+        return (orderMap.get(ka) ?? 0) - (orderMap.get(kb) ?? 0);
+      });
+      setFavProducts(merged);
+      void force; // force non utilise ici (pas de cache dedie produits)
+    } catch (e) {
+      setErrorProd(e instanceof Error ? e.message : 'Impossible de charger les favoris produits.');
+    } finally {
+      setLoadingProd(false);
+      setRefreshingProd(false);
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      const cached = peekAllEnterprises();
-      if (cached?.length) {
-        setLoading(false);
-        void getFavoriteEnterpriseIds().then((ids) => {
-          setFavoriteIds(ids);
-          applyFavorites(ids, cached);
-        });
-      }
-      void load();
-    }, [load, applyFavorites])
+      void loadEnterprises();
+      void loadProducts();
+    }, [loadEnterprises, loadProducts]),
   );
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    void load();
+  const onRefreshEnt = () => {
+    setRefreshingEnt(true);
+    void loadEnterprises(true);
+  };
+
+  const onRefreshProd = () => {
+    setRefreshingProd(true);
+    void loadProducts(true);
+  };
+
+  const onUnfavProduct = async (p: ProductPublic) => {
+    const kind: 'plat' | 'article' = p.kind === 'article' ? 'article' : 'plat';
+    setFavProducts((prev) => prev.filter((x) => x.id !== p.id));
+    setFavProductRefs((prev) =>
+      prev.filter((r) => !(r.produit_id === p.id && r.produit_kind === kind)),
+    );
+    try {
+      await toggleFavoriteProduct(p.id, kind);
+    } catch {
+      // Revert en cas d'erreur
+      setFavProducts((prev) => [p, ...prev]);
+      setFavProductRefs((prev) => [...prev, { produit_id: p.id, produit_kind: kind }]);
+    }
   };
 
   return (
     <ThemedView style={styles.screen}>
-      <View style={[styles.heroGlow, { backgroundColor: colors.heroGlow }]} />
-      <FlatList
-        data={enterprises}
-        keyExtractor={(item) => item.id}
-        ListHeaderComponent={
-          <View style={[styles.head, { paddingTop: Math.max(insets.top, 14) }]}>
-            <ThemedText type="title" style={[styles.title, { color: colors.primaryDeep }]}>
-              Favoris
-            </ThemedText>
-            <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>Commerces enregistrés depuis l'accueil.</ThemedText>
-          </View>
-        }
-        ListEmptyComponent={
-          loading ? (
-            <View style={styles.center}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <ThemedText style={[styles.muted, { color: colors.textMuted }]}>Chargement…</ThemedText>
-            </View>
-          ) : error ? (
-            <View style={[styles.stateCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-              <ActivityIndicator color={colors.primary} />
-              <ThemedText style={[styles.stateBody, { color: colors.textMuted }]}>Chargement des favoris…</ThemedText>
-              <Pressable style={[styles.retry, { backgroundColor: colors.primary }]} onPress={() => void load(true)}>
-                <ThemedText style={[styles.retryText, { color: colors.surface }]}>Actualiser</ThemedText>
-              </Pressable>
-            </View>
-          ) : favoriteIds.length === 0 ? (
-            <View style={[styles.stateCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-              <View style={[styles.emptyIcon, { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong }]}>
-                <Heart size={28} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-              </View>
-              <ThemedText style={[styles.stateTitle, { color: colors.primaryDeep }]}>Aucun favori</ThemedText>
-              <ThemedText style={[styles.stateBody, { color: colors.textMuted }]}>
-                Touchez le cœur sur un commerce dans l'accueil pour le retrouver ici.
-              </ThemedText>
-              <Pressable style={[styles.retry, { backgroundColor: colors.primary }]} onPress={() => router.push('/(tabs)')}>
-                <ThemedText style={[styles.retryText, { color: colors.surface }]}>Retour à l'accueil</ThemedText>
-              </Pressable>
-            </View>
-          ) : (
-            <View style={[styles.stateCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-              <LayoutGrid size={36} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-              <ThemedText style={[styles.stateTitle, { color: colors.primaryDeep }]}>Favoris indisponibles</ThemedText>
-              <ThemedText style={[styles.stateBody, { color: colors.textMuted }]}>
-                Ces commerces ne sont plus listés comme ouverts.
-              </ThemedText>
-              <Pressable style={[styles.retry, { backgroundColor: colors.primary }]} onPress={onRefresh}>
-                <ThemedText style={[styles.retryText, { color: colors.surface }]}>Actualiser</ThemedText>
-              </Pressable>
-            </View>
-          )
-        }
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        contentContainerStyle={[styles.list, { paddingBottom: bottomPad }]}
-        renderItem={({ item }) => {
-          const img = resolveRemoteImageUrl(item.image_url);
-          return (
-            <Pressable
-              style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}
-              onPress={() => router.push(`/(tabs)/marketplace/${item.id}`)}
-              android_ripple={{ color: colors.primaryMuted }}>
-              <View style={[styles.thumbWrap, { backgroundColor: colors.primarySoft }]}>
-                {img ? (
-                  <Image source={{ uri: img }} style={styles.thumb} contentFit="cover" />
-                ) : (
-                  <View style={[styles.thumb, styles.thumbPh]}>
-                    {item.type === 'restaurant' ? (
-                      <UtensilsCrossed size={30} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-                    ) : (
-                      <Store size={30} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-                    )}
-                  </View>
-                )}
-              </View>
-              <View style={{ flex: 1 }}>
-                <ThemedText type="defaultSemiBold" style={[styles.rowTitle, { color: colors.text }]}>
-                  {item.nom ?? 'Commerce'}
+      <View style={[styles.head, { paddingTop: Math.max(insets.top, 14) }]}>
+        <ThemedText type="title" style={[styles.title, { color: colors.primaryDeep }]}>
+          Favoris
+        </ThemedText>
+        <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>
+          Commerces et produits que vous avez enregistrés.
+        </ThemedText>
+
+        {/* TABS */}
+        <View style={[styles.tabsWrap, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
+          {(['commerces', 'produits'] as TabKey[]).map((k) => {
+            const active = tab === k;
+            return (
+              <Pressable
+                key={k}
+                onPress={() => setTab(k)}
+                style={[
+                  styles.tab,
+                  active && { backgroundColor: colors.surface },
+                ]}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}>
+                <ThemedText
+                  style={[
+                    styles.tabTxt,
+                    { color: active ? colors.text : colors.textMuted },
+                    active && { fontWeight: '800' },
+                  ]}>
+                  {k === 'commerces' ? 'Commerces' : 'Produits'}
                 </ThemedText>
-                <View style={[styles.badge, { backgroundColor: colors.primarySoft }]}>
-                  <ThemedText style={[styles.badgeText, { color: colors.primary }]}>{item.type === 'restaurant' ? 'Restaurant' : 'Boutique'}</ThemedText>
-                </View>
-                {item.adresse ? (
-                  <ThemedText style={[styles.rowAddr, { color: colors.textMuted }]} numberOfLines={2}>
-                    {item.adresse}
-                  </ThemedText>
-                ) : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      {tab === 'commerces' ? (
+        <FlatList
+          data={enterprises}
+          keyExtractor={(item) => `ent-${item.id}`}
+          contentContainerStyle={[styles.list, { paddingBottom: bottomPad }]}
+          ListEmptyComponent={
+            loadingEnt ? (
+              <View style={styles.center}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <ThemedText style={[styles.muted, { color: colors.textMuted }]}>Chargement…</ThemedText>
               </View>
-              <ChevronRight size={22} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-            </Pressable>
-          );
-        }}
-      />
+            ) : errorEnt ? (
+              <StateCard
+                title="Oups"
+                body={errorEnt}
+                ctaLabel="Réessayer"
+                onCta={() => void loadEnterprises(true)}
+                colors={colors}
+              />
+            ) : favoriteEntIds.length === 0 ? (
+              <StateCard
+                icon={<Heart size={28} color={colors.primary} strokeWidth={LUCIDE_STROKE} />}
+                title="Aucun commerce favori"
+                body="Touchez le cœur sur un commerce dans l'accueil pour le retrouver ici."
+                ctaLabel="Retour à l'accueil"
+                onCta={() => router.push('/(tabs)')}
+                colors={colors}
+              />
+            ) : (
+              <StateCard
+                title="Commerces indisponibles"
+                body="Ces commerces ne sont plus listés comme ouverts."
+                ctaLabel="Actualiser"
+                onCta={onRefreshEnt}
+                colors={colors}
+              />
+            )
+          }
+          refreshControl={
+            <RefreshControl refreshing={refreshingEnt} onRefresh={onRefreshEnt} tintColor={colors.primary} />
+          }
+          renderItem={({ item }) => {
+            const img = resolveRemoteImageUrl(item.image_url);
+            return (
+              <Pressable
+                style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}
+                onPress={() => router.push(`/(tabs)/marketplace/${item.id}`)}
+                android_ripple={{ color: colors.primaryMuted }}>
+                <View style={[styles.thumbWrap, { backgroundColor: colors.primarySoft }]}>
+                  {img ? (
+                    <Image source={{ uri: img }} style={styles.thumb} contentFit="cover" />
+                  ) : (
+                    <View style={[styles.thumb, styles.thumbPh]}>
+                      {item.type === 'restaurant' ? (
+                        <UtensilsCrossed size={30} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+                      ) : (
+                        <Store size={30} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+                      )}
+                    </View>
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText type="defaultSemiBold" style={[styles.rowTitle, { color: colors.text }]} numberOfLines={2}>
+                    {item.nom ?? 'Commerce'}
+                  </ThemedText>
+                  <View style={[styles.badge, { backgroundColor: colors.primarySoft }]}>
+                    <ThemedText style={[styles.badgeText, { color: colors.primary }]}>
+                      {item.type === 'restaurant' ? 'Restaurant' : 'Boutique'}
+                    </ThemedText>
+                  </View>
+                  {item.adresse ? (
+                    <ThemedText style={[styles.rowAddr, { color: colors.textMuted }]} numberOfLines={2}>
+                      {item.adresse}
+                    </ThemedText>
+                  ) : null}
+                </View>
+                <ChevronRight size={22} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+              </Pressable>
+            );
+          }}
+        />
+      ) : (
+        <FlatList
+          data={favProducts}
+          keyExtractor={(item) => `p-${item.kind}-${item.id}`}
+          numColumns={2}
+          columnWrapperStyle={styles.gridRow}
+          contentContainerStyle={[styles.list, { paddingBottom: bottomPad }]}
+          ListEmptyComponent={
+            loadingProd ? (
+              <View style={styles.center}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <ThemedText style={[styles.muted, { color: colors.textMuted }]}>Chargement…</ThemedText>
+              </View>
+            ) : errorProd ? (
+              <StateCard
+                title="Oups"
+                body={errorProd}
+                ctaLabel="Réessayer"
+                onCta={() => void loadProducts(true)}
+                colors={colors}
+              />
+            ) : favProductRefs.length === 0 ? (
+              <StateCard
+                icon={<Heart size={28} color={colors.primary} strokeWidth={LUCIDE_STROKE} />}
+                title="Aucun produit favori"
+                body="Touchez le cœur sur un produit dans l'accueil pour le retrouver ici."
+                ctaLabel="Retour à l'accueil"
+                onCta={() => router.push('/(tabs)')}
+                colors={colors}
+              />
+            ) : (
+              <StateCard
+                title="Produits indisponibles"
+                body="Ces produits ne sont plus listés. Ils ont peut-être été retirés par le vendeur."
+                ctaLabel="Actualiser"
+                onCta={onRefreshProd}
+                colors={colors}
+              />
+            )
+          }
+          refreshControl={
+            <RefreshControl refreshing={refreshingProd} onRefresh={onRefreshProd} tintColor={colors.primary} />
+          }
+          renderItem={({ item, index }) => {
+            const kind = item.kind === 'article' ? 'article' : 'plat';
+            const basePrice = Number(getEffectiveUnitPrice(item) ?? item.prix ?? 0);
+            const isPromo = item.prix_promo != null && Number(item.prix_promo) < Number(item.prix);
+            const fallbackImage =
+              Array.isArray(item.images_urls) && item.images_urls.length > 0
+                ? item.images_urls[0]
+                : null;
+            const imageUrl = item.image_url || fallbackImage || null;
+            const image = resolveRemoteImageUrl(imageUrl);
+            const VendorIcon = kind === 'article' ? Store : UtensilsCrossed;
+            return (
+              <Pressable
+                onPress={() => router.push(`/(tabs)/product/${item.id}?kind=${kind}` as never)}
+                android_ripple={{ color: colors.primaryMuted }}
+                style={[
+                  styles.productCard,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    marginLeft: index % 2 === 0 ? 0 : 10,
+                  },
+                ]}>
+                <View style={[styles.productImgWrap, { backgroundColor: colors.primarySoft }]}>
+                  {image ? (
+                    <Image source={{ uri: image }} style={styles.productImg} contentFit="cover" />
+                  ) : (
+                    <VendorIcon size={32} color={colors.primary} strokeWidth={1.2} />
+                  )}
+                  <Pressable
+                    style={[styles.productFavBtn, { backgroundColor: colors.surface }]}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      void onUnfavProduct(item);
+                    }}
+                    hitSlop={6}
+                    accessibilityLabel="Retirer des favoris">
+                    <Heart size={14} color={colors.error} fill={colors.error} strokeWidth={LUCIDE_STROKE} />
+                  </Pressable>
+                </View>
+                <View style={styles.productBody}>
+                  <ThemedText style={[styles.productName, { color: colors.text }]} numberOfLines={2}>
+                    {item.nom || 'Produit'}
+                  </ThemedText>
+                  {isPromo ? (
+                    <View style={styles.productPriceRow}>
+                      <ThemedText style={[styles.productPrice, { color: colors.primary }]}>
+                        {formatFcfa(Number(item.prix_promo))}
+                      </ThemedText>
+                      <ThemedText style={[styles.productOldPrice, { color: colors.textMuted }]}>
+                        {formatFcfa(Number(item.prix))}
+                      </ThemedText>
+                    </View>
+                  ) : (
+                    <ThemedText style={[styles.productPrice, { color: colors.text }]}>
+                      {formatFcfa(basePrice)}
+                    </ThemedText>
+                  )}
+                </View>
+              </Pressable>
+            );
+          }}
+        />
+      )}
     </ThemedView>
+  );
+}
+
+type StateCardProps = {
+  title: string;
+  body: string;
+  ctaLabel: string;
+  onCta: () => void;
+  icon?: React.ReactNode;
+  colors: ReturnType<typeof useAppColors>;
+};
+
+function StateCard({ title, body, ctaLabel, onCta, icon, colors }: StateCardProps) {
+  return (
+    <View style={[styles.stateCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+      {icon ? (
+        <View style={[styles.emptyIcon, { backgroundColor: colors.primarySoft, borderColor: colors.border }]}>
+          {icon}
+        </View>
+      ) : null}
+      <ThemedText style={[styles.stateTitle, { color: colors.primaryDeep }]}>{title}</ThemedText>
+      <ThemedText style={[styles.stateBody, { color: colors.textMuted }]}>{body}</ThemedText>
+      <Pressable style={[styles.retry, { backgroundColor: colors.primary }]} onPress={onCta}>
+        <ThemedText style={[styles.retryText, { color: colors.surface }]}>{ctaLabel}</ThemedText>
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  heroGlow: {
-    position: 'absolute',
-    top: -140,
-    left: -90,
-    width: 360,
-    height: 360,
-    borderRadius: 220,
-  },
-  head: { paddingHorizontal: 20, marginBottom: 14 },
+  head: { paddingHorizontal: 20, marginBottom: 14, gap: 8 },
   title: { fontSize: 28, fontWeight: '800' },
-  subtitle: { marginTop: 8, fontSize: 15, lineHeight: 22, opacity: 0.92 },
+  subtitle: { fontSize: 15, lineHeight: 22, opacity: 0.92 },
+  tabsWrap: {
+    flexDirection: 'row',
+    marginTop: 14,
+    padding: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+  tabTxt: { fontSize: 14, fontWeight: '700' },
   list: { paddingHorizontal: 20, flexGrow: 1, gap: 14 },
   center: { paddingVertical: 48, alignItems: 'center', gap: 12 },
   muted: { fontSize: 15 },
@@ -219,7 +464,6 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 11, fontWeight: '800' },
   rowAddr: { fontSize: 13, marginTop: 8, lineHeight: 18 },
   stateCard: {
-    marginHorizontal: 4,
     marginTop: 12,
     borderRadius: 20,
     borderWidth: 1,
@@ -227,7 +471,6 @@ const styles = StyleSheet.create({
     gap: 12,
     alignItems: 'center',
   },
-  stateError: {},
   emptyIcon: {
     width: 56,
     height: 56,
@@ -245,4 +488,35 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   retryText: { fontWeight: '800' },
+  // Product grid
+  gridRow: { gap: 0, marginBottom: 10 },
+  productCard: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  productImgWrap: {
+    width: '100%',
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  productImg: { width: '100%', height: '100%' },
+  productFavBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  productBody: { padding: 10, gap: 4 },
+  productName: { fontSize: 13, fontWeight: '700', minHeight: 32 },
+  productPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  productPrice: { fontSize: 14, fontWeight: '800' },
+  productOldPrice: { fontSize: 11, textDecorationLine: 'line-through' },
 });
