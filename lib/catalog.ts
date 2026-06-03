@@ -43,6 +43,30 @@ export type ProductPublic = {
   nb_vues?: number;
   nb_clics?: number;
   nb_ventes?: number;
+  /** Options de personnalisation (uniquement plats) : groupes de choix avec supplément. */
+  options?: ProductOptionGroup[] | null;
+  /** Tags / catégories secondaires (utile pour la fiche produit). */
+  tags?: string[] | null;
+  /** Catégorie de produit (FK categorie_id resolue cote API). */
+  categorie_id?: string | null;
+  /** Hydratation par le feed cross-commerces (optionnel sur l'endpoint /enterprise/:id). */
+  enterprise_nom?: string | null;
+  enterprise_type?: 'restaurant' | 'boutique' | null;
+  enterprise_image_url?: string | null;
+};
+
+export type ProductOptionGroup = {
+  nom: string;
+  /** true = au moins un choix obligatoire. */
+  requis?: boolean;
+  choix: { label: string; prix_sup?: number }[];
+};
+
+export type ProductFeedParams = {
+  type?: 'plat' | 'article' | 'all';
+  promo?: boolean;
+  limit?: number;
+  offset?: number;
 };
 
 export async function fetchEnterpriseById(id: string, force = false): Promise<EnterprisePublic> {
@@ -51,6 +75,39 @@ export async function fetchEnterpriseById(id: string, force = false): Promise<En
 
 export async function fetchProductsForEnterprise(enterpriseId: string, force = false): Promise<ProductPublic[]> {
   return fetchProductsForEnterpriseCached(enterpriseId, force);
+}
+
+/**
+ * Feed public de produits/dishes, agrege depuis TOUS les commerces actifs.
+ * Utilise par l'accueil client pour la grille 2 colonnes. Renvoie un tableau
+ * plat de produits enrichis avec enterprise_nom/type/image_url.
+ */
+export async function fetchProductFeed(params: ProductFeedParams = {}): Promise<ProductPublic[]> {
+  const search = new URLSearchParams();
+  if (params.type) search.set('type', params.type);
+  if (params.promo) search.set('promo', 'true');
+  if (params.limit != null) search.set('limit', String(params.limit));
+  if (params.offset != null) search.set('offset', String(params.offset));
+  const qs = search.toString();
+  return apiFetch<ProductPublic[]>(`/products/feed${qs ? `?${qs}` : ''}`, {
+    skipIncidentReport: true,
+  });
+}
+
+/**
+ * Fetch un produit par son id (cross-commerces) avec une seule requete.
+ * Si on connait deja l'entreprise, preferer fetchProductsForEnterprise
+ * (cache partage) + findById en local. Sinon, fallback sur le feed.
+ */
+export async function fetchProductById(
+  productId: string,
+  kind: 'plat' | 'article',
+): Promise<ProductPublic | null> {
+  // Strategie simple: requeter le feed avec une grande limite et filtrer.
+  // Les UUIDs sont uniques donc 1 match garanti. Pas de nouvel endpoint
+  // dedie pour eviter la duplication de logique.
+  const list = await fetchProductFeed({ type: kind, limit: 100 });
+  return list.find((p) => p.id === productId) ?? null;
 }
 
 /**

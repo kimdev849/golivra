@@ -64,3 +64,25 @@ export async function syncFavoritesRemote(token: string, enterpriseIds: string[]
     jsonBody: { enterpriseIds },
   });
 }
+
+export type FavoriteProductRef = {
+  produit_id: string;
+  produit_kind: 'plat' | 'article';
+  favorited_at?: string;
+};
+
+export async function fetchFavoriteProducts(token: string): Promise<{ items: FavoriteProductRef[] }> {
+  return apiFetch('/api/favorites/products', { method: 'GET', token });
+}
+
+export async function toggleFavoriteProductRemote(
+  token: string,
+  productId: string,
+  kind: 'plat' | 'article',
+): Promise<{ produit_id: string; produit_kind: string; favori: boolean }> {
+  return apiFetch('/api/favorites/products/toggle', {
+    method: 'POST',
+    token,
+    jsonBody: { produitId: productId, produitKind: kind },
+  });
+}
