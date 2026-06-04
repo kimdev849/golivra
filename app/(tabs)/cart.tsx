@@ -43,8 +43,10 @@ import { CLIENT_PAYMENT_METHODS, type ClientPaymentMethodId } from '@/lib/paymen
 import { resolveRemoteImageUrl } from '@/lib/images';
 import {
   DEFAULT_PUBLIC_PRICING,
+  deliveryFeeForQuartier,
   displayDeliveryFeeFcfa,
   fetchPublicPricing,
+  zoneLabelForQuartier,
   type PublicPricing,
 } from '@/lib/pricing';
 import { validatePromoCode, type PromoValidation } from '@/lib/promo-api';
@@ -163,11 +165,23 @@ export default function CartScreen() {
   const subtotal = useMemo(() => (cart ? cartTotal(cart) : 0), [cart]);
   const deliveryFeeForSegment = useCallback(
     (enterpriseId: string) => {
+      const p = pricing ?? DEFAULT_PUBLIC_PRICING;
+      if (p.zones?.zones?.length && address.quartier.trim()) {
+        return deliveryFeeForQuartier(address.quartier, p);
+      }
       const ent = enterpriseById[enterpriseId];
-      return displayDeliveryFeeFcfa(ent?.frais_livraison, pricing ?? DEFAULT_PUBLIC_PRICING);
+      return displayDeliveryFeeFcfa(ent?.frais_livraison, p);
     },
-    [enterpriseById, pricing],
+    [enterpriseById, pricing, address.quartier],
   );
+
+  const zoneDeliveryHint = useMemo(() => {
+    const p = pricing ?? DEFAULT_PUBLIC_PRICING;
+    if (!address.quartier.trim() || !p.zones?.zones?.length) return null;
+    const label = zoneLabelForQuartier(address.quartier, p);
+    const fee = deliveryFeeForQuartier(address.quartier, p);
+    return label ? `${label} · ${formatFcfa(fee)} / livraison` : `${formatFcfa(fee)} / livraison`;
+  }, [address.quartier, pricing]);
 
   const deliveryFeeTotal = useMemo(() => {
     if (!cart || segmentCount === 0) return 0;
@@ -465,6 +479,8 @@ export default function CartScreen() {
                 <DeliveryAddressForm value={address} onChange={setAddress} compact />
                 {!addressOk ? (
                   <ThemedText style={[styles.checkoutWarn, { color: colors.warning }]}>Quartier + description requis pour commander.</ThemedText>
+                ) : zoneDeliveryHint ? (
+                  <ThemedText style={[styles.checkoutWarn, { color: colors.primary }]}>{zoneDeliveryHint}</ThemedText>
                 ) : null}
               </View>
 
