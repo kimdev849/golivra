@@ -139,9 +139,7 @@ export default function TabLayout() {
           options={{
             href: null,
             title: 'Favoris',
-            tabBarIcon: ({ color, focused }) => (
-              <Heart size={24} color={color} strokeWidth={LUCIDE_STROKE} fill={focused ? color : 'none'} />
-            ),
+            tabBarIcon: ({ color }) => <Heart size={24} color={color} strokeWidth={LUCIDE_STROKE} />,
           }}
         />
       </Tabs>
