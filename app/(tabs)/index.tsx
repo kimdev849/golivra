@@ -51,6 +51,7 @@ import { resolveRemoteImageUrl } from '@/lib/images';
 import { toggleFavoriteProduct } from '@/lib/favorites';
 import { productDetailHref } from '@/lib/listing-utils';
 import { getEffectiveUnitPrice } from '@/lib/product-promo';
+import { trackInteraction } from '@/lib/tracking';
 
 const GRID_GAP = 8;
 const H_PAD = 10;
@@ -120,6 +121,15 @@ export default function ExplorerScreen() {
 
   const debouncedSearch = useDebouncedValue(search.trim(), 150);
   const searchActive = debouncedSearch.length >= 2;
+
+  useEffect(() => {
+    if (debouncedSearch.length >= 3) {
+      void trackInteraction({
+        type: 'search',
+        metadata: { query: debouncedSearch, category },
+      });
+    }
+  }, [debouncedSearch]);
 
   const { data: restaurants = [] } = useEnterprises('restaurant');
   const { data: boutiques = [] } = useEnterprises('boutique');
@@ -382,10 +392,7 @@ export default function ExplorerScreen() {
           return (
             <Pressable
               key={c.key}
-              onPress={() => {
-                void Haptics.selectionAsync();
-                setCategory(c.key);
-              }}
+              onPress={() => handleCategoryPress(c.key)}
               style={[
                 styles.chip,
                 {
@@ -516,6 +523,17 @@ export default function ExplorerScreen() {
       ) : null}
     </View>
   );
+
+  const handleCategoryPress = (key: ExplorerCategory) => {
+     if (category === key) return;
+     void Haptics.selectionAsync();
+     setCategory(key);
+     void trackInteraction({
+       type: 'category_click',
+       targetId: key,
+       targetType: 'category',
+     });
+   };
 
   return (
     <ThemedView style={[styles.screen, { backgroundColor: colors.background }]}>

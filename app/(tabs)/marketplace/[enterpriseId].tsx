@@ -47,6 +47,7 @@ import {
 } from '@/lib/product-stock';
 import { toggleFavorite, isFavorite } from '@/lib/favorites-api';
 import { getSessionToken } from '@/lib/auth';
+import { trackInteraction } from '@/lib/tracking';
 
 export default function EnterpriseDetailScreen() {
   const { enterpriseId } = useLocalSearchParams<{ enterpriseId: string }>();
@@ -64,6 +65,17 @@ export default function EnterpriseDetailScreen() {
   const [isFavorited, setIsFavorited] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [galleryState, setGalleryState] = useState<{ images: string[]; index: number } | null>(null);
+
+  useEffect(() => {
+    if (enterprise) {
+      void trackInteraction({
+        type: 'view_enterprise',
+        targetId: enterprise.id,
+        targetType: enterprise.type === 'restaurant' ? 'restaurant' : 'boutique',
+        categoryId: enterprise.categorie_id ?? undefined,
+      });
+    }
+  }, [enterprise]);
 
   const reload = useCallback(async (force = false) => {
     if (!id) return;

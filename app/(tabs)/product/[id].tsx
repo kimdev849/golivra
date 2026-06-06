@@ -33,6 +33,7 @@ import { LUCIDE_STROKE } from '@/constants/icons';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { fetchProductById, trackProductClick, type ProductPublic } from '@/lib/catalog';
+import { trackInteraction } from '@/lib/tracking';
 import { resolveRemoteImageUrl } from '@/lib/images';
 import { getEffectiveUnitPrice } from '@/lib/product-promo';
 import { formatFcfa } from '@/lib/format';
@@ -85,6 +86,17 @@ export default function ProductDetailScreen() {
   const [note, setNote] = useState('');
 
   const [selectedGalleryIndex, setSelectedGalleryIndex] = useState(0);
+
+  useEffect(() => {
+    if (product) {
+      void trackInteraction({
+        type: 'view_product',
+        targetId: product.id,
+        targetType: 'product',
+        categoryId: product.categorie_id ?? undefined,
+      });
+    }
+  }, [product]);
 
   const load = useCallback(
     async (force = false) => {
