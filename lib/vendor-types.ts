@@ -105,6 +105,13 @@ export type VendorStats = {
   produitsVendus: number;
   produitsTrend: string;
   topProduits: { nom: string; ventes: number }[];
+  averageOrderValue: number;
+  inventorySummary: {
+    outOfStock: number;
+    lowStock: number;
+    total: number;
+  };
+  dailyRevenues: { date: string; amount: number; label: string }[];
   engagement?: {
     totalVues: number;
     totalClics: number;
@@ -151,23 +158,26 @@ export function computeVendorStats(
   periodDays = 7,
   engagement?: VendorEngagementInput | null,
 ): VendorStats {
-  const now = Date.now();
-  const since = now - periodDays * 24 * 60 * 60 * 1000;
+  const now = new Date();
+  now.setHours(23, 59, 59, 999);
+  const since = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000);
+  since.setHours(0, 0, 0, 0);
+
   const recent = orders.filter((o) => {
     if (!o.created_at) return false;
-    return new Date(o.created_at).getTime() >= since;
+    const date = new Date(o.created_at);
+    return date >= since;
   });
+
   const periodLabel = periodDays === 7 ? '7 jours' : periodDays === 30 ? '30 jours' : `${periodDays} jours`;
-  const revenus7j = recent
-    .filter((o) => o.statut !== 'annulee')
-    .reduce((acc, o) => acc + o.prixTotal, 0);
-  const produitsVendus = recent
-    .filter((o) => o.statut !== 'annulee')
-    .reduce((acc, o) => acc + o.lignes.reduce((s, l) => s + l.quantite, 0), 0);
+  const validRecent = recent.filter((o) => o.statut !== 'annulee');
+  
+  const revenus7j = validRecent.reduce((acc, o) => acc + o.prixTotal, 0);
+  const produitsVendus = validRecent.reduce((acc, o) => acc + o.lignes.reduce((s, l) => s + l.quantite, 0), 0);
+  const averageOrderValue = validRecent.length > 0 ? revenus7j / validRecent.length : 0;
 
   const productSales = new Map<string, number>();
-  for (const o of recent) {
-    if (o.statut === 'annulee') continue;
+  for (const o of validRecent) {
     for (const l of o.lignes) {
       productSales.set(l.nom, (productSales.get(l.nom) || 0) + l.quantite);
     }
@@ -177,8 +187,31 @@ export function computeVendorStats(
     .slice(0, 5)
     .map(([nom, ventes]) => ({ nom, ventes }));
 
-  const lowStock = products.filter((p) => p.stock <= 5).length;
-  void lowStock;
+  // Inventaire
+  const inventorySummary = {
+    outOfStock: products.filter((p) => !p.stockIllimite && p.stock <= 0).length,
+    lowStock: products.filter((p) => !p.stockIllimite && p.stock > 0 && p.stock <= 5).length,
+    total: products.length,
+  };
+
+  // Daily Revenues for Chart
+  const dailyRevenues: { date: string; amount: number; label: string }[] = [];
+  const dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+  
+  for (let i = periodDays - 1; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+    const dateStr = d.toISOString().split('T')[0];
+    const dayLabel = dayNames[d.getDay()];
+    const amount = validRecent
+      .filter(o => o.created_at?.startsWith(dateStr))
+      .reduce((acc, o) => acc + o.prixTotal, 0);
+    
+    dailyRevenues.push({
+      date: dateStr,
+      amount,
+      label: i === 0 ? 'Auj.' : dayLabel
+    });
+  }
 
   const out: VendorStats = {
     revenus7j,
@@ -188,6 +221,9 @@ export function computeVendorStats(
     produitsVendus,
     produitsTrend: `${products.filter((p) => p.enLigne).length} en ligne`,
     topProduits,
+    averageOrderValue,
+    inventorySummary,
+    dailyRevenues,
   };
 
   if (engagement) {
@@ -198,12 +234,12 @@ export function computeVendorStats(
       tauxConversionPct: engagement.taux_conversion_pct ?? engagement.taux_achat_pct ?? 0,
       topVus: (engagement.top_vus ?? []).map((t) => ({
         id: t.id ?? t.produit_id ?? '',
-        nom: t.nom ?? 'Produit',
+        nom: t.nom ?? 'Article inconnu',
         vues: t.vues ?? 0,
       })),
       topCliques: (engagement.top_cliques ?? []).map((t) => ({
         id: t.id ?? t.produit_id ?? '',
-        nom: t.nom ?? 'Produit',
+        nom: t.nom ?? 'Article inconnu',
         clics: t.clics ?? 0,
       })),
     };

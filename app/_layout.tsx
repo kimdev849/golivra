@@ -10,6 +10,7 @@ import 'react-native-reanimated';
 
 import { BiometricAppGate } from '@/components/biometric-app-gate';
 import { OfflineBanner } from '@/components/offline-banner';
+import { CustomSplashScreen } from '@/components/splash-screen';
 import { AppThemeProvider, useAppTheme } from '@/contexts/app-theme-context';
 import { useIsOffline } from '@/hooks/use-network-status';
 import { warmAppCaches } from '@/lib/app-bootstrap';
@@ -36,7 +37,7 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-function RootNavigation() {
+function RootNavigation({ onReady }: { onReady: () => void }) {
   const { colors, isDark } = useAppTheme();
 
   useEffect(() => {
@@ -76,7 +77,9 @@ function RootNavigation() {
 
   return (
     <NavThemeProvider value={navTheme}>
-      <Stack screenOptions={stackScreenOptions(colors)}>
+      <Stack 
+        screenOptions={stackScreenOptions(colors)}
+        onLayout={onReady}>
         <Stack.Screen name="index" />
         <Stack.Screen name="auth" options={stackAuthOptions()} />
         <Stack.Screen name="forgot-password" />
@@ -132,9 +135,20 @@ function useSilentReconnectRefresh() {
 }
 
 function RootLayout() {
+  const [appReady, setAppReady] = (require('react') as any).useState(false);
+  const [splashVisible, setSplashVisible] = (require('react') as any).useState(true);
+
   useEffect(() => {
-    void warmAppCaches();
+    const init = async () => {
+      try {
+        await warmAppCaches();
+      } finally {
+        setAppReady(true);
+      }
+    };
+    void init();
   }, []);
+
   useSilentReconnectRefresh();
 
   return (
@@ -142,8 +156,11 @@ function RootLayout() {
       <AppThemeProvider>
         <BiometricAppGate>
           <View style={{ flex: 1 }}>
+            {splashVisible && (
+              <CustomSplashScreen onAnimationComplete={() => setSplashVisible(false)} />
+            )}
             <OfflineBanner />
-            <RootNavigation />
+            <RootNavigation onReady={() => {}} />
           </View>
         </BiometricAppGate>
       </AppThemeProvider>

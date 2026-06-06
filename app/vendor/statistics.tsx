@@ -1,6 +1,6 @@
-import { ChevronDown, Eye, MousePointerClick, Percent, ShoppingBag, TrendingUp, TrendingDown, Info } from 'lucide-react-native';
+import { ChevronDown, Eye, MousePointerClick, Percent, ShoppingBag, TrendingUp, Info, Package, AlertTriangle } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -15,6 +15,7 @@ import { formatFcfa } from '@/lib/format';
 import { fetchMyEnterpriseStats } from '@/lib/vendor-api';
 import { computeVendorStats, type VendorEngagementInput } from '@/lib/vendor-types';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const PERIODS = [
   { days: 7, label: '7 derniers jours' },
@@ -54,7 +55,6 @@ export default function VendorStatisticsScreen() {
     };
   }, [shop?.id, orders.length, periodDays]);
 
-  const periodLabel = PERIODS.find((p) => p.days === periodDays)?.label ?? `${periodDays} jours`;
   const stats = useMemo(
     () => computeVendorStats(orders, products, periodDays, engagement),
     [orders, products, periodDays, engagement],
@@ -63,7 +63,7 @@ export default function VendorStatisticsScreen() {
   return (
     <ThemedView style={styles.screen}>
       <VendorScreenHeader
-        title="STATISTIQUES"
+        title="TABLEAU DE BORD"
         right={
           <Pressable style={[styles.dd, { backgroundColor: colors.surfaceMuted }]} hitSlop={8} onPress={() => setPickerOpen(true)}>
             <ThemedText style={[styles.ddTxt, { color: colors.text }]}>{periodDays}j</ThemedText>
@@ -89,7 +89,7 @@ export default function VendorStatisticsScreen() {
           <ThemedText style={styles.revVal}>{formatFcfa(stats.revenus7j)}</ThemedText>
           <View style={styles.trendRow}>
             <View style={[styles.trendBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-              <ThemedText style={styles.trend}>{stats.revenusTrend}</ThemedText>
+              <ThemedText style={styles.trend}>Panier moyen: {formatFcfa(stats.averageOrderValue)}</ThemedText>
             </View>
           </View>
           <View style={styles.bigCardGlow} />
@@ -99,30 +99,79 @@ export default function VendorStatisticsScreen() {
           <StatMiniCard
             label="Commandes"
             value={stats.commandes}
-            trend={stats.commandesTrend}
             colors={colors}
             icon={<ShoppingBag size={18} color={palette.primary} strokeWidth={LUCIDE_STROKE} />}
           />
           <StatMiniCard
             label="Articles vendus"
             value={stats.produitsVendus}
-            trend={stats.produitsTrend}
             colors={colors}
             icon={<Package size={18} color={palette.primary} strokeWidth={LUCIDE_STROKE} />}
           />
+        </View>
+
+        {/* Chart Section */}
+        <View style={[styles.chartContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.sectionHeader}>
+            <ThemedText type="defaultSemiBold" style={{ color: colors.text }}>Performance quotidienne</ThemedText>
+          </View>
+          <View style={styles.barsContainer}>
+            {stats.dailyRevenues.map((day) => {
+              const max = Math.max(...stats.dailyRevenues.map(d => d.amount), 1);
+              const height = (day.amount / max) * 100;
+              return (
+                <View key={day.date} style={styles.barColumn}>
+                  <View style={styles.barTrack}>
+                    <LinearGradient
+                      colors={[palette.primary, palette.primarySoft]}
+                      style={[styles.bar, { height: `${Math.max(height, 5)}%` }]}
+                    />
+                  </View>
+                  <ThemedText style={[styles.barLabel, { color: colors.textSecondary }]}>{day.label}</ThemedText>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Inventory Section */}
+        <View style={[styles.inventoryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.sectionHeader}>
+            <ThemedText type="defaultSemiBold" style={{ color: colors.text }}>Gestion de Stock</ThemedText>
+            <Package size={16} color={colors.textMuted} />
+          </View>
+          <View style={styles.inventoryRow}>
+            <InventoryItem 
+              label="Rupture" 
+              count={stats.inventorySummary.outOfStock} 
+              color={colors.error} 
+              icon={<AlertTriangle size={14} color={colors.error} />}
+            />
+            <InventoryItem 
+              label="Stock faible" 
+              count={stats.inventorySummary.lowStock} 
+              color="#F59E0B" 
+              icon={<Info size={14} color="#F59E0B" />}
+            />
+            <InventoryItem 
+              label="Total articles" 
+              count={stats.inventorySummary.total} 
+              color={colors.primary} 
+              icon={<Package size={14} color={colors.primary} />}
+            />
+          </View>
         </View>
 
         <View style={styles.sectionHeader}>
           <ThemedText type="defaultSemiBold" style={[styles.h, { color: colors.text }]}>
             Top Produits (Ventes)
           </ThemedText>
-          <Info size={16} color={colors.textMuted} />
         </View>
         
         <View style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {stats.topProduits.length === 0 ? (
             <View style={styles.emptyState}>
-              <ThemedText style={[styles.empty, { color: colors.textMuted }]}>Aucune vente enregistrée sur cette période.</ThemedText>
+              <ThemedText style={[styles.empty, { color: colors.textMuted }]}>Aucune vente enregistrée.</ThemedText>
             </View>
           ) : (
             stats.topProduits.map((t, idx) => (
@@ -144,10 +193,14 @@ export default function VendorStatisticsScreen() {
           <ThemedText type="defaultSemiBold" style={[styles.h, { color: colors.text }]}>
             Engagement Client
           </ThemedText>
-          {engagementLoading && <ActivityIndicator size="small" color={colors.primary} />}
         </View>
 
-        {!stats.engagement && !engagementLoading ? (
+        {engagementLoading ? (
+          <View style={{ gap: 12 }}>
+            <Skeleton width="100%" height={80} borderRadius={16} />
+            <Skeleton width="100%" height={80} borderRadius={16} />
+          </View>
+        ) : !stats.engagement ? (
           <View style={[styles.emptyState, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, borderRadius: 20, borderWidth: 1 }]}>
             <ThemedText style={[styles.empty, { color: colors.textMuted }]}>
               Données d'engagement non disponibles.
@@ -234,14 +287,28 @@ export default function VendorStatisticsScreen() {
   );
 }
 
-function StatMiniCard({ label, value, trend, colors, icon }: any) {
+function StatMiniCard({ label, value, colors, icon }: any) {
   return (
     <View style={[styles.smallCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={[styles.miniIconWrap, { backgroundColor: colors.primarySoft }]}>
         {icon}
       </View>
-      <ThemedText style={[styles.sVal, { color: colors.text }]}>{value}</ThemedText>
-      <ThemedText style={[styles.sLab, { color: colors.textMuted }]}>{label}</ThemedText>
+      <View>
+        <ThemedText style={[styles.sVal, { color: colors.text }]}>{value}</ThemedText>
+        <ThemedText style={[styles.sLab, { color: colors.textMuted }]}>{label}</ThemedText>
+      </View>
+    </View>
+  );
+}
+
+function InventoryItem({ label, count, color, icon }: any) {
+  return (
+    <View style={styles.invItem}>
+      <View style={styles.invHeader}>
+        {icon}
+        <ThemedText style={[styles.invLabel, { color }]}>{label}</ThemedText>
+      </View>
+      <ThemedText style={[styles.invCount, { color }]}>{count}</ThemedText>
     </View>
   );
 }
@@ -264,11 +331,13 @@ function EngagementCard({
   return (
     <View style={[styles.engCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={[styles.engIcon, { backgroundColor: colors.primarySoft }]}>{icon}</View>
-      <ThemedText style={[styles.engVal, { color: colors.text }]}>
-        {value.toLocaleString('fr-FR')}
-        {suffix ?? ''}
-      </ThemedText>
-      <ThemedText style={[styles.engLabel, { color: colors.textMuted }]} numberOfLines={1}>{label}</ThemedText>
+      <View style={{ flex: 1 }}>
+        <ThemedText style={[styles.engVal, { color: colors.text }]}>
+          {value.toLocaleString('fr-FR')}
+          {suffix ?? ''}
+        </ThemedText>
+        <ThemedText style={[styles.engLabel, { color: colors.textMuted }]} numberOfLines={1}>{label}</ThemedText>
+      </View>
     </View>
   );
 }
@@ -327,23 +396,32 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    elevation: 2,
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 12,
   },
   miniIconWrap: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
   },
   sLab: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  sVal: { fontSize: 24, fontWeight: '900', marginBottom: 2 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sVal: { fontSize: 22, fontWeight: '900', marginBottom: 2 },
+  chartContainer: { padding: 16, borderRadius: 20, borderWidth: 1, marginBottom: 20 },
+  barsContainer: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 120, marginTop: 16, paddingHorizontal: 8 },
+  barColumn: { alignItems: 'center', flex: 1 },
+  barTrack: { width: 12, height: '100%', backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 6, justifyContent: 'flex-end', overflow: 'hidden' },
+  bar: { width: '100%', borderRadius: 6 },
+  barLabel: { fontSize: 10, marginTop: 6, fontWeight: '600' },
+  inventoryCard: { padding: 16, borderRadius: 20, borderWidth: 1, marginBottom: 20 },
+  inventoryRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 },
+  invItem: { flex: 1, alignItems: 'center' },
+  invHeader: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+  invLabel: { fontSize: 11, fontWeight: '700' },
+  invCount: { fontSize: 18, fontWeight: '900' },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   h: { fontSize: 18, fontWeight: '900' },
   listCard: { borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
   emptyState: { padding: 32, alignItems: 'center' },
@@ -389,7 +467,5 @@ const styles = StyleSheet.create({
   },
   modalRowText: { fontSize: 16, fontWeight: '800' },
   checkDot: { width: 8, height: 8, borderRadius: 4 },
-  engagementLoading: { padding: 20, alignItems: 'center' },
-  engagementHint: { marginTop: 8 },
   rank: { width: 22, textAlign: 'center', fontSize: 13, fontWeight: '800' },
 });

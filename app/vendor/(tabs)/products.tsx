@@ -2,8 +2,8 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Plus } from 'lucide-react-native';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Plus, AlertCircle, Package } from 'lucide-react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { VendorTabHeader } from '@/components/vendor-tab-header';
@@ -21,6 +21,7 @@ import { vendorStockLabel } from '@/lib/product-stock';
 import { resolveRemoteImageUrl } from '@/lib/images';
 import { deleteVendorProduct, updateVendorProduct } from '@/lib/vendor-api';
 import { hrefVendorStock, VENDOR_HREF } from '@/lib/vendor-nav';
+import { Skeleton, CardSkeleton } from '@/components/ui/skeleton';
 
 function triggerHaptic() {
   if (process.env.EXPO_OS === 'ios') {
@@ -33,7 +34,7 @@ export default function VendorProductsTabScreen() {
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const { showError, showSuccess, FeedbackOverlay } = useActionFeedback();
-  const { shop, products, setProducts, refresh } = useVendor();
+  const { shop, products, setProducts, refresh, loading } = useVendor();
   const { palette, labels, commerceType } = useVendorTheme();
   const [tab, setTab] = useState<'all' | 'on' | 'off'>('all');
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -54,6 +55,11 @@ export default function VendorProductsTabScreen() {
     const n = def.key === 'all' ? allCount : def.key === 'on' ? onCount : offCount;
     return { ...def, label: `${def.label} (${n})` };
   });
+
+  const lowStockProducts = useMemo(() => 
+    products.filter(p => !p.stockIllimite && p.stock <= 5 && p.enLigne),
+    [products]
+  );
 
   const toggle = async (id: string, value: boolean) => {
     if (!shop?.id) return;
@@ -125,6 +131,20 @@ export default function VendorProductsTabScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scroll, { paddingBottom: fabClearance }]}>
+        
+        {/* Stock Alerts Section */}
+        {lowStockProducts.length > 0 && tab === 'all' && (
+          <View style={[styles.alertCard, { backgroundColor: colors.warningSoft, borderColor: colors.warning }]}>
+            <AlertCircle size={18} color={colors.warning} />
+            <ThemedText style={[styles.alertText, { color: colors.warning }]}>
+              {lowStockProducts.length} article(s) en stock faible ou épuisé.
+            </ThemedText>
+            <Pressable onPress={() => setTab('off')}>
+              <ThemedText style={[styles.alertAction, { color: colors.warning }]}>Voir</ThemedText>
+            </Pressable>
+          </View>
+        )}
+
         <View style={styles.pillRow}>
           {pillDefs.map((p) => {
             const on = tab === p.key;
@@ -139,7 +159,11 @@ export default function VendorProductsTabScreen() {
           })}
         </View>
 
-        {filtered.length === 0 ? (
+        {loading ? (
+          <View style={{ gap: 10 }}>
+            {[1, 2, 3, 4, 5].map(i => <CardSkeleton key={i} />)}
+          </View>
+        ) : filtered.length === 0 ? (
           <View style={[styles.emptyBox, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
             <ThemedText style={[styles.emptyText, { color: colors.textSecondary }]}>Aucun produit</ThemedText>
             <ThemedText style={[styles.emptyHint, { color: colors.textMuted }]}>
@@ -150,10 +174,11 @@ export default function VendorProductsTabScreen() {
           <View style={{ gap: 10 }}>
             {filtered.map((p) => {
               const img = resolveRemoteImageUrl(p.imageUrl);
+              const isLowStock = !p.stockIllimite && p.stock <= 5;
               return (
                 <Pressable
                   key={p.id}
-                  style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  style={[styles.row, { backgroundColor: colors.surface, borderColor: isLowStock ? colors.warning : colors.border }]}
                   onPress={() => router.push(hrefVendorStock(p.id))}
                   onLongPress={() => confirmDelete(p.id, p.nom)}
                   delayLongPress={450}
@@ -161,19 +186,25 @@ export default function VendorProductsTabScreen() {
                   {img ? (
                     <Image source={{ uri: img }} style={styles.thumb} contentFit="cover" />
                   ) : (
-                    <View style={[styles.thumb, { backgroundColor: colors.surfaceMuted }]} />
+                    <View style={[styles.thumb, { backgroundColor: colors.surfaceMuted }]}>
+                       <Package size={20} color={colors.textMuted} />
+                    </View>
                   )}
                   <View style={{ flex: 1 }}>
                     <ThemedText type="defaultSemiBold" style={[styles.name, { color: colors.text }]}>
                       {p.nom}
                     </ThemedText>
-                    <ThemedText style={[styles.meta, { color: colors.textMuted }]}>
-                      {formatFcfa(p.prix)} · {commerceType === 'restaurant' ? 'Dispo.' : 'Stock'}:{' '}
-                      {commerceType === 'restaurant' ? (p.enLigne ? 'Oui' : 'Non') : vendorStockLabel(p, { enterpriseType: 'boutique' })}
-                    </ThemedText>
+                    <View style={styles.metaRow}>
+                      <ThemedText style={[styles.meta, { color: colors.textMuted }]}>
+                        {formatFcfa(p.prix)} · {commerceType === 'restaurant' ? 'Dispo.' : 'Stock'}:{' '}
+                        <ThemedText style={{ color: isLowStock ? colors.warning : colors.textMuted, fontWeight: isLowStock ? '800' : '400' }}>
+                          {commerceType === 'restaurant' ? (p.enLigne ? 'Oui' : 'Non') : vendorStockLabel(p, { enterpriseType: 'boutique' })}
+                        </ThemedText>
+                      </ThemedText>
+                    </View>
                   </View>
                   {busyId === p.id ? (
-                    <ActivityIndicator color={palette.primary} />
+                    <Skeleton width={40} height={24} borderRadius={12} />
                   ) : (
                     <Switch
                       value={p.enLigne}
@@ -202,6 +233,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scroll: { paddingHorizontal: 18, paddingTop: 4 },
+  alertCard: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    padding: 12, 
+    borderRadius: 12, 
+    borderWidth: 1, 
+    marginBottom: 16,
+    gap: 10
+  },
+  alertText: { flex: 1, fontSize: 13, fontWeight: '600' },
+  alertAction: { fontSize: 13, fontWeight: '800', textDecorationLine: 'underline' },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   pill: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: 999 },
   pillText: { fontSize: 12, fontWeight: '800' },
@@ -219,10 +261,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     padding: 12,
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 1,
   },
-  thumb: { width: 52, height: 52, borderRadius: 10 },
-  name: { fontSize: 15 },
-  meta: { fontSize: 13, marginTop: 4 },
+  thumb: { width: 56, height: 56, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  name: { fontSize: 15, fontWeight: '700' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  meta: { fontSize: 13 },
 });

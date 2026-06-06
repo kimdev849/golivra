@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Search } from 'lucide-react-native';
+import { Search, Clock, MapPin } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,10 +17,10 @@ import { useRealtimeOrders } from '@/hooks/use-realtime-orders';
 import { formatFcfa } from '@/lib/format';
 import { getSessionToken } from '@/lib/auth';
 import { livraisonStatutLabel } from '@/lib/vendor-api';
-import type { VendorPalette } from '@/lib/vendor-theme';
 import type { VendorOrder, VendorOrderStatus } from '@/lib/vendor-types';
 import { vendorOrderStatusLabel } from '@/lib/ux-copy';
 import { hrefVendorOrder } from '@/lib/vendor-nav';
+import { CardSkeleton } from '@/components/ui/skeleton';
 
 type FilterKey = 'all' | 'prep' | 'ship';
 
@@ -68,7 +68,7 @@ export default function VendorOrdersTabScreen() {
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const colorScheme = useColorScheme();
-  const { orders, refresh, shop } = useVendor();
+  const { orders, refresh, shop, loading } = useVendor();
   const { palette, labels } = useVendorTheme();
   const [filter, setFilter] = useState<FilterKey>('all');
   const [token, setToken] = useState<string | null>(null);
@@ -103,7 +103,7 @@ export default function VendorOrdersTabScreen() {
   return (
     <ThemedView style={styles.screen}>
       <VendorTabHeader
-        title="LISTE COMMANDES"
+        title="COMMANDES"
         right={
           <Pressable hitSlop={10} onPress={() => {}}>
             <Search size={22} color={palette.primaryDeep} strokeWidth={LUCIDE_STROKE} />
@@ -127,7 +127,11 @@ export default function VendorOrdersTabScreen() {
           })}
         </View>
 
-        {list.length === 0 ? (
+        {loading ? (
+          <View style={{ gap: 12 }}>
+            {[1, 2, 3, 4].map(i => <CardSkeleton key={i} />)}
+          </View>
+        ) : list.length === 0 ? (
           <View style={[styles.emptyBox, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
             <ThemedText style={[styles.emptyText, { color: colors.textSecondary }]}>Aucune commande</ThemedText>
             <ThemedText style={[styles.emptyHint, { color: colors.textMuted }]}>Les commandes de vos clients apparaîtront ici.</ThemedText>
@@ -139,29 +143,45 @@ export default function VendorOrdersTabScreen() {
               return (
                 <Pressable
                   key={o.id}
-                  style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, shadowColor: colorScheme === 'dark' ? colors.primary : '#0C3020' }]}
+                  style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
                   onPress={() => router.push(hrefVendorOrder(o.id))}
                   android_ripple={{ color: colors.primarySoft }}>
                   <View style={styles.cardTop}>
-                    <ThemedText type="defaultSemiBold" style={[styles.ref, { color: colors.text }]}>
-                      #{o.ref}
-                    </ThemedText>
-                    <ThemedText type="defaultSemiBold" style={[styles.price, { color: colors.text }]}>
+                    <View style={[styles.refBadge, { backgroundColor: colors.surfaceMuted }]}>
+                       <ThemedText style={[styles.ref, { color: colors.text }]}>#{o.ref}</ThemedText>
+                    </View>
+                    <ThemedText type="defaultSemiBold" style={[styles.price, { color: colors.primary }]}>
                       {formatFcfa(o.prixTotal)}
                     </ThemedText>
                   </View>
-                  <ThemedText type="defaultSemiBold" style={[styles.client, { color: colors.text }]}>
-                    {o.clientNom}
-                  </ThemedText>
-                  {(o.statut === 'prete' || o.statut === 'en_livraison') && o.livraison_statut ? (
-                    <ThemedText style={[styles.deliveryHint, { color: colors.primary }]} numberOfLines={1}>
-                      Livraison · {livraisonStatutLabel(o.livraison_statut)}
+                  
+                  <View style={styles.cardBody}>
+                    <ThemedText type="defaultSemiBold" style={[styles.client, { color: colors.text }]}>
+                      {o.clientNom}
                     </ThemedText>
+                    <View style={styles.infoRow}>
+                      <MapPin size={12} color={colors.textMuted} />
+                      <ThemedText style={[styles.infoText, { color: colors.textMuted }]} numberOfLines={1}>
+                        {o.adresse}
+                      </ThemedText>
+                    </View>
+                  </View>
+
+                  {(o.statut === 'prete' || o.statut === 'en_livraison') && o.livraison_statut ? (
+                    <View style={[styles.deliveryBadge, { backgroundColor: colors.primarySoft }]}>
+                      <ThemedText style={[styles.deliveryHint, { color: colors.primary }]} numberOfLines={1}>
+                        Livraison · {livraisonStatutLabel(o.livraison_statut)}
+                      </ThemedText>
+                    </View>
                   ) : null}
+
                   <View style={styles.cardBottom}>
-                    <ThemedText style={[styles.time, { color: colors.textMuted }]}>{o.creeLeLabel}</ThemedText>
-                    <View style={[styles.badge, { backgroundColor: st.bg }]}>
-                      <ThemedText style={[styles.badgeText, { color: st.text }]}>
+                    <View style={styles.timeRow}>
+                      <Clock size={12} color={colors.textMuted} />
+                      <ThemedText style={[styles.time, { color: colors.textMuted }]}>{o.creeLeLabel}</ThemedText>
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: st.bg }]}>
+                      <ThemedText style={[styles.statusBadgeText, { color: st.text }]}>
                         {statusLabel(o.statut)}
                       </ThemedText>
                     </View>
@@ -192,22 +212,29 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 15, fontWeight: '700' },
   emptyHint: { fontSize: 13, textAlign: 'center' },
   card: {
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    shadowOffset: { width: 0, height: 3 },
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowRadius: 10,
     elevation: 2,
   },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  ref: { fontSize: 14 },
-  price: { fontSize: 15 },
-  client: { fontSize: 16, marginBottom: 10 },
-  deliveryHint: { fontSize: 12, fontWeight: '600', marginBottom: 8 },
-  cardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  time: { fontSize: 13 },
-  badge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
-  badgeText: { fontSize: 11, fontWeight: '800' },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  refBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  ref: { fontSize: 12, fontWeight: '800' },
+  price: { fontSize: 16, fontWeight: '900' },
+  cardBody: { marginBottom: 12 },
+  client: { fontSize: 16, marginBottom: 6, fontWeight: '700' },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  infoText: { fontSize: 13 },
+  deliveryBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, marginBottom: 12 },
+  deliveryHint: { fontSize: 11, fontWeight: '800' },
+  cardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(0,0,0,0.05)' },
+  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  time: { fontSize: 12, fontWeight: '600' },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  statusBadgeText: { fontSize: 11, fontWeight: '900', textTransform: 'uppercase' },
 });
 
