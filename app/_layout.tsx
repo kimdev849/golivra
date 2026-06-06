@@ -3,9 +3,10 @@ import { DarkTheme, DefaultTheme, ThemeProvider as NavThemeProvider } from '@rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { Platform, View } from 'react-native';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
@@ -138,6 +139,14 @@ function RootLayout() {
   const [splashVisible, setSplashVisible] = useState(true);
 
   useEffect(() => {
+    // Empêche l'auto-hide du splash natif et le garde-awake résiduel d'une
+    // session précédente. Sans cet appel, expo-splash-screen garde l'écran
+    // allumé indéfiniment et toute réactivation successive échoue avec
+    // "Unable to activate keep awake".
+    SplashScreen.preventAutoHideAsync().catch(() => {});
+  }, []);
+
+  useEffect(() => {
     const init = async () => {
       try {
         await warmAppCaches();
@@ -152,6 +161,14 @@ function RootLayout() {
 
   if (!appReady) return null;
 
+  const handleSplashDone = useCallback(() => {
+    setSplashVisible(false);
+    // Notifie expo-splash-screen qu'on peut masquer le splash natif. Cela
+    // libère le keep-awake interne et évite l'erreur "Unable to activate
+    // keep awake" au prochain démarrage ou reload Metro.
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <GestureHandlerRootView style={{ flex: 1 }}>
@@ -159,7 +176,7 @@ function RootLayout() {
           <BiometricAppGate>
             <View style={{ flex: 1 }}>
               {splashVisible && (
-                <CustomSplashScreen onAnimationComplete={() => setSplashVisible(false)} />
+                <CustomSplashScreen onAnimationComplete={handleSplashDone} />
               )}
               <OfflineBanner />
               <RootNavigation />
