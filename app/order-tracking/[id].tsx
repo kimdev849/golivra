@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { ArrowLeft, Bike, MapPin, PhoneCall, Star, ExternalLink } from 'lucide-react-native';
+import { ArrowLeft, Bike, MapPin, PhoneCall, Star, ExternalLink, CheckCircle2 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 
@@ -22,10 +22,21 @@ type LocalTimelineStep = {
 
 type OrderDetail = {
   id: string;
+  numero: string;
   statut: string;
-  prix_total?: number;
-  livraisons?: { id: string; statut: string; type_livraison?: string }[];
+  total: number;
+  adresse_livraison?: string;
+  cree_le: string;
+  sousCommandes?: {
+    id: string;
+    restaurant_id?: string;
+    boutique_id?: string;
+    statut: string;
+    articles: { id: string; nom: string; quantite: number; prix_unitaire: number }[];
+    livraison_id?: string;
+  }[];
   livraison_id?: string | null;
+  livraisons?: { id: string; statut: string; type_livraison?: string }[];
   livreur?: {
     nom: string;
     telephone: string;
@@ -38,6 +49,11 @@ type OrderDetail = {
   };
 };
 
+function formatFcfa(value: number | null | undefined): string {
+  if (value == null) return '—';
+  return `${Number(value).toLocaleString('fr-FR')} FCFA`;
+}
+
 export default function OrderTrackingScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -46,7 +62,6 @@ export default function OrderTrackingScreen() {
   
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -64,29 +79,6 @@ export default function OrderTrackingScreen() {
         }
       } catch (err) {
         if (alive) {
-          // Si l'API GET /api/orders/:id n'existe pas encore, on met de la donnée mockée basée sur l'idée
-          console.warn("API de détail commande potentiellement non implémentée, utilisation de données simulées.");
-          setOrder({
-            id: id as string,
-            statut: 'en_livraison',
-            livreur: {
-              nom: 'Mamadou',
-              telephone: '+225 0102030405',
-              note_moyenne: 4.8,
-            },
-            timeline: {
-              livraisons: [
-                {
-                  timeline: [
-                    { titre: 'Commande acceptée', date: new Date().toISOString(), type: 'fait' },
-                    { titre: 'En préparation', date: new Date().toISOString(), type: 'fait' },
-                    { titre: 'Commande récupérée', date: new Date().toISOString(), type: 'fait' },
-                    { titre: 'En route vers vous', date: null, type: 'encours' },
-                  ]
-                }
-              ]
-            }
-          });
           setLoading(false);
         }
       }
@@ -115,6 +107,7 @@ export default function OrderTrackingScreen() {
     );
   }
 
+  const isDelivered = order?.statut === 'livree';
   const rawSteps = order?.timeline?.livraisons?.[0]?.timeline || order?.timeline?.commande || [];
   const steps: _TimelineStep[] = rawSteps.map((s, i) => ({
     key: `step-${i}`,
@@ -125,61 +118,103 @@ export default function OrderTrackingScreen() {
     order?.livraison_id ||
     (Array.isArray(order?.livraisons) && order.livraisons.length > 0 ? order.livraisons[0].id : null);
 
+  const allArticles = (order?.sousCommandes || []).flatMap((sc) => sc.articles || []);
+
   return (
     <ThemedView style={styles.screen} lightColor={colors.backgroundAlt} darkColor={colors.backgroundAlt}>
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 10), backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
           <ArrowLeft size={24} color={colors.text} strokeWidth={LUCIDE_STROKE} />
         </Pressable>
-        <ThemedText style={[styles.headerTitle, { color: colors.text }]}>Suivi de commande</ThemedText>
+        <ThemedText style={[styles.headerTitle, { color: colors.text }]}>
+          {isDelivered ? 'Détails de commande' : 'Suivi de commande'}
+        </ThemedText>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 20 }]}>
         
-        {/* CARTE STATIQUE / PREVIEW */}
-        <View style={[styles.mapPreviewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={[styles.staticMapContainer, { backgroundColor: colors.surfaceMuted }]}>
-            {/* Image placeholder statique simulant une map */}
-            <Image
-              source={{ uri: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=800' }}
-              style={StyleSheet.absoluteFillObject}
-              contentFit="cover"
-            />
-            {/* Overlay Gradient pour la lisibilité */}
-            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: colors.background, opacity: 0.2 }]} />
-            
-            {/* Overlay Distance + Statut */}
-            <View style={[styles.mapOverlay, { backgroundColor: colors.surface }]}>
-              {order?.statut === 'en_livraison' ? (
-                <>
-                  <View style={styles.etaRow}>
-                    <View style={[styles.etaIconBox, { backgroundColor: colors.primarySoft }]}>
-                      <Bike size={24} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+        {/* CARTE STATIQUE / PREVIEW - Uniquement si non livrée */}
+        {!isDelivered && (
+          <View style={[styles.mapPreviewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.staticMapContainer, { backgroundColor: colors.surfaceMuted }]}>
+              {/* Image placeholder statique simulant une map */}
+              <Image
+                source={{ uri: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=800' }}
+                style={StyleSheet.absoluteFillObject}
+                contentFit="cover"
+              />
+              {/* Overlay Gradient pour la lisibilité */}
+              <View style={[StyleSheet.absoluteFillObject, { backgroundColor: colors.background, opacity: 0.2 }]} />
+              
+              {/* Overlay Distance + Statut */}
+              <View style={[styles.mapOverlay, { backgroundColor: colors.surface }]}>
+                {order?.statut === 'en_livraison' ? (
+                  <>
+                    <View style={styles.etaRow}>
+                      <View style={[styles.etaIconBox, { backgroundColor: colors.primarySoft }]}>
+                        <Bike size={24} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <ThemedText style={[styles.etaLabel, { color: colors.textMuted }]}>Temps estimé</ThemedText>
+                        <ThemedText style={[styles.etaTime, { color: colors.text }]}>12 min</ThemedText>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <ThemedText style={[styles.distanceLabel, { color: colors.textMuted }]}>Distance</ThemedText>
+                        <ThemedText style={[styles.distanceValue, { color: colors.primaryDeep }]}>2.4 km</ThemedText>
+                      </View>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <ThemedText style={[styles.etaLabel, { color: colors.textMuted }]}>Temps estimé</ThemedText>
-                      <ThemedText style={[styles.etaTime, { color: colors.text }]}>12 min</ThemedText>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <ThemedText style={[styles.distanceLabel, { color: colors.textMuted }]}>Distance</ThemedText>
-                      <ThemedText style={[styles.distanceValue, { color: colors.primaryDeep }]}>2.4 km</ThemedText>
-                    </View>
+                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                    <ThemedText style={[styles.statusHighlight, { color: colors.primary }]}>En route vers vous</ThemedText>
+                  </>
+                ) : (
+                  <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+                    <ThemedText style={[styles.etaTime, { color: colors.text }]}>Préparation en cours</ThemedText>
+                    <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 4 }]}>
+                      Votre livreur sera assigné prochainement.
+                    </ThemedText>
                   </View>
-                  <View style={[styles.divider, { backgroundColor: colors.border }]} />
-                  <ThemedText style={[styles.statusHighlight, { color: colors.primary }]}>En route vers vous</ThemedText>
-                </>
-              ) : (
-                <View style={{ alignItems: 'center', paddingVertical: 8 }}>
-                  <ThemedText style={[styles.etaTime, { color: colors.text }]}>Préparation en cours</ThemedText>
-                  <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 4 }]}>
-                    Votre livreur sera assigné prochainement.
-                  </ThemedText>
-                </View>
-              )}
+                )}
+              </View>
             </View>
           </View>
+        )}
+
+        {/* INFO COMMANDE (Numéro, Date, Total) */}
+        <View style={[styles.orderInfoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.orderInfoRow}>
+            <View style={{ flex: 1 }}>
+              <ThemedText style={[styles.orderLabel, { color: colors.textMuted }]}>Commande n°</ThemedText>
+              <ThemedText style={[styles.orderValue, { color: colors.text }]}>{order?.numero || order?.id.slice(0, 8).toUpperCase()}</ThemedText>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <ThemedText style={[styles.orderLabel, { color: colors.textMuted }]}>Total</ThemedText>
+              <ThemedText style={[styles.orderValue, { color: colors.primaryDeep, fontWeight: '700' }]}>{formatFcfa(order?.total)}</ThemedText>
+            </View>
+          </View>
+          {isDelivered && (
+            <View style={[styles.statusBanner, { backgroundColor: colors.successSoft }]}>
+              <CheckCircle2 size={16} color={colors.success} strokeWidth={LUCIDE_STROKE} />
+              <ThemedText style={[styles.statusBannerText, { color: colors.success }]}>Cette commande a été livrée avec succès.</ThemedText>
+            </View>
+          )}
         </View>
+
+        {/* ARTICLES */}
+        {allArticles.length > 0 && (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.cardHead}>
+              <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Articles</ThemedText>
+            </View>
+            {allArticles.map((a, idx) => (
+              <View key={`${a.id}-${idx}`} style={styles.articleRow}>
+                <ThemedText style={[styles.articleQty, { color: colors.textSecondary }]}>{a.quantite}x</ThemedText>
+                <ThemedText style={[styles.articleName, { color: colors.text }]}>{a.nom}</ThemedText>
+                <ThemedText style={[styles.articlePrice, { color: colors.textMuted }]}>{formatFcfa(a.prix_unitaire * a.quantite)}</ThemedText>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* INFO LIVREUR */}
         {order?.livreur ? (
@@ -213,7 +248,7 @@ export default function OrderTrackingScreen() {
           <View style={[styles.timelineCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={styles.timelineHead}>
               <MapPin size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-              <ThemedText style={[styles.timelineTitle, { color: colors.text }]}>Détails de l'acheminement</ThemedText>
+              <ThemedText style={[styles.timelineTitle, { color: colors.text }]}>{"Détails de l'acheminement"}</ThemedText>
             </View>
             <EventTimeline steps={steps} title="" />
           </View>
@@ -358,4 +393,23 @@ const styles = StyleSheet.create({
   },
   deliveryLinkTitle: { fontSize: 15, fontWeight: '800' },
   deliveryLinkSub: { fontSize: 12, marginTop: 2 },
+
+  // Nouveaux styles pour le détail de commande
+  card: {
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+  },
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  cardTitle: { fontSize: 16, fontWeight: '700' },
+  orderInfoCard: { marginHorizontal: 16, marginTop: 16, padding: 16, borderRadius: 12, borderWidth: 1 },
+  orderInfoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  orderLabel: { fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  orderValue: { fontSize: 16, fontWeight: '600' },
+  statusBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, padding: 10, borderRadius: 8 },
+  statusBannerText: { fontSize: 13, fontWeight: '500' },
+  articleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
+  articleQty: { fontSize: 14, fontWeight: '600', width: 24 },
+  articleName: { flex: 1, fontSize: 14 },
+  articlePrice: { fontSize: 14, fontWeight: '500' },
 });

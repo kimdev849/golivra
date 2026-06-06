@@ -1,26 +1,51 @@
 import * as ImagePicker from 'expo-image-picker';
-import { Alert, Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
-import { Plus, Trash2, X } from 'lucide-react-native';
+import { Image } from 'expo-image';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Plus, X } from 'lucide-react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { LUCIDE_STROKE } from '@/constants/icons';
-import { emptyOptionGroup, type ProductOptionGroup } from '@/lib/vendor-product-types';
+import type { AppPalette } from '@/constants/app-palette';
 
 export const MAX_GALLERY_PHOTOS = 8;
 
-type VendorImageAsset = { uri: string; dataUrl: string };
+export type VendorImageAsset = { uri: string; dataUrl: string };
 
-function dataUrlFromAsset(asset: ImagePicker.ImagePickerAsset): VendorImageAsset | null {
-  if (!asset?.base64) return null;
-  const mime = asset.mimeType || 'image/jpeg';
-  return { uri: asset.uri, dataUrl: `data:${mime};base64,${asset.base64}` };
+/** Convertit une URI locale en data URL (fallback si le picker ne renvoie pas base64). */
+export async function uriToDataUrl(uri: string, mimeType = 'image/jpeg'): Promise<string | null> {
+  try {
+    const res = await fetch(uri);
+    const buf = await res.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let binary = '';
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    }
+    const b64 = btoa(binary);
+    return `data:${mimeType};base64,${b64}`;
+  } catch {
+    return null;
+  }
 }
 
-/**
- * Sélection unique d'une photo (principale, logo, avatar).
- * AUCUNE retouche : pas de recadrage, pas d'aspect forcé, pas de recompression.
- * L'image est uploadée telle quelle sortie du téléphone.
- */
+async function assetToVendorImage(asset: ImagePicker.ImagePickerAsset): Promise<VendorImageAsset | null> {
+  if (!asset?.uri) return null;
+  const mime = asset.mimeType || 'image/jpeg';
+  if (asset.base64) {
+    return { uri: asset.uri, dataUrl: `data:${mime};base64,${asset.base64}` };
+  }
+  const dataUrl = await uriToDataUrl(asset.uri, mime);
+  if (!dataUrl) return null;
+  return { uri: asset.uri, dataUrl };
+}
+
+export async function ensureImageDataUrl(item: { uri: string; dataUrl: string }): Promise<string | null> {
+  if (item.dataUrl) return item.dataUrl;
+  if (item.uri.startsWith('http')) return null;
+  return uriToDataUrl(item.uri);
+}
+
 export async function pickVendorImageAsset(): Promise<VendorImageAsset | null> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) {
@@ -29,22 +54,18 @@ export async function pickVendorImageAsset(): Promise<VendorImageAsset | null> {
   }
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
-    quality: 1,
+    quality: 0.92,
     base64: true,
     allowsEditing: false,
+    allowsMultipleSelection: false,
     selectionLimit: 1,
   });
   if (result.canceled) return null;
   const asset = result.assets?.[0];
   if (!asset) return null;
-  return dataUrlFromAsset(asset);
+  return assetToVendorImage(asset);
 }
 
-/**
- * Sélection multiple d'images (galerie produit, max 8).
- * Vidéos exclues via `mediaTypes: ['images']`. Pas de retouche.
- * @param max limite absolue (par défaut MAX_GALLERY_PHOTOS).
- */
 export async function pickMultipleVendorImages(max: number = MAX_GALLERY_PHOTOS): Promise<VendorImageAsset[]> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) {
@@ -53,152 +74,124 @@ export async function pickMultipleVendorImages(max: number = MAX_GALLERY_PHOTOS)
   }
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
-    quality: 1,
+    quality: 0.82,
     base64: true,
     allowsEditing: false,
-    selectionLimit: max,
+    allowsMultipleSelection: true,
+    selectionLimit: Math.max(1, max),
   });
-  if (result.canceled) return [];
-  return (result.assets || [])
-    .map(dataUrlFromAsset)
-    .filter((a): a is VendorImageAsset => a !== null);
+  if (result.canceled || !result.assets?.length) return [];
+
+  const out: VendorImageAsset[] = [];
+  for (const asset of result.assets) {
+    const img = await assetToVendorImage(asset);
+    if (img) out.push(img);
+  }
+  if (result.assets.length > 0 && out.length === 0) {
+    Alert.alert(
+      'Photos',
+      'Les images sélectionnées n\'ont pas pu être lues. Réessayez ou choisissez une photo à la fois.',
+    );
+  }
+  return out;
 }
 
-export function OptionGroupsEditor({
-  groups,
-  onChange,
-  accent,
-  groupLabel = 'variantes',
-  colors,
-}: {
-  groups: ProductOptionGroup[];
-  onChange: (g: ProductOptionGroup[]) => void;
+type GalleryProps = {
+  mainUri: string | null;
+  gallery: VendorImageAsset[];
+  onPickMain: () => void;
+  onPickGallery: () => void;
+  onRemoveGallery: (index: number) => void;
+  colors: AppPalette;
   accent: string;
-  groupLabel?: string;
-  colors: { border: string; surface: string; surfaceMuted: string; text: string; textSecondary: string; textMuted: string; borderStrong: string; success: string; onPrimary: string; error: string; placeholder: string };
-}) {
-  const updateGroup = (idx: number, patch: Partial<ProductOptionGroup>) => {
-    onChange(groups.map((g, i) => (i === idx ? { ...g, ...patch } : g)));
-  };
+  mainRequired?: boolean;
+};
 
-  const updateChoice = (gIdx: number, cIdx: number, label: string, prix_sup?: string) => {
-    const g = groups[gIdx];
-    const choix = g.choix.map((c, i) =>
-      i === cIdx ? { ...c, label, prix_sup: prix_sup !== undefined ? Number(prix_sup) || 0 : c.prix_sup } : c,
-    );
-    updateGroup(gIdx, { choix });
-  };
+/** Champ photos : principale + galerie avec tuile + cliquable. */
+export function VendorPhotoGalleryField({
+  mainUri,
+  gallery,
+  onPickMain,
+  onPickGallery,
+  onRemoveGallery,
+  colors,
+  accent,
+  mainRequired,
+}: GalleryProps) {
+  const remaining = MAX_GALLERY_PHOTOS - gallery.length;
 
   return (
-    <View style={styles.variantBlock}>
-      {groups.length === 0 ? (
-        <ThemedText style={[styles.hint, { color: colors.textMuted }]}>
-          Ajoutez des groupes d'options (taille, cuisson, suppléments…) si le plat le nécessite.
-        </ThemedText>
-      ) : null}
-      {groups.map((g, gi) => (
-        <View key={gi} style={[styles.variantCard, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}>
-          <View style={styles.variantHead}>
-            <TextInput
-              style={[styles.input, { flex: 1, backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
-              placeholder="Nom du groupe (ex. Taille)"
-              placeholderTextColor={colors.placeholder}
-              value={g.nom}
-              onChangeText={(t) => updateGroup(gi, { nom: t })}
-            />
-            <Pressable onPress={() => onChange(groups.filter((_, i) => i !== gi))} hitSlop={8}>
-              <Trash2 size={18} color={colors.error} strokeWidth={LUCIDE_STROKE} />
+    <View style={styles.wrap}>
+      <Pressable
+        style={[styles.hero, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
+        onPress={() => void onPickMain()}>
+        {mainUri ? (
+          <Image source={{ uri: mainUri }} style={styles.heroImg} contentFit="cover" />
+        ) : (
+          <View style={styles.heroEmpty}>
+            <Plus size={28} color={accent} strokeWidth={LUCIDE_STROKE} />
+            <ThemedText style={[styles.heroHint, { color: colors.textMuted }]}>
+              {mainRequired ? 'Photo principale *' : 'Photo principale'}
+            </ThemedText>
+          </View>
+        )}
+      </Pressable>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+        {gallery.map((g, i) => (
+          <View key={`${g.uri}-${i}`} style={styles.thumbWrap}>
+            <Image source={{ uri: g.uri }} style={styles.thumb} contentFit="cover" />
+            <Pressable style={styles.thumbRemove} onPress={() => onRemoveGallery(i)} hitSlop={6}>
+              <X size={14} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
             </Pressable>
           </View>
-          <View style={styles.switchRow}>
-            <ThemedText style={[styles.switchLabel, { color: colors.text }]}>Choix obligatoire</ThemedText>
-            <Switch
-              value={g.requis !== false}
-              onValueChange={(v) => updateGroup(gi, { requis: v })}
-              trackColor={{ false: colors.borderStrong, true: colors.success }}
-              thumbColor={g.requis !== false ? accent : colors.surfaceMuted}
-            />
-          </View>
-          {g.choix.map((c, ci) => (
-            <View key={ci} style={styles.choiceRow}>
-              <TextInput
-                style={[styles.input, { flex: 1, backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
-                placeholder="Libellé (ex. Moyen)"
-                placeholderTextColor={colors.placeholder}
-                value={c.label}
-                onChangeText={(t) => updateChoice(gi, ci, t)}
-              />
-              <TextInput
-                style={[styles.input, styles.choicePrice, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
-                placeholder="+0"
-                placeholderTextColor={colors.placeholder}
-                keyboardType="numeric"
-                value={String(c.prix_sup ?? 0)}
-                onChangeText={(t) => updateChoice(gi, ci, c.label, t)}
-              />
-              {g.choix.length > 1 ? (
-                <Pressable onPress={() => updateGroup(gi, { choix: g.choix.filter((_, i) => i !== ci) })}>
-                  <X size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-                </Pressable>
-              ) : null}
-            </View>
-          ))}
+        ))}
+        {remaining > 0 ? (
           <Pressable
-            style={styles.linkBtn}
-            onPress={() => updateGroup(gi, { choix: [...g.choix, { label: '', prix_sup: 0 }] })}>
-            <ThemedText style={[styles.linkTxt, { color: accent }]}>+ Ajouter un choix</ThemedText>
+            style={[styles.addTile, { borderColor: accent, backgroundColor: colors.surface }]}
+            onPress={() => void onPickGallery()}>
+            <Plus size={22} color={accent} strokeWidth={LUCIDE_STROKE} />
           </Pressable>
-        </View>
-      ))}
-      <Pressable
-        style={[styles.outlineBtn, { borderColor: accent }]}
-        onPress={() => onChange([...groups, emptyOptionGroup()])}>
-        <Plus size={18} color={accent} strokeWidth={LUCIDE_STROKE} />
-        <ThemedText style={[styles.outlineTxt, { color: accent }]}>
-          Ajouter un groupe d'{groupLabel}
-        </ThemedText>
-      </Pressable>
+        ) : null}
+      </ScrollView>
     </View>
   );
 }
 
+// Réexport pour compatibilité avec OptionGroupsEditor dans ce fichier
+export { OptionGroupsEditor } from '@/components/vendor-option-groups-editor';
+
 const styles = StyleSheet.create({
-  variantBlock: { gap: 12 },
-  variantCard: {
+  wrap: { gap: 10 },
+  hero: {
+    height: 200,
+    borderRadius: 14,
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
-  },
-  variantHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginVertical: 4,
-  },
-  switchLabel: { fontSize: 13, fontWeight: '700' },
-  choiceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  choicePrice: { width: 72 },
-  linkBtn: { alignSelf: 'flex-start' },
-  linkTxt: { fontWeight: '700', fontSize: 13 },
-  outlineBtn: {
-    flexDirection: 'row',
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    borderWidth: 1.5,
-    borderRadius: 12,
-    paddingVertical: 12,
-    marginTop: 4,
   },
-  outlineTxt: { fontWeight: '800', fontSize: 14 },
-  hint: { fontSize: 13, lineHeight: 19, marginBottom: 12 },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
+  heroImg: { width: '100%', height: '100%' },
+  heroEmpty: { alignItems: 'center', gap: 8 },
+  heroHint: { fontSize: 13, fontWeight: '700' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
+  thumbWrap: { position: 'relative' },
+  thumb: { width: 72, height: 72, borderRadius: 10 },
+  thumbRemove: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 10,
+    padding: 2,
+  },
+  addTile: {
+    width: 72,
+    height: 72,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

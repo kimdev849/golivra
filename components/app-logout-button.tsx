@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useLogout } from '@/hooks/use-logout';
+import { useActionFeedback } from '@/hooks/use-action-feedback';
 
 type Props = {
   clearCart?: boolean;
@@ -13,37 +14,51 @@ type Props = {
 
 export function AppLogoutButton({ clearCart, variant = 'link' }: Props) {
   const colors = useAppColors();
-  const { confirmLogout, loggingOut } = useLogout({ clearCart });
+  const { showConfirm, FeedbackOverlay } = useActionFeedback();
+  const { performLogout, loggingOut } = useLogout({ clearCart });
 
   const filled = variant === 'filled';
   const link = variant === 'link';
 
+  const onConfirm = () => {
+    showConfirm({
+      title: 'Déconnexion',
+      message: 'Voulez-vous vraiment vous déconnecter ?',
+      primaryLabel: 'Se déconnecter',
+      secondaryLabel: 'Annuler',
+      onPrimary: () => void performLogout(),
+    });
+  };
+
   return (
-    <Pressable
-      onPress={confirmLogout}
-      disabled={loggingOut}
-      style={({ pressed }) => [
-        link ? styles.link : styles.btn,
-        link
-          ? undefined
-          : filled
-            ? { backgroundColor: colors.errorSoft, borderColor: colors.error }
-            : { backgroundColor: colors.surface, borderColor: colors.border },
-        pressed && !loggingOut && (link ? styles.linkPressed : styles.btnPressed),
-        loggingOut && styles.disabled,
-      ]}
-      android_ripple={link ? { color: colors.primaryMuted, borderless: true } : { color: filled ? 'rgba(220,38,38,0.12)' : colors.primaryMuted }}>
-      <View style={link ? styles.linkInner : styles.inner}>
-        {loggingOut ? (
-          <ActivityIndicator size="small" color={colors.error} />
-        ) : (
-          <LogOut size={link ? 16 : 18} color={colors.error} strokeWidth={LUCIDE_STROKE} />
-        )}
-        <ThemedText style={[link ? styles.linkLabel : styles.label, { color: colors.error }]}>
-          {loggingOut ? 'Déconnexion…' : 'Se déconnecter'}
-        </ThemedText>
-      </View>
-    </Pressable>
+    <>
+      <Pressable
+        onPress={onConfirm}
+        disabled={loggingOut}
+        style={({ pressed }) => [
+          link ? styles.link : styles.btn,
+          link
+            ? undefined
+            : filled
+              ? { backgroundColor: colors.errorSoft, borderColor: colors.error }
+              : { backgroundColor: colors.surface, borderColor: colors.border },
+          pressed && !loggingOut && (link ? styles.linkPressed : styles.btnPressed),
+          loggingOut && styles.disabled,
+        ]}
+        android_ripple={link ? { color: colors.primaryMuted, borderless: true } : { color: filled ? 'rgba(220,38,38,0.12)' : colors.primaryMuted }}>
+        <View style={link ? styles.linkInner : styles.inner}>
+          {loggingOut ? (
+            <ActivityIndicator size="small" color={colors.error} />
+          ) : (
+            <LogOut size={link ? 16 : 18} color={colors.error} strokeWidth={LUCIDE_STROKE} />
+          )}
+          <ThemedText style={[link ? styles.linkLabel : styles.label, { color: colors.error }]}>
+            {loggingOut ? 'Déconnexion…' : 'Se déconnecter'}
+          </ThemedText>
+        </View>
+      </Pressable>
+      <FeedbackOverlay />
+    </>
   );
 }
 

@@ -21,8 +21,8 @@ export default function VendorShopPaymentsScreen() {
         <View style={[styles.box, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}>
           <Wallet size={28} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
           <ThemedText type="defaultSemiBold" style={[styles.title, { color: colors.text }]}>Paiements clients</ThemedText>
-          <ThemedText style={[styles.body, { color: colors.textMuted }]}>Les commandes utilisent les méthodes définies au moment du paiement (espèces, Mobile Money, etc.). Il n'y a pas de compte bancaire boutique séparé dans le schéma actuel.</ThemedText>
-          <ThemedText style={[styles.body, { color: colors.textMuted }]}>Le solde vendeur et l'historique sont disponibles dans l'écran Portefeuille, basés sur les commandes livrées réelles.</ThemedText>
+          <ThemedText style={[styles.body, { color: colors.textMuted }]}>{"Les commandes utilisent les méthodes définies au moment du paiement (espèces, Mobile Money, etc.). Il n'y a pas de compte bancaire boutique séparé dans le schéma actuel."}</ThemedText>
+          <ThemedText style={[styles.body, { color: colors.textMuted }]}>{"Le solde vendeur et l'historique sont disponibles dans l'écran Portefeuille, basés sur les commandes livrées réelles."}</ThemedText>
         </View>
       </ScrollView>
     </ThemedView>

@@ -59,6 +59,7 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
             const remote = await fetchPreferences(token);
             if (remote.dark_mode === true) pref = 'dark';
             else if (remote.dark_mode === false) pref = 'light';
+            else if (remote.dark_mode === null) pref = 'system';
           } catch {
             /* garde le stockage local */
           }
@@ -86,9 +87,10 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     setPreferenceState(pref);
     await AsyncStorage.setItem(STORAGE_KEY, pref);
     const token = await getSessionToken();
-    if (token && pref !== 'system') {
+    if (token) {
       try {
-        await updatePreferences(token, { dark_mode: pref === 'dark' });
+        const dark_mode = pref === 'system' ? null : pref === 'dark';
+        await updatePreferences(token, { dark_mode });
       } catch {
         /* local OK */
       }

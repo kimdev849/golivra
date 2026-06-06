@@ -98,6 +98,12 @@ export default function TabLayout() {
           tabBarInactiveTintColor: Colors[colorScheme ?? 'light'].tabIconDefault,
           headerShown: false,
           tabBarHideOnKeyboard: true,
+          tabBarStyle: {
+            position: 'absolute',
+            borderTopWidth: 0,
+            elevation: 0,
+            backgroundColor: 'transparent',
+          },
         }}>
         <Tabs.Screen
           name="index"
@@ -121,10 +127,10 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="marketplace"
+          name="favorites"
           options={{
-            title: 'Marketplace',
-            tabBarIcon: ({ color }) => <Store size={24} color={color} strokeWidth={LUCIDE_STROKE} />,
+            title: 'Favoris',
+            tabBarIcon: ({ color }) => <Heart size={24} color={color} strokeWidth={LUCIDE_STROKE} />,
           }}
         />
         <Tabs.Screen
@@ -135,11 +141,11 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="favorites"
+          name="marketplace"
           options={{
             href: null,
-            title: 'Favoris',
-            tabBarIcon: ({ color }) => <Heart size={24} color={color} strokeWidth={LUCIDE_STROKE} />,
+            title: 'Marketplace',
+            tabBarIcon: ({ color }) => <Store size={24} color={color} strokeWidth={LUCIDE_STROKE} />,
           }}
         />
       </Tabs>

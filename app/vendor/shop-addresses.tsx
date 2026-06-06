@@ -37,7 +37,7 @@ export default function VendorShopAddressesScreen() {
         </View>
 
         <Pressable style={[styles.editBtn, { borderColor: palette.primary, backgroundColor: colors.surface }]} onPress={() => router.push(VENDOR_HREF.shopInfo)}>
-          <ThemedText style={[styles.editTxt, { color: palette.primaryDeep }]}>Modifier l'adresse</ThemedText>
+          <ThemedText style={[styles.editTxt, { color: palette.primaryDeep }]}>{"Modifier l'adresse"}</ThemedText>
         </Pressable>
       </ScrollView>
     </ThemedView>

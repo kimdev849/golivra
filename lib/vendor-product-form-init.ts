@@ -4,10 +4,11 @@ import {
   tagsToText,
   type VendorProductFormValues,
 } from '@/lib/vendor-product-types';
+import { galleryAssetsFromUrls, splitMainAndGalleryUrls } from '@/lib/vendor-image-urls';
 
 export function productToFormValues(product: VendorProduct): VendorProductFormValues {
   const dims = product.dimensions;
-  const existing = Array.isArray(product.imagesUrls) ? product.imagesUrls : [];
+  const { main, gallery } = splitMainAndGalleryUrls(product.imageUrl, product.imagesUrls);
   return {
     ...DEFAULT_PRODUCT_FORM,
     nom: product.nom,
@@ -32,9 +33,8 @@ export function productToFormValues(product: VendorProduct): VendorProductFormVa
     enVedette: product.enVedette === true,
     tagsText: tagsToText(product.tags),
     optionGroups: product.optionGroups?.length ? product.optionGroups : [],
-    mainImageUri: product.imageUrl ?? null,
+    mainImageUri: main,
     mainImageDataUrl: null,
-    // Pré-remplir avec les URLs déjà uploadées (dataUrl vide = déjà sur le serveur).
-    gallery: existing.map((uri) => ({ uri, dataUrl: '' })),
+    gallery: galleryAssetsFromUrls(gallery),
   };
 }

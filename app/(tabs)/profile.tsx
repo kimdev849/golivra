@@ -12,7 +12,6 @@ import {
   HelpCircle,
   MapPin,
   Settings,
-  SlidersHorizontal,
   Smartphone,
   Sparkles,
   Store,
@@ -74,12 +73,6 @@ export default function ProfileScreen() {
       void load();
     }, [load])
   );
-
-  const handleLogout = useCallback(async () => {
-    await logoutLocal();
-    await saveCart(null);
-    router.replace('/auth');
-  }, [router]);
 
   const avatarUri = resolveRemoteImageUrl(me?.imageUrl ?? me?.image_url);
   const memberSince =
@@ -199,21 +192,23 @@ export default function ProfileScreen() {
             router.push('/(tabs)/favorites')
           )}
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          {menuRow(SlidersHorizontal, 'Paramètres', 'Notifications et affichage', () => router.push('/settings'))}
+          {menuRow(Settings, 'Préférences', 'Thème et notifications push', () => router.push('/settings'))}
         </View>
 
-        <ThemedText style={[styles.sectionLabel, styles.sectionSupport, { color: colors.primaryDeep }]}>Support</ThemedText>
+        <ThemedText style={[styles.sectionLabel, { color: colors.primaryDeep }]}>Assistance</ThemedText>
         <View style={[styles.menuCard, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-          {menuRow(HelpCircle, "Centre d'aide", 'Questions et contact', () =>
-            showInfo('Centre d’aide', 'Contactez le support GoLivra depuis votre espace web ou par téléphone.'),
+          {menuRow(HelpCircle, 'Centre d’aide', 'Foire aux questions et support client', () =>
+            showInfo('Assistance', 'Le centre d’aide sera disponible prochainement.')
           )}
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          {menuRow(Gavel, 'Conditions et confidentialité', 'Informations légales', () =>
-            showInfo('Informations légales', 'Les documents officiels seront publiés ici prochainement.')
+          {menuRow(Gavel, 'Conditions & Confidentialité', 'Mentions légales et politique de données', () =>
+            showInfo('Mentions Légales', 'Conditions Générales d’Utilisation GoLivra v2.1')
           )}
         </View>
 
-        <AppLogoutButton />
+        <View style={styles.logoutWrapper}>
+          <AppLogoutButton variant="ghost" clearCart />
+        </View>
 
         <ThemedText style={[styles.versionLine, { color: colors.textMuted }]}>GoLivra · version {appVersion}</ThemedText>
       </ScrollView>
@@ -357,6 +352,7 @@ const styles = StyleSheet.create({
   menuTitle: { fontSize: 15 },
   menuSub: { fontSize: 11, marginTop: 2 },
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 60 },
+  logoutWrapper: { marginTop: 24, marginBottom: 8 },
   versionLine: {
     textAlign: 'center',
     fontSize: 11,

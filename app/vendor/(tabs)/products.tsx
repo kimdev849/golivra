@@ -2,14 +2,15 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
+import { Plus } from 'lucide-react-native';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { VendorAddProductFab } from '@/components/vendor-add-product-fab';
 import { VendorTabHeader } from '@/components/vendor-tab-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { VENDOR_TAB_BAR_PADDING_BOTTOM } from '@/constants/vendor-layout';
+import { LUCIDE_STROKE } from '@/constants/icons';
 import { useVendor } from '@/contexts/vendor-context';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
@@ -37,10 +38,7 @@ export default function VendorProductsTabScreen() {
   const [tab, setTab] = useState<'all' | 'on' | 'off'>('all');
   const [busyId, setBusyId] = useState<string | null>(null);
   const tabBarHeight = Math.max(insets.bottom, 10) + VENDOR_TAB_BAR_PADDING_BOTTOM;
-  // Petit espace visible entre la base du FAB et le haut de la barre d'onglets,
-  // pour qu'il flotte au-dessus sans toucher le menu.
-  const fabBottom = tabBarHeight + 12;
-  const fabClearance = fabBottom + 76;
+  const fabClearance = tabBarHeight + 20;
 
   const filtered = useMemo(() => {
     if (tab === 'on') return products.filter((p) => p.enLigne);
@@ -111,7 +109,19 @@ export default function VendorProductsTabScreen() {
   return (
     <ThemedView style={styles.screen}>
       <FeedbackOverlay />
-      <VendorTabHeader title={labels.productsHeader} />
+      <VendorTabHeader
+        title={labels.productsHeader}
+        right={
+          <Pressable
+            onPress={() => router.push(VENDOR_HREF.addProduct)}
+            style={({ pressed }) => [
+              styles.headerAddBtn,
+              { backgroundColor: palette.primary, opacity: pressed ? 0.8 : 1 }
+            ]}>
+            <Plus size={22} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
+          </Pressable>
+        }
+      />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scroll, { paddingBottom: fabClearance }]}>
@@ -178,17 +188,19 @@ export default function VendorProductsTabScreen() {
           </View>
         )}
       </ScrollView>
-      <VendorAddProductFab
-        label={labels.addProductFab}
-        bottom={fabBottom}
-        onPress={() => router.push(VENDOR_HREF.addProduct)}
-      />
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  headerAddBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   scroll: { paddingHorizontal: 18, paddingTop: 4 },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   pill: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: 999 },

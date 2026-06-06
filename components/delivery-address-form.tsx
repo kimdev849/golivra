@@ -7,6 +7,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { QUARTIERS_BRAZZAVILLE } from '@/constants/quartiers-brazzaville';
@@ -24,6 +25,7 @@ type Props = {
 
 export function DeliveryAddressForm({ value, onChange, accentColor, compact = false }: Props) {
   const colors = useAppColors();
+  const insets = useSafeAreaInsets();
   const accent = accentColor ?? colors.primary;
   const accentDeep = accentColor ?? colors.primaryDeep;
   const [quartierOpen, setQuartierOpen] = useState(false);
@@ -51,7 +53,7 @@ export function DeliveryAddressForm({ value, onChange, accentColor, compact = fa
       {step(1, 'Arrondissement *')}
       {!compact ? (
         <ThemedText style={[styles.hint, { color: colors.textMuted }]}>
-          Choisissez votre quartier (arrondissement), puis précisez l'adresse en texte libre.
+          {"Choisissez votre quartier (arrondissement), puis précisez l'adresse en texte libre."}
         </ThemedText>
       ) : null}
       <Pressable style={[styles.select, { borderColor: colors.border, backgroundColor: colors.surface }]} onPress={() => setQuartierOpen(true)}>
@@ -111,7 +113,11 @@ export function DeliveryAddressForm({ value, onChange, accentColor, compact = fa
 
       <Modal visible={quartierOpen} transparent animationType="slide" onRequestClose={() => setQuartierOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setQuartierOpen(false)}>
-          <View style={[styles.modalSheet, { backgroundColor: colors.surface }]}>
+          <View
+            style={[
+              styles.modalSheet,
+              { backgroundColor: colors.surface, paddingBottom: Math.max(insets.bottom, 18) },
+            ]}>
             <ThemedText type="defaultSemiBold" style={[styles.modalTitle, { color: colors.text }]}>
               Arrondissement / quartier
             </ThemedText>

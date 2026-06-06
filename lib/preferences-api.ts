@@ -3,7 +3,7 @@ import { apiFetch } from '@/lib/api';
 export type UserPreferences = {
   notif_push_enabled: boolean;
   notif_email_enabled: boolean;
-  dark_mode: boolean;
+  dark_mode: boolean | null;
   langue: string;
 };
 

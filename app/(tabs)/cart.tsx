@@ -5,6 +5,7 @@ import { Image } from 'expo-image';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -13,7 +14,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Info, Minus, Plus, ShoppingBag, Smartphone, Truck } from 'lucide-react-native';
+import { Info, Minus, Plus, ShoppingBag, Smartphone, Trash2, Truck } from 'lucide-react-native';
 
 import { DeliveryAddressForm, type DeliveryAddressFormValue } from '@/components/delivery-address-form';
 import { ProductPrice } from '@/components/product-price';
@@ -66,7 +67,7 @@ export default function CartScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
-  const { showSuccess, showError, FeedbackOverlay } = useActionFeedback();
+  const { showSuccess, showError, showConfirm, FeedbackOverlay } = useActionFeedback();
   const { cart, hydrated, hydrate, syncFromMemory } = useCart();
   const [address, setAddress] = useState<DeliveryAddressFormValue>({
     quartier: '',
@@ -250,6 +251,37 @@ export default function CartScreen() {
     void saveCart(next);
   };
 
+  const clearCartAction = () => {
+    if (!cart || cart.segments.length === 0) return;
+    const total = cart.segments.reduce(
+      (n, s) => n + s.lines.reduce((m, l) => m + l.quantite, 0),
+      0,
+    );
+    showConfirm({
+      title: 'Vider le panier',
+      message: `${total} article${total > 1 ? 's' : ''} dans ${cart.segments.length} commerce${cart.segments.length > 1 ? 's' : ''}. Tout sera supprimé.`,
+      primaryLabel: 'Vider',
+      secondaryLabel: 'Annuler',
+      onPrimary: () => {
+        void saveCart(null);
+        clearPromo();
+        setStockByProduct({});
+        setProductById({});
+        setEnterpriseById({});
+        setAddress({
+          quartier: '',
+          ligne1: '',
+          instructions: '',
+          point_reperes: '',
+          ville: 'Brazzaville',
+          pays: 'Congo',
+        });
+        setSavedAddressId(null);
+        showSuccess('Panier vidé', 'Tous les articles ont été retirés.');
+      },
+    });
+  };
+
   const submitOrder = async () => {
     if (!cart || cart.segments.length === 0) return;
     if (orderInFlight.current || submitting) return;
@@ -355,9 +387,25 @@ export default function CartScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.scroll, { paddingTop: Math.max(insets.top, 14), paddingBottom: bottomPad }]}>
-          <ThemedText type="title" style={[styles.title, { color: colors.text }]}>
-            Votre panier
-          </ThemedText>
+          <View style={styles.titleRow}>
+            <ThemedText type="title" style={[styles.title, { color: colors.text }]}>
+              Votre panier
+            </ThemedText>
+            {hasItems ? (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.clearBtn,
+                  { borderColor: colors.border, backgroundColor: pressed ? colors.primarySoft : colors.surface },
+                ]}
+                onPress={clearCartAction}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Vider le panier">
+                <Trash2 size={16} color={colors.error} strokeWidth={LUCIDE_STROKE} />
+                <ThemedText style={[styles.clearBtnText, { color: colors.error }]}>Vider</ThemedText>
+              </Pressable>
+            ) : null}
+          </View>
 
           {!hydrated && !hasItems ? (
             <View style={styles.bootRow}>
@@ -616,6 +664,7 @@ export default function CartScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+      <FeedbackOverlay />
     </ThemedView>
   );
 }
@@ -624,6 +673,22 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   scroll: { paddingHorizontal: 20 },
   title: { fontSize: 26, fontWeight: '800', marginBottom: 20 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  clearBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  clearBtnText: { fontSize: 13, fontWeight: '700' },
   bootRow: { alignItems: 'center', paddingVertical: 48 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   muted: { fontSize: 14 },

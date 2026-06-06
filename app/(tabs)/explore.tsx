@@ -100,10 +100,6 @@ function orderCreatedLabel(o: OrderRow): string {
   return o.created_at_label || formatDateTimeFr(o.cree_le);
 }
 
-function orderDeliveredLabel(o: OrderRow): string {
-  return o.livraison_livree_at_label || o.livree_at_label || formatDateTimeFr(o.livree_le);
-}
-
 const PREVIEW_LIMIT = 4;
 
 function StepperRow({ filled, colors }: { filled: number; colors: ReturnType<typeof useAppColors> }) {
@@ -159,7 +155,6 @@ function OrdersScreenInner({
     const prixNum =
       o.prix_total !== undefined && o.prix_total !== null ? Number(o.prix_total) : null;
     const priceOk = prixNum !== null && Number.isFinite(prixNum);
-    const canOpenCommerce = Boolean(o.entreprise_id);
 
     if (filter === 'livrees') {
       const dateStr = formatLivreeLe(o.livree_le ?? o.cree_le);
@@ -168,8 +163,7 @@ function OrdersScreenInner({
         <View key={o.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Pressable
             style={({ pressed }) => [pressed && styles.cardPressed]}
-            onPress={() => canOpenCommerce && router.push(`/(tabs)/marketplace/${o.entreprise_id}`)}
-            disabled={!canOpenCommerce}
+            onPress={() => router.push(`/order-tracking/${o.id}`)}
             android_ripple={{ color: colors.primarySoft }}>
             <View style={styles.cardTop}>
               <ThemedText type="defaultSemiBold" style={[styles.orderId, { color: colors.text }]}>
@@ -206,7 +200,15 @@ function OrdersScreenInner({
 
     if (filter === 'annulees') {
       return (
-        <View key={o.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Pressable
+          key={o.id}
+          style={({ pressed }) => [
+            styles.card,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+            pressed && styles.cardPressed,
+          ]}
+          onPress={() => router.push(`/order-tracking/${o.id}`)}
+          android_ripple={{ color: colors.primarySoft }}>
           <View style={styles.cardTop}>
             <ThemedText type="defaultSemiBold" style={[styles.orderId, { color: colors.text }]}>
               #{refStr}
@@ -221,7 +223,7 @@ function OrdersScreenInner({
               Commandée le {orderCreatedLabel(o)}
             </ThemedText>
           ) : null}
-        </View>
+        </Pressable>
       );
     }
 
@@ -373,11 +375,11 @@ export default function OrdersScreen() {
     }
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-    }, [load])
-  );
+  const onRefresh = useCallback(() => {
+    void load();
+  }, [load]);
+
+  useFocusEffect(onRefresh);
 
   const enterpriseById = useMemo(() => new Map(enterprises.map((e) => [e.id, e])), [enterprises]);
 

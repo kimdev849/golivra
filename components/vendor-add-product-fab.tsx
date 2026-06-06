@@ -1,17 +1,16 @@
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Plus } from 'lucide-react-native';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
 import { brandGradient3, GOLIVRA_BRAND_SHADOW } from '@/constants/app-palette';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
 
 type Props = {
-  label: string;
   bottom: number;
   onPress: () => void;
+  accessibilityLabel?: string;
 };
 
 function triggerHaptic() {
@@ -20,81 +19,44 @@ function triggerHaptic() {
   }
 }
 
-/** FAB ajout plat / produit (onglet Menu ou Produits vendeur). */
-export function VendorAddProductFab({ label, bottom, onPress }: Props) {
+/** FAB + centré en bas de l'écran (onglet produits / menu). */
+export function VendorAddProductFab({ bottom, onPress, accessibilityLabel = 'Ajouter' }: Props) {
   const colors = useAppColors();
 
   return (
     <View style={[styles.host, styles.boxPointer, { bottom }]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={label}
+        accessibilityLabel={accessibilityLabel}
         onPress={() => {
           triggerHaptic();
           onPress();
         }}
-        style={({ pressed }) => [styles.press, pressed && styles.pressPressed]}>
-        <View
-          style={[
-            styles.labelChip,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              shadowColor: GOLIVRA_BRAND_SHADOW,
-            },
-          ]}>
-          <ThemedText style={[styles.labelText, { color: colors.text }]} numberOfLines={1}>
-            {label}
-          </ThemedText>
-        </View>
+        style={({ pressed }) => [pressed && styles.pressPressed]}>
         <LinearGradient
           colors={brandGradient3(colors)}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[styles.fab, { borderColor: colors.surface }]}>
-          <Plus size={28} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
+          <Plus size={30} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
         </LinearGradient>
       </Pressable>
     </View>
   );
 }
 
-const FAB_SIZE = 58;
+const FAB_SIZE = 60;
 
 const styles = StyleSheet.create({
   host: {
     position: 'absolute',
     right: 18,
-    left: 18,
-    alignItems: 'flex-end',
     zIndex: 30,
   },
   boxPointer: { pointerEvents: 'box-none' },
-  press: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    maxWidth: '100%',
-  },
   pressPressed: {
     opacity: 0.92,
-    transform: [{ scale: 0.98 }],
-  },
-  labelChip: {
-    flexShrink: 1,
-    maxWidth: '72%',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  labelText: {
-    fontSize: 14,
-    fontWeight: '800',
+    transform: [{ scale: 0.96 }],
   },
   fab: {
     width: FAB_SIZE,

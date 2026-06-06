@@ -25,6 +25,9 @@ export type AuthMe = {
 export function prefetchClientCatalog(): void {
   void fetchAllEnterprises().catch(() => {});
   void fetchEnterpriseCategories('restaurant').catch(() => {});
+  void import('@/lib/catalog').then(({ fetchProductFeed }) =>
+    fetchProductFeed({ limit: 24, offset: 0 }).catch(() => {}),
+  );
 }
 
 export async function fetchAllEnterprises(force = false): Promise<EnterprisePublic[]> {

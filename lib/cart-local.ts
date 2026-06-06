@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const STORAGE_KEY = 'golivra_cart_v1';
 
@@ -145,7 +145,7 @@ function parseStoredCart(raw: string): CartState | null {
 
 async function readCartFromStorage(): Promise<CartState | null> {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    const raw = await SecureStore.getItemAsync(STORAGE_KEY);
     if (!raw) return null;
     return parseStoredCart(raw);
   } catch {
@@ -153,7 +153,7 @@ async function readCartFromStorage(): Promise<CartState | null> {
   }
 }
 
-/** Charge AsyncStorage une fois au démarrage. */
+/** Charge SecureStore une fois au démarrage. */
 export async function hydrateCart(): Promise<CartState | null> {
   if (memoryHydrated) return memoryCart;
   const loaded = await readCartFromStorage();
@@ -179,11 +179,11 @@ function persistCartAsync(state: CartState | null): void {
   void (async () => {
     try {
       if (!state) {
-        await AsyncStorage.removeItem(STORAGE_KEY);
+        await SecureStore.deleteItemAsync(STORAGE_KEY);
         void pushCartToServer(null);
         return;
       }
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      await SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify(state));
       void pushCartToServer(state);
     } catch {
       /* mémoire reste source de vérité */

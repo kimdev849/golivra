@@ -21,7 +21,7 @@ export default function MyAddressesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
-  const { showSuccess, showError, FeedbackOverlay } = useActionFeedback();
+  const { showError, FeedbackOverlay } = useActionFeedback();
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<UserAddress[]>([]);
   const [editing, setEditing] = useState(false);
@@ -38,7 +38,7 @@ export default function MyAddressesScreen() {
       showError('Chargement impossible', e instanceof Error ? e.message : undefined);
     }
     finally { setLoading(false); }
-  }, []);
+  }, [showError]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 

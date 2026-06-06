@@ -28,7 +28,7 @@ export function VendorTabBar({ state, descriptors, navigation }: BottomTabBarPro
   );
 
   const focusedName = state.routes[state.index]?.name;
-  const trackBg = isDark ? colors.surfaceElevated : '#FFFFFF';
+  const trackBg = isDark ? colors.surfaceElevated : colors.surface;
   const trackBorder = isDark ? colors.border : 'rgba(13,82,55,0.08)';
 
   return (
@@ -95,6 +95,10 @@ export function VendorTabBar({ state, descriptors, navigation }: BottomTabBarPro
 const styles = StyleSheet.create({
   root: {
     paddingTop: 4,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
   boxPointer: { pointerEvents: 'box-none' },
   barArea: {

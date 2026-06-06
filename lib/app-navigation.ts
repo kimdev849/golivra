@@ -25,8 +25,8 @@ export function stackTabRootOptions(): NativeStackNavigationOptions {
 
 export function stackAuthOptions(): NativeStackNavigationOptions {
   return {
-    animation: 'fade',
-    animationDuration: 220,
+    animation: Platform.OS === 'ios' ? 'default' : 'slide_from_right',
+    animationDuration: 280,
     gestureEnabled: false,
   };
 }

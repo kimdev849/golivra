@@ -1,9 +1,10 @@
-import { useNavigation } from '@react-navigation/native';
-import { useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import {
+  ArrowLeft,
   Building2,
   Clock,
   Heart,
@@ -38,6 +39,7 @@ import { peekEnterpriseById, peekProductsForEnterprise } from '@/lib/client-data
 import { addProductToCartPrompt } from '@/lib/cart-local';
 import { getEffectiveUnitPrice } from '@/lib/product-promo';
 import { resolveRemoteImageUrl } from '@/lib/images';
+import { productDetailHref } from '@/lib/listing-utils';
 import {
   effectiveStockCap,
   isProductOrderable,
@@ -48,7 +50,8 @@ import { getSessionToken } from '@/lib/auth';
 
 export default function EnterpriseDetailScreen() {
   const { enterpriseId } = useLocalSearchParams<{ enterpriseId: string }>();
-  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
   const id = typeof enterpriseId === 'string' ? enterpriseId : '';
   const colors = useAppColors();
   const styles = useThemedStyles(createEnterpriseDetailStyles);
@@ -65,14 +68,17 @@ export default function EnterpriseDetailScreen() {
   const reload = useCallback(async (force = false) => {
     if (!id) return;
     setError(null);
+    
     const cachedEnt = peekEnterpriseById(id);
     const cachedProds = peekProductsForEnterprise(id);
+    
     if (cachedEnt) setEnterprise(cachedEnt);
     if (cachedProds) setProducts(cachedProds);
-    const hasCache = Boolean(cachedEnt || cachedProds);
-    if (!hasCache) setLoading(true);
+    
+    // N'afficher le loader que si on n'a absolument rien en cache
+    const hasCache = Boolean(cachedEnt); 
+    if (!hasCache && !force) setLoading(true);
     else {
-      setLoading(false);
       setRefreshing(true);
     }
 
@@ -126,27 +132,6 @@ export default function EnterpriseDetailScreen() {
       setError(e instanceof Error ? e.message : 'Erreur lors de la mise à jour des favoris.');
     }
   }, [token, enterprise]);
-
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      title: enterprise?.nom ?? 'Commerce',
-      headerRight: enterprise ? () => (
-        <Pressable
-          onPress={handleToggleFavorite}
-          style={({ pressed }) => [
-            { padding: 8, borderRadius: 20, backgroundColor: pressed ? colors.primarySoft : 'transparent' },
-          ]}
-          hitSlop={10}>
-          <Heart
-            size={24}
-            color={isFavorited ? colors.primary : colors.textMuted}
-            fill={isFavorited ? colors.primary : 'none'}
-            strokeWidth={LUCIDE_STROKE}
-          />
-        </Pressable>
-      ) : undefined,
-    });
-  }, [navigation, enterprise?.nom, isFavorited, handleToggleFavorite, colors]);
 
   const hero = resolveRemoteImageUrl(enterprise?.image_url);
   const isRestaurant = enterprise?.type === 'restaurant';
@@ -223,7 +208,7 @@ export default function EnterpriseDetailScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.heroWrap}>
           {hero ? (
-            <Image source={{ uri: hero }} style={styles.heroImg} contentFit="cover" />
+            <Image source={{ uri: hero }} style={styles.heroImg} contentFit="cover" transition={200} />
           ) : (
             <View style={[styles.heroImg, styles.heroPh]}>
               {enterprise.type === 'restaurant' ? (
@@ -233,6 +218,30 @@ export default function EnterpriseDetailScreen() {
               )}
             </View>
           )}
+
+          {/* top controls custom header */}
+          <View style={[styles.heroTop, { paddingTop: Math.max(insets.top, 16) + 8 }]}>
+            <Pressable
+              style={[styles.iconBtn, { backgroundColor: colors.surface }]}
+              onPress={() => router.back()}
+              hitSlop={8}
+              accessibilityLabel="Retour">
+              <ArrowLeft size={20} color={colors.text} strokeWidth={LUCIDE_STROKE} />
+            </Pressable>
+            <Pressable
+              style={[styles.iconBtn, { backgroundColor: colors.surface }]}
+              onPress={handleToggleFavorite}
+              hitSlop={8}
+              accessibilityLabel={isFavorited ? 'Retirer des favoris' : 'Ajouter aux favoris'}>
+              <Heart
+                size={20}
+                color={isFavorited ? colors.error : colors.text}
+                fill={isFavorited ? colors.error : 'none'}
+                strokeWidth={LUCIDE_STROKE}
+              />
+            </Pressable>
+          </View>
+
           <View style={styles.heroBadge}>
             <ThemedText style={styles.heroBadgeText}>{enterprise.type === 'restaurant' ? 'Restaurant' : 'Boutique'}</ThemedText>
           </View>
@@ -293,12 +302,19 @@ export default function EnterpriseDetailScreen() {
               setGalleryState({ images: allImages, index: 0 });
             };
             return (
-              <View key={p.id} style={styles.productCard}>
+              <Pressable
+                key={p.id}
+                style={styles.productCard}
+                onPress={() => router.push(productDetailHref(p) as never)}
+                android_ripple={{ color: colors.primaryMuted }}>
                 <Pressable
                   style={styles.productThumb}
                   accessibilityRole="button"
                   accessibilityLabel={allImages.length > 1 ? `Voir les ${allImages.length} photos` : 'Voir la photo'}
-                  onPress={openGallery}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    openGallery();
+                  }}
                   disabled={!img}>
                   {img ? (
                     <Image source={{ uri: img }} style={styles.productImg} contentFit="cover" />
@@ -333,11 +349,14 @@ export default function EnterpriseDetailScreen() {
                 <Pressable
                   style={[styles.addBtn, disabled && styles.addBtnDisabled]}
                   disabled={disabled}
-                  onPress={() => addProduct(p)}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    addProduct(p);
+                  }}
                   android_ripple={{ color: colors.primaryMuted }}>
                   <ShoppingCart size={22} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
                 </Pressable>
-              </View>
+              </Pressable>
             );
           })
         )}

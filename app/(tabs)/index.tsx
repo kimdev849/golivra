@@ -1,178 +1,225 @@
 import { useFocusEffect } from '@react-navigation/native';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   FlatList,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   TextInput,
   View,
-  type ListRenderItem,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import {
+  ArrowDownUp,
   Bell,
-  Heart,
   Search,
-  ShoppingBag,
   ShoppingBasket,
   SlidersHorizontal,
   Sparkles,
   Store,
   Tag,
   UtensilsCrossed,
-  Zap,
+  X,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HomeActiveOrderWidget } from '@/components/home-active-order-widget';
+import { ListingCard } from '@/components/listing-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { TAB_BAR_CONTENT_PADDING_BOTTOM } from '@/constants/layout';
 import { useActiveOrders } from '@/hooks/useActiveOrders';
 import { useAppColors } from '@/hooks/use-app-colors';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useUnreadNotifications } from '@/hooks/use-unread-notifications';
-import { getSessionToken } from '@/lib/auth';
-import { fetchAuthMe } from '@/lib/client-data';
-import { fetchProductFeed, type ProductPublic } from '@/lib/catalog';
+import { useEnterprises } from '@/hooks/useMarketplace';
+import {
+  fetchProductFeed,
+  searchCatalog,
+  type CatalogSearchType,
+  type EnterprisePublic,
+  type ProductPublic,
+} from '@/lib/catalog';
+import { prefetchClientCatalog } from '@/lib/client-data';
 import { resolveRemoteImageUrl } from '@/lib/images';
-import { formatFcfa } from '@/lib/format';
-import { isFavoriteProduct, toggleFavoriteProduct } from '@/lib/favorites';
+import { toggleFavoriteProduct } from '@/lib/favorites';
+import { productDetailHref } from '@/lib/listing-utils';
 import { getEffectiveUnitPrice } from '@/lib/product-promo';
 
-const PAGE_SIZE = 30;
-const SCREEN_PADDING = 16;
-const GRID_GAP = 12;
+const GRID_GAP = 8;
+const H_PAD = 10;
+const FEED_PAGE_SIZE = 24;
 
-const FILTERS: { key: 'all' | 'plat' | 'article' | 'promo'; label: string; Icon: typeof Store }[] = [
-  { key: 'all', label: 'Tout', Icon: ShoppingBag },
+type ExplorerCategory = 'all' | 'plat' | 'article' | 'restaurant' | 'boutique' | 'promo';
+type SortKey = 'recent' | 'price_low' | 'price_high';
+
+const CATEGORIES: {
+  key: ExplorerCategory;
+  label: string;
+  Icon: typeof Store;
+}[] = [
+  { key: 'all', label: 'Tout', Icon: Sparkles },
   { key: 'plat', label: 'Plats', Icon: UtensilsCrossed },
-  { key: 'article', label: 'Articles', Icon: ShoppingBasket },
+  { key: 'article', label: 'Produits', Icon: ShoppingBasket },
+  { key: 'restaurant', label: 'Restaurants', Icon: UtensilsCrossed },
+  { key: 'boutique', label: 'Boutiques', Icon: Store },
   { key: 'promo', label: 'Promos', Icon: Tag },
 ];
 
-type Me = {
-  id: string;
-  nom: string | null;
-  telephone: string;
-  image_url?: string | null;
-  imageUrl?: string | null;
-};
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'recent', label: 'Récents' },
+  { key: 'price_low', label: 'Prix ↑' },
+  { key: 'price_high', label: 'Prix ↓' },
+];
 
-export default function HomeScreen() {
+function categoryToSearchType(category: ExplorerCategory): CatalogSearchType {
+  if (category === 'plat') return 'plat';
+  if (category === 'article') return 'article';
+  if (category === 'restaurant') return 'restaurant';
+  if (category === 'boutique') return 'boutique';
+  return 'all';
+}
+
+function isPromoProduct(p: ProductPublic): boolean {
+  const promo = Number(p.prix_promo);
+  const base = Number(getEffectiveUnitPrice(p) ?? p.prix);
+  return Number.isFinite(promo) && promo < base;
+}
+
+function unitPrice(p: ProductPublic): number {
+  return Number(getEffectiveUnitPrice(p) ?? p.prix ?? 0);
+}
+
+function sortProducts(list: ProductPublic[], sort: SortKey): ProductPublic[] {
+  if (sort === 'recent') return list;
+  const copy = [...list];
+  if (sort === 'price_low') copy.sort((a, b) => unitPrice(a) - unitPrice(b));
+  if (sort === 'price_high') copy.sort((a, b) => unitPrice(b) - unitPrice(a));
+  return copy;
+}
+
+export default function ExplorerScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const { unreadCount } = useUnreadNotifications();
   const { heroOrder, isLoading: loadingOrders, refetch: refetchOrders } = useActiveOrders();
 
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'plat' | 'article' | 'promo'>('all');
-  const [me, setMe] = useState<Me | null>(null);
-  const [products, setProducts] = useState<ProductPublic[]>([]);
+  const [category, setCategory] = useState<ExplorerCategory>('all');
+  const [sort, setSort] = useState<SortKey>('recent');
+  const [showSortRow, setShowSortRow] = useState(false);
   const [favProductKeys, setFavProductKeys] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(true);
-  const [offset, setOffset] = useState(0);
 
-  // Charge le profil user
-  useEffect(() => {
-    let alive = true;
-    void (async () => {
-      try {
-        const token = await getSessionToken();
-        if (!token) return;
-        const data = await fetchAuthMe(token);
-        if (alive) setMe(data as Me);
-      } catch {
-        /* ignore */
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
+  const debouncedSearch = useDebouncedValue(search.trim(), 150);
+  const searchActive = debouncedSearch.length >= 2;
 
-  const loadFavorites = useCallback(async (items: ProductPublic[]) => {
-    if (items.length === 0) {
-      setFavProductKeys(new Set());
-      return;
-    }
-    const token = await getSessionToken();
-    if (!token) return;
-    // On charge en parallele, on garde seulement ceux qui matchent les items affiches.
-    const checks = await Promise.all(
-      items.map(async (p) => {
-        const k = (p.kind === 'article' ? 'article' : 'plat') + ':' + p.id;
-        try {
-          return { k, fav: await isFavoriteProduct(p.id, p.kind === 'article' ? 'article' : 'plat') };
-        } catch {
-          return { k, fav: false };
-        }
-      }),
-    );
-    setFavProductKeys((prev) => {
-      const next = new Set(prev);
-      for (const { k, fav } of checks) {
-        if (fav) next.add(k);
-        else next.delete(k);
-      }
-      return next;
-    });
-  }, []);
+  const { data: restaurants = [] } = useEnterprises('restaurant');
+  const { data: boutiques = [] } = useEnterprises('boutique');
 
-  const loadFeed = useCallback(
-    async (reset = true) => {
-      setError(null);
-      if (reset) {
-        setLoading(true);
-        setOffset(0);
-        setHasMore(true);
-      } else {
-        setLoadingMore(true);
-      }
-      try {
-        const params: Parameters<typeof fetchProductFeed>[0] = {
-          limit: PAGE_SIZE,
-          offset: reset ? 0 : offset,
-        };
-        if (filter === 'plat') params.type = 'plat';
-        if (filter === 'article') params.type = 'article';
-        if (filter === 'promo') params.promo = true;
-        const data = await fetchProductFeed(params);
-        if (reset) {
-          setProducts(data);
-        } else {
-          setProducts((prev) => [...prev, ...data]);
-        }
-        setHasMore(data.length >= PAGE_SIZE);
-        setOffset((reset ? 0 : offset) + data.length);
-        void loadFavorites(data);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Impossible de charger les produits.');
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-        setLoadingMore(false);
-      }
+  const feedParams = useMemo(() => {
+    if (category === 'promo') return { promo: true };
+    if (category === 'plat') return { type: 'plat' as const };
+    if (category === 'article') return { type: 'article' as const };
+    return {};
+  }, [category]);
+
+  const feedEnabled = !searchActive && category !== 'restaurant' && category !== 'boutique';
+
+  const {
+    data: feedPages,
+    isLoading: loadingFeed,
+    error: feedError,
+    refetch: refetchFeed,
+    isRefetching: refetchingFeed,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['explorer-feed', feedParams],
+    queryFn: ({ pageParam }) =>
+      fetchProductFeed({ ...feedParams, limit: FEED_PAGE_SIZE, offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      if (lastPage.length < FEED_PAGE_SIZE) return undefined;
+      return allPages.reduce((sum, page) => sum + page.length, 0);
     },
-    [filter, offset, loadFavorites],
-  );
+    enabled: feedEnabled,
+    staleTime: 1000 * 60 * 3,
+    gcTime: 1000 * 60 * 10,
+    placeholderData: (previousData) => previousData,
+  });
+
+  const feedProducts = useMemo(() => feedPages?.pages.flat() ?? [], [feedPages]);
+
+  const {
+    data: searchResult,
+    isFetching: searching,
+    refetch: refetchSearch,
+    isRefetching: refetchingSearch,
+  } = useQuery({
+    queryKey: ['explorer-search', debouncedSearch, category],
+    queryFn: () => searchCatalog(debouncedSearch, categoryToSearchType(category), 40),
+    enabled: searchActive,
+    staleTime: 1000 * 45,
+  });
+
+  const displayProducts = useMemo(() => {
+    let list: ProductPublic[] = [];
+    if (searchActive) {
+      // Résultats serveur si dispo
+      const serverProds = searchResult?.products ?? [];
+      
+      // Résultats locaux (pour l'effet < 100ms)
+      const needle = debouncedSearch.toLowerCase();
+      const localProds = feedProducts.filter(p => 
+        (p.nom ?? '').toLowerCase().includes(needle) || 
+        (p.description ?? '').toLowerCase().includes(needle) ||
+        (p.enterprise_nom ?? '').toLowerCase().includes(needle)
+      );
+
+      // Fusionner sans doublons
+      const seen = new Set(serverProds.map(p => p.id));
+      list = [...serverProds, ...localProds.filter(p => !seen.has(p.id))];
+
+      if (category === 'promo') {
+        list = list.filter(isPromoProduct);
+      }
+    } else {
+      list = feedProducts;
+      if (category === 'promo') {
+        list = list.filter(isPromoProduct);
+      }
+    }
+    return sortProducts(list, sort);
+  }, [searchActive, searchResult, feedProducts, category, sort, debouncedSearch]);
+
+  const displayEnterprises = useMemo(() => {
+    if (searchActive) return searchResult?.enterprises ?? [];
+    if (category === 'restaurant') return restaurants;
+    if (category === 'boutique') return boutiques;
+    return [];
+  }, [searchActive, searchResult, category, restaurants, boutiques]);
+
+  const showProductGrid =
+    !searchActive ? category !== 'restaurant' && category !== 'boutique' : true;
 
   useEffect(() => {
-    void loadFeed(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter]);
+    prefetchClientCatalog();
+    void queryClient.prefetchInfiniteQuery({
+      queryKey: ['explorer-feed', {}],
+      queryFn: ({ pageParam }) =>
+        fetchProductFeed({ limit: FEED_PAGE_SIZE, offset: pageParam as number }),
+      initialPageParam: 0,
+    });
+  }, [queryClient]);
 
   useFocusEffect(
     useCallback(() => {
@@ -181,14 +228,9 @@ export default function HomeScreen() {
   );
 
   const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    void loadFeed(true);
-  }, [loadFeed]);
-
-  const onEndReached = useCallback(() => {
-    if (loadingMore || !hasMore || loading) return;
-    void loadFeed(false);
-  }, [loadingMore, hasMore, loading, loadFeed]);
+    if (searchActive) void refetchSearch();
+    else void refetchFeed();
+  }, [searchActive, refetchFeed, refetchSearch]);
 
   const onToggleFav = useCallback(
     async (p: ProductPublic) => {
@@ -222,336 +264,332 @@ export default function HomeScreen() {
     [favProductKeys],
   );
 
-  const onPressProduct = useCallback(
-    (p: ProductPublic) => {
-      const kind = p.kind === 'article' ? 'article' : 'plat';
-      router.push(`/(tabs)/product/${p.id}?kind=${kind}` as never);
-    },
-    [router],
+  const onEndReached = useCallback(() => {
+    if (!feedEnabled || searchActive || !hasNextPage || isFetchingNextPage) return;
+    void fetchNextPage();
+  }, [feedEnabled, searchActive, hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const renderProduct = useCallback(
+    ({ item }: { item: ProductPublic }) => (
+      <View style={styles.gridCell}>
+        <ListingCard
+          product={item}
+          variant="grid"
+          onPress={() => router.push(productDetailHref(item) as never)}
+          isFav={favProductKeys.has(`${item.kind === 'article' ? 'article' : 'plat'}:${item.id}`)}
+          onToggleFav={() => void onToggleFav(item)}
+        />
+      </View>
+    ),
+    [favProductKeys, onToggleFav, router],
   );
 
-  const firstName = me?.nom?.split(' ')[0] || 'Bienvenue';
+  const renderEnterpriseRow = (ent: EnterprisePublic) => {
+    const logoUrl = resolveRemoteImageUrl(ent.image_url);
+    return (
+      <Pressable
+        key={ent.id}
+        style={[styles.enterpriseRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        onPress={() => router.push(`/(tabs)/marketplace/${ent.id}` as never)}>
+        <View style={[styles.enterpriseLogoBox, { backgroundColor: colors.primarySoft, borderColor: colors.border }]}>
+          {logoUrl ? (
+            <Image source={{ uri: logoUrl }} style={styles.enterpriseLogo} contentFit="cover" />
+          ) : (
+            <Store size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+          )}
+        </View>
+        <View style={{ flex: 1 }}>
+          <ThemedText style={[styles.enterpriseName, { color: colors.text }]} numberOfLines={1}>
+            {ent.nom}
+          </ThemedText>
+          {ent.adresse ? (
+            <ThemedText style={[styles.enterpriseMeta, { color: colors.textMuted }]} numberOfLines={1}>
+              {ent.adresse}
+            </ThemedText>
+          ) : null}
+        </View>
+      </Pressable>
+    );
+  };
 
-  const renderItem: ListRenderItem<ProductPublic> = useCallback(
-    ({ item, index }) => (
-      <ProductCard
-        product={item}
-        onPress={() => onPressProduct(item)}
-        isFav={favProductKeys.has(`${item.kind === 'article' ? 'article' : 'plat'}:${item.id}`)}
-        onToggleFav={() => void onToggleFav(item)}
-        leftInRow={index % 2 === 0}
-      />
-    ),
-    [favProductKeys, onPressProduct, onToggleFav],
+  const loading = searchActive ? searching && !searchResult : loadingFeed && feedProducts.length === 0;
+  const refreshing = searchActive ? refetchingSearch : refetchingFeed;
+  const activeCategoryLabel = CATEGORIES.find((c) => c.key === category)?.label ?? 'Tout';
+  const hasActiveFilters = category !== 'all' || sort !== 'recent' || search.length > 0;
+
+  const clearAllFilters = useCallback(() => {
+    setSearch('');
+    setCategory('all');
+    setSort('recent');
+    setShowSortRow(false);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, []);
+
+  const listHeader = (
+    <View style={styles.headerWrap}>
+      <View style={[styles.topBar, { marginTop: Math.max(insets.top, 10) }]}>
+        <View style={styles.topBarLeft}>
+          <ThemedText style={[styles.marketTitle, { color: colors.text }]}>GoLivra</ThemedText>
+          <ThemedText style={[styles.marketSub, { color: colors.textMuted }]}>
+            Restaurants, Boutiques & Services
+          </ThemedText>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {hasActiveFilters && (
+            <Pressable
+              style={[styles.iconBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              onPress={clearAllFilters}
+              hitSlop={8}>
+              <X size={18} color={colors.error} strokeWidth={LUCIDE_STROKE} />
+            </Pressable>
+          )}
+          <Pressable
+            style={[styles.iconBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => router.push('/notifications')}
+            hitSlop={8}
+            accessibilityLabel="Notifications">
+            <Bell size={20} color={colors.text} strokeWidth={LUCIDE_STROKE} />
+            {unreadCount > 0 ? (
+              <View style={[styles.notifDot, { backgroundColor: colors.error, borderColor: colors.background }]}>
+                <ThemedText style={styles.notifDotTxt}>{unreadCount > 9 ? '9+' : String(unreadCount)}</ThemedText>
+              </View>
+            ) : null}
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={[styles.searchBar, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
+        <Search size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+        <TextInput
+          style={[styles.searchInput, { color: colors.text }]}
+          placeholder="Rechercher des articles…"
+          placeholderTextColor={colors.placeholder}
+          value={search}
+          onChangeText={setSearch}
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+        />
+        {search.length > 0 ? (
+          <Pressable onPress={() => setSearch('')} hitSlop={8}>
+            <X size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          </Pressable>
+        ) : null}
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+        {CATEGORIES.map((c) => {
+          const active = category === c.key;
+          return (
+            <Pressable
+              key={c.key}
+              onPress={() => {
+                void Haptics.selectionAsync();
+                setCategory(c.key);
+              }}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: active ? colors.primary : colors.surface,
+                  borderColor: active ? colors.primary : colors.border,
+                },
+              ]}>
+              <c.Icon
+                size={14}
+                color={active ? colors.onPrimary : colors.text}
+                strokeWidth={LUCIDE_STROKE}
+              />
+              <ThemedText style={[styles.chipTxt, { color: active ? colors.onPrimary : colors.text }]}>
+                {c.label}
+              </ThemedText>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      <View style={styles.toolbarRow}>
+        <Pressable
+          style={[
+            styles.filterBtn,
+            {
+              backgroundColor: showSortRow ? colors.primary : colors.surface,
+              borderColor: showSortRow ? colors.primary : colors.border,
+            },
+          ]}
+          onPress={() => {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setShowSortRow((v) => !v);
+          }}
+          accessibilityLabel="Filtres et tri">
+          <SlidersHorizontal
+            size={16}
+            color={showSortRow ? colors.onPrimary : colors.text}
+            strokeWidth={LUCIDE_STROKE}
+          />
+          <ThemedText style={[styles.filterBtnTxt, { color: showSortRow ? colors.onPrimary : colors.text }]}>
+            Trier par
+          </ThemedText>
+        </Pressable>
+        <View style={[styles.activeFilterPill, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, borderWidth: 1 }]}>
+          <ThemedText style={[styles.activeFilterTxt, { color: colors.textSecondary }]} numberOfLines={1}>
+            {activeCategoryLabel}
+            {searchActive ? ` · « ${debouncedSearch} »` : ''}
+            {sort !== 'recent' ? ` · ${SORT_OPTIONS.find((s) => s.key === sort)?.label}` : ''}
+          </ThemedText>
+        </View>
+      </View>
+
+      {showSortRow ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortRow}>
+          <ArrowDownUp size={14} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          {SORT_OPTIONS.map((s) => {
+            const active = sort === s.key;
+            return (
+              <Pressable
+                key={s.key}
+                onPress={() => setSort(s.key)}
+                style={[
+                  styles.sortChip,
+                  {
+                    backgroundColor: active ? colors.primary : colors.surface,
+                    borderColor: active ? colors.primary : colors.border,
+                  },
+                ]}>
+                <ThemedText style={[styles.sortChipTxt, { color: active ? colors.onPrimary : colors.text }]}>
+                  {s.label}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      ) : null}
+
+      {!loadingOrders && heroOrder && !searchActive ? <HomeActiveOrderWidget order={heroOrder} /> : null}
+
+      {searchActive && searching ? (
+        <View style={styles.loaderRow}>
+          <ActivityIndicator color={colors.primary} />
+          <ThemedText style={[styles.loaderText, { color: colors.textMuted }]}>Recherche…</ThemedText>
+        </View>
+      ) : null}
+
+      {searchActive && !searching ? (
+        <ThemedText style={[styles.resultCount, { color: colors.textMuted }]}>
+          {displayProducts.length + displayEnterprises.length} résultat
+          {displayProducts.length + displayEnterprises.length !== 1 ? 's' : ''}
+        </ThemedText>
+      ) : null}
+
+      {searchActive && displayEnterprises.length > 0 ? (
+        <View style={styles.section}>
+          <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>Commerces</ThemedText>
+          {displayEnterprises.map(renderEnterpriseRow)}
+        </View>
+      ) : null}
+
+      {!searchActive && (category === 'restaurant' || category === 'boutique') ? (
+        <View style={styles.section}>
+          <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
+            {category === 'restaurant' ? 'Restaurants' : 'Boutiques'}
+          </ThemedText>
+          {displayEnterprises.map(renderEnterpriseRow)}
+        </View>
+      ) : null}
+
+      {loading && showProductGrid ? (
+        <View style={styles.loaderRow}>
+          <ActivityIndicator color={colors.primary} />
+          <ThemedText style={[styles.loaderText, { color: colors.textMuted }]}>Chargement…</ThemedText>
+        </View>
+      ) : null}
+
+      {feedError && !searchActive && showProductGrid ? (
+        <View style={[styles.warnCard, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}>
+          <ThemedText style={[styles.warnBody, { color: colors.textMuted }]}>
+            {feedError instanceof Error ? feedError.message : 'Impossible de charger les produits.'}
+          </ThemedText>
+          <Pressable
+            style={[styles.warnBtn, { backgroundColor: colors.primary }]}
+            onPress={() => void refetchFeed()}>
+            <ThemedText style={[styles.warnBtnText, { color: colors.onPrimary }]}>Réessayer</ThemedText>
+          </Pressable>
+        </View>
+      ) : null}
+    </View>
   );
 
   return (
     <ThemedView style={[styles.screen, { backgroundColor: colors.background }]}>
-      <FlatList
-        data={products}
-        keyExtractor={(p) => `${p.kind || 'p'}-${p.id}`}
-        renderItem={renderItem}
-        numColumns={2}
-        columnWrapperStyle={styles.columnRow}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: TAB_BAR_CONTENT_PADDING_BOTTOM + insets.bottom },
-        ]}
-        ListHeaderComponent={
-          <View style={styles.headerWrap}>
-            {/* TOP BAR */}
-            <View style={[styles.topBar, { marginTop: Math.max(insets.top, 12) }]}>
-              <View style={styles.topBarLeft}>
-                <ThemedText style={[styles.greeting, { color: colors.textMuted }]}>
-                  Bonjour 👋
+      {showProductGrid ? (
+        <FlatList
+          data={displayProducts}
+          key={`grid-${category}-${searchActive ? debouncedSearch : 'feed'}`}
+          numColumns={2}
+          keyExtractor={(p) => `${p.kind || 'p'}-${p.id}`}
+          renderItem={renderProduct}
+          columnWrapperStyle={styles.gridRow}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={
+            !loading ? (
+              <View style={[styles.warnCard, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}>
+                <ThemedText style={[styles.warnTitle, { color: colors.text }]}>
+                  {searchActive ? 'Aucun résultat' : 'Aucun produit'}
                 </ThemedText>
-                <ThemedText style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
-                  {firstName}
+                <ThemedText style={[styles.warnBody, { color: colors.textMuted }]}>
+                  {searchActive ? 'Modifiez la recherche ou les filtres.' : 'Revenez un peu plus tard.'}
                 </ThemedText>
               </View>
-              <View style={styles.topBarRight}>
-                <Pressable
-                  style={[styles.iconBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                  onPress={() => router.push('/notifications')}
-                  hitSlop={8}
-                  accessibilityLabel="Notifications">
-                  <Bell size={20} color={colors.text} strokeWidth={LUCIDE_STROKE} />
-                  {unreadCount > 0 ? (
-                    <View style={[styles.notifDot, { backgroundColor: colors.error, borderColor: colors.background }]}>
-                      <ThemedText style={styles.notifDotTxt}>
-                        {unreadCount > 9 ? '9+' : String(unreadCount)}
-                      </ThemedText>
-                    </View>
-                  ) : null}
-                </Pressable>
+            ) : null
+          }
+          ListFooterComponent={
+            isFetchingNextPage ? (
+              <View style={styles.loaderRow}>
+                <ActivityIndicator color={colors.primary} />
               </View>
-            </View>
-
-            {/* SEARCH */}
-            <View
-              style={[
-                styles.searchBar,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}>
-              <Search size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-              <TextInput
-                style={[styles.searchInput, { color: colors.text }]}
-                placeholder="Rechercher un plat, un article…"
-                placeholderTextColor={colors.placeholder}
-                value={search}
-                onChangeText={setSearch}
-                returnKeyType="search"
-              />
-              <Pressable
-                style={[styles.filterTap, { backgroundColor: colors.primarySoft }]}
-                onPress={() => router.push('/(tabs)/marketplace')}
-                hitSlop={8}
-                accessibilityLabel="Voir les commerces">
-                <SlidersHorizontal size={16} color={colors.primaryDeep} strokeWidth={LUCIDE_STROKE} />
-              </Pressable>
-            </View>
-
-            {/* SHINE BANNER */}
-            <View style={[styles.shineBanner, { backgroundColor: colors.primaryDeep }]}>
-              <View style={[styles.shineIcon, { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
-                <Zap size={14} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} fill={colors.onPrimary} />
-              </View>
-              <ThemedText style={[styles.shineTitle, { color: colors.onPrimary }]} numberOfLines={1}>
-                Livraison express · moins d'une heure
-              </ThemedText>
-              <Sparkles size={16} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
-            </View>
-
-            {/* ACTIVE ORDER WIDGET */}
-            {!loadingOrders && heroOrder ? (
-              <View style={{ marginTop: 14 }}>
-                <HomeActiveOrderWidget order={heroOrder} />
-              </View>
-            ) : null}
-
-            {/* FILTER CHIPS */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filterRow}>
-              {FILTERS.map((f) => {
-                const active = filter === f.key;
-                return (
-                  <Pressable
-                    key={f.key}
-                    onPress={() => setFilter(f.key)}
-                    style={[
-                      styles.chip,
-                      {
-                        backgroundColor: active ? colors.primary : colors.surface,
-                        borderColor: active ? colors.primary : colors.border,
-                      },
-                    ]}>
-                    <f.Icon
-                      size={14}
-                      color={active ? colors.onPrimary : colors.text}
-                      strokeWidth={LUCIDE_STROKE}
-                    />
-                    <ThemedText
-                      style={[
-                        styles.chipTxt,
-                        { color: active ? colors.onPrimary : colors.text },
-                      ]}>
-                      {f.label}
-                    </ThemedText>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
-            {/* SECTION TITLE */}
-            <View style={styles.sectionHead}>
-              <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
-                {filter === 'promo'
-                  ? '🔥 Bonnes affaires'
-                  : filter === 'plat'
-                    ? '🍽️ Plats du moment'
-                    : filter === 'article'
-                      ? '🛍️ Articles populaires'
-                      : '✨ Pour vous'}
-              </ThemedText>
-              <Pressable
-                onPress={() => router.push('/(tabs)/marketplace')}
-                hitSlop={8}
-                accessibilityLabel="Voir tous les commerces">
-                <ThemedText style={[styles.seeAll, { color: colors.primary }]}>
-                  Commerces
-                </ThemedText>
-              </Pressable>
-            </View>
-          </View>
-        }
-        ListEmptyComponent={
-          loading ? (
-            <View style={styles.loaderRow}>
-              <ActivityIndicator color={colors.primary} />
-              <ThemedText style={[styles.loaderText, { color: colors.textMuted }]}>
-                Chargement des produits…
-              </ThemedText>
-            </View>
-          ) : error ? (
-            <View style={[styles.warnCard, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}>
-              <ThemedText style={[styles.warnTitle, { color: colors.text }]}>Oups</ThemedText>
-              <ThemedText style={[styles.warnBody, { color: colors.textMuted }]}>{error}</ThemedText>
-              <Pressable
-                style={[styles.warnBtn, { backgroundColor: colors.primary }]}
-                onPress={() => void loadFeed(true)}>
-                <ThemedText style={[styles.warnBtnText, { color: colors.onPrimary }]}>
-                  Réessayer
-                </ThemedText>
-              </Pressable>
-            </View>
-          ) : (
-            <View style={[styles.warnCard, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}>
-              <ThemedText style={[styles.warnTitle, { color: colors.text }]}>
-                Aucun produit
-              </ThemedText>
-              <ThemedText style={[styles.warnBody, { color: colors.textMuted }]}>
-                Aucun {filter === 'plat' ? 'plat' : filter === 'article' ? 'article' : 'produit'} disponible pour le moment.
-              </ThemedText>
-            </View>
-          )
-        }
-        ListFooterComponent={
-          loadingMore ? (
-            <View style={styles.footerLoader}>
-              <ActivityIndicator color={colors.primary} />
-            </View>
-          ) : null
-        }
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
-          />
-        }
-        onEndReached={onEndReached}
-        onEndReachedThreshold={0.4}
-        removeClippedSubviews={Platform.OS !== 'web'}
-        windowSize={7}
-        initialNumToRender={8}
-        maxToRenderPerBatch={8}
-        showsVerticalScrollIndicator={false}
-      />
-    </ThemedView>
-  );
-}
-
-type ProductCardProps = {
-  product: ProductPublic;
-  onPress: () => void;
-  onToggleFav: () => void;
-  isFav: boolean;
-  leftInRow: boolean;
-};
-
-const screenWidth = Dimensions.get('window').width;
-const cardWidth = (screenWidth - SCREEN_PADDING * 2 - GRID_GAP) / 2;
-
-function ProductCard({ product, onPress, onToggleFav, isFav, leftInRow }: ProductCardProps) {
-  const colors = useAppColors();
-  const kind: 'plat' | 'article' = product.kind === 'article' ? 'article' : 'plat';
-  const basePrice = Number(getEffectiveUnitPrice(product) ?? product.prix ?? 0);
-  const isPromo = product.prix_promo != null && Number(product.prix_promo) < Number(product.prix);
-  const fallbackImage =
-    Array.isArray(product.images_urls) && product.images_urls.length > 0
-      ? product.images_urls[0]
-      : null;
-  const imageUrl = product.image_url || fallbackImage || null;
-  const image = resolveRemoteImageUrl(imageUrl);
-  const VendorIcon = kind === 'article' ? Store : UtensilsCrossed;
-
-  return (
-    <Pressable
-      onPress={onPress}
-      android_ripple={{ color: colors.primaryMuted }}
-      style={[
-        styles.card,
-        {
-          backgroundColor: colors.surface,
-          borderColor: colors.border,
-          width: cardWidth,
-          marginLeft: leftInRow ? 0 : GRID_GAP,
-        },
-      ]}>
-      <View style={[styles.cardImageWrap, { backgroundColor: colors.primarySoft }]}>
-        {image ? (
-          <Image source={{ uri: image }} style={styles.cardImage} contentFit="cover" />
-        ) : (
-          <VendorIcon size={32} color={colors.primary} strokeWidth={1.2} />
-        )}
-        {isPromo ? (
-          <View style={[styles.promoBadge, { backgroundColor: colors.error }]}>
-            <ThemedText style={styles.promoBadgeTxt}>PROMO</ThemedText>
-          </View>
-        ) : null}
-        <Pressable
-          style={[styles.cardFavBtn, { backgroundColor: colors.surface }]}
-          onPress={(e) => {
-            e.stopPropagation();
-            onToggleFav();
+            ) : (
+              <View style={{ height: 8 }} />
+            )
+          }
+          contentContainerStyle={{
+            paddingHorizontal: H_PAD,
+            paddingBottom: TAB_BAR_CONTENT_PADDING_BOTTOM + insets.bottom,
           }}
-          hitSlop={6}
-          accessibilityLabel={isFav ? 'Retirer des favoris' : 'Ajouter aux favoris'}>
-          <Heart
-            size={14}
-            color={isFav ? colors.error : colors.textMuted}
-            fill={isFav ? colors.error : 'none'}
-            strokeWidth={LUCIDE_STROKE}
-          />
-        </Pressable>
-      </View>
-      <View style={styles.cardBody}>
-        <ThemedText style={[styles.cardName, { color: colors.text }]} numberOfLines={2}>
-          {product.nom || 'Produit'}
-        </ThemedText>
-        {isPromo ? (
-          <View style={styles.cardPriceRow}>
-            <ThemedText style={[styles.cardPrice, { color: colors.primary }]}>
-              {formatFcfa(Number(product.prix_promo))}
-            </ThemedText>
-            <ThemedText style={[styles.cardOldPrice, { color: colors.textMuted }]}>
-              {formatFcfa(Number(product.prix))}
-            </ThemedText>
-          </View>
-        ) : (
-          <ThemedText style={[styles.cardPrice, { color: colors.text }]}>
-            {formatFcfa(basePrice)}
-          </ThemedText>
-        )}
-        {product.enterprise_nom ? (
-          <ThemedText style={[styles.cardVendor, { color: colors.textMuted }]} numberOfLines={1}>
-            {product.enterprise_nom}
-          </ThemedText>
-        ) : null}
-      </View>
-    </Pressable>
+          onEndReached={onEndReached}
+          onEndReachedThreshold={0.4}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+          }
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          removeClippedSubviews
+          initialNumToRender={12}
+          maxToRenderPerBatch={12}
+          windowSize={7}
+        />
+      ) : (
+        <ScrollView
+          contentContainerStyle={{
+            paddingHorizontal: H_PAD,
+            paddingBottom: TAB_BAR_CONTENT_PADDING_BOTTOM + insets.bottom,
+          }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+          }
+          showsVerticalScrollIndicator={false}>
+          {listHeader}
+        </ScrollView>
+      )}
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  scrollContent: {
-    paddingHorizontal: SCREEN_PADDING,
-  },
-  headerWrap: { gap: 12, marginBottom: 8 },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
+  headerWrap: { gap: 10, marginBottom: 6 },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   topBarLeft: { flex: 1, gap: 2, marginRight: 8 },
-  greeting: { fontSize: 13 },
-  userName: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
-  topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  marketTitle: { fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
+  marketSub: { fontSize: 13, fontWeight: '500' },
   iconBtn: {
     width: 40,
     height: 40,
@@ -576,110 +614,87 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  searchInput: { flex: 1, fontSize: 14, paddingVertical: 4 },
-  filterTap: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  shineBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-  },
-  shineIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  shineTitle: { flex: 1, fontSize: 13, fontWeight: '700' },
-  filterRow: { gap: 8, paddingVertical: 4 },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 11,
     borderRadius: 999,
     borderWidth: 1,
   },
-  chipTxt: { fontSize: 13, fontWeight: '700' },
-  sectionHead: {
+  searchInput: { flex: 1, fontSize: 15, paddingVertical: 0 },
+  filterRow: { gap: 8, paddingVertical: 2 },
+  chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  sectionTitle: { fontSize: 16, fontWeight: '800' },
-  seeAll: { fontSize: 13, fontWeight: '700' },
-  columnRow: { gap: 0, marginBottom: GRID_GAP },
-  card: {
-    borderRadius: 16,
-    overflow: 'hidden',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
     borderWidth: 1,
   },
-  cardImageWrap: {
-    position: 'relative',
-    width: '100%',
-    aspectRatio: 1,
+  chipTxt: { fontSize: 14, fontWeight: '700' },
+  toolbarRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  filterBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardImage: { width: '100%', height: '100%' },
-  cardFavBtn: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
-  },
-  promoBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  promoBadgeTxt: { color: '#FFF', fontSize: 9, fontWeight: '800', letterSpacing: 0.4 },
-  cardBody: { padding: 10, gap: 4 },
-  cardName: { fontSize: 13, fontWeight: '700', minHeight: 32 },
-  cardPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  cardPrice: { fontSize: 14, fontWeight: '800' },
-  cardOldPrice: { fontSize: 11, textDecorationLine: 'line-through' },
-  cardVendor: { fontSize: 11, marginTop: 2 },
-  loaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 30 },
-  loaderText: { fontSize: 13 },
-  warnCard: {
-    marginTop: 16,
-    padding: 18,
-    borderRadius: 14,
-    borderWidth: 1,
     gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
   },
+  filterBtnTxt: { fontSize: 13, fontWeight: '700' },
+  activeFilterPill: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  activeFilterTxt: { fontSize: 12, fontWeight: '700' },
+  sortRow: { gap: 8, alignItems: 'center', paddingVertical: 2 },
+  sortChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  sortChipTxt: { fontSize: 12, fontWeight: '700' },
+  section: { gap: 8, marginBottom: 8 },
+  sectionTitle: { fontSize: 16, fontWeight: '800' },
+  resultCount: { fontSize: 13, marginBottom: 4 },
+  gridRow: { gap: GRID_GAP },
+  gridCell: {
+    flex: 1,
+    paddingHorizontal: GRID_GAP / 2,
+    marginBottom: GRID_GAP + 4,
+  },
+  enterpriseRow: {
+    padding: 12,
+    borderRadius: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  enterpriseLogoBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  enterpriseLogo: {
+    width: '100%',
+    height: '100%',
+  },
+  enterpriseName: { fontSize: 16, fontWeight: '700' },
+  enterpriseMeta: { fontSize: 13, marginTop: 2 },
+  loaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 20 },
+  loaderText: { fontSize: 13 },
+  warnCard: { padding: 16, borderRadius: 12, borderWidth: 1, gap: 8, marginTop: 8 },
   warnTitle: { fontSize: 14, fontWeight: '700' },
-  warnBody: { fontSize: 12 },
-  warnBtn: { marginTop: 8, alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10 },
+  warnBody: { fontSize: 13 },
+  warnBtn: { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
   warnBtnText: { fontWeight: '800', fontSize: 13 },
-  footerLoader: { padding: 16, alignItems: 'center' },
 });

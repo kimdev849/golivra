@@ -1,12 +1,12 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -28,6 +28,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenEmptyState, ScreenLoadState } from '@/components/screen-load-state';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { DETAIL_SCREEN_PADDING_BOTTOM } from '@/constants/layout';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
@@ -65,6 +66,7 @@ export default function ProductDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
+  const { width: windowWidth } = useWindowDimensions();
   const { showSuccess, showError, FeedbackOverlay } = useActionFeedback();
   const params = useLocalSearchParams<{ id: string; kind?: string }>();
 
@@ -82,19 +84,23 @@ export default function ProductDetailScreen() {
   const [selectedOptions, setSelectedOptions] = useState<SelectedOptionChoice[]>([]);
   const [note, setNote] = useState('');
 
+  const [selectedGalleryIndex, setSelectedGalleryIndex] = useState(0);
+
   const load = useCallback(
     async (force = false) => {
       if (!productId) return;
       setError(null);
-      if (!force) setLoading(true);
+      
+      // Tentative de récupération depuis le cache via l'entreprise si connue
+      const cached = product; // Déjà chargé ou en mémoire
+      if (!cached && !force) setLoading(true);
+
       try {
         const p = await fetchProductById(productId, kind);
-        setProduct(p);
         if (p) {
+          setProduct(p);
           const fav = await isFavoriteProduct(p.id, kind);
           setIsFav(fav);
-          // Track view (fire-and-forget) — on utilise l'endpoint click qui
-          // a la meme signature et qui couvre l'ouverture detail.
           void trackProductClick(p.entreprise_id, p.id);
         }
       } catch (e) {
@@ -103,12 +109,19 @@ export default function ProductDetailScreen() {
         setLoading(false);
       }
     },
-    [productId, kind],
+    [productId, kind, product],
   );
 
   useEffect(() => {
+    // Reset state when product changes to avoid "flash" of previous product
+    setProduct(null);
+    setLoading(true);
+    setQuantity(1);
+    setSelectedOptions([]);
+    setNote('');
+    setSelectedGalleryIndex(0);
     void load();
-  }, [load]);
+  }, [productId, kind]); // Removed load from dependencies to avoid infinite loop if it's not stable
 
   const galleryImages = useMemo(() => {
     if (!product) return [] as string[];
@@ -234,20 +247,22 @@ export default function ProductDetailScreen() {
   return (
     <ThemedView style={[styles.screen, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 140 + insets.bottom }}
+        contentContainerStyle={{ paddingBottom: DETAIL_SCREEN_PADDING_BOTTOM + insets.bottom + 96 }}
         showsVerticalScrollIndicator={false}>
         {/* HERO IMAGE */}
         <View style={styles.heroWrap}>
-          {galleryImages[0] ? (
+          {galleryImages[selectedGalleryIndex] ? (
             <Pressable
               onPress={() => {
-                setGalleryIndex(0);
+                setGalleryIndex(selectedGalleryIndex);
                 setGalleryOpen(true);
               }}>
               <Image
-                source={{ uri: resolveRemoteImageUrl(galleryImages[0]) || undefined }}
+                key={`${productId}-${selectedGalleryIndex}`}
+                source={{ uri: resolveRemoteImageUrl(galleryImages[selectedGalleryIndex]) || undefined }}
                 style={styles.heroImg}
                 contentFit="cover"
+                transition={200}
               />
             </Pressable>
           ) : (
@@ -257,7 +272,7 @@ export default function ProductDetailScreen() {
           )}
 
           {/* top controls */}
-          <View style={[styles.heroTop, { paddingTop: insets.top + 8 }]}>
+          <View style={[styles.heroTop, { paddingTop: Math.max(insets.top, 16) + 8 }]}>
             <Pressable
               style={[styles.iconBtn, { backgroundColor: colors.surface }]}
               onPress={() => router.back()}
@@ -305,12 +320,12 @@ export default function ProductDetailScreen() {
               <Pressable
                 key={`${i}-${u}`}
                 onPress={() => {
-                  setGalleryIndex(i);
-                  setGalleryOpen(true);
+                  setSelectedGalleryIndex(i);
+                  void Haptics.selectionAsync();
                 }}
                 style={[
                   styles.thumb,
-                  { borderColor: i === 0 ? colors.primary : 'transparent' },
+                  { borderColor: i === selectedGalleryIndex ? colors.primary : 'transparent' },
                 ]}>
                 <Image
                   source={{ uri: resolveRemoteImageUrl(u) || undefined }}
@@ -477,33 +492,11 @@ export default function ProductDetailScreen() {
         style={[
           styles.footer,
           {
-            paddingBottom: Math.max(insets.bottom, 12),
+            paddingBottom: Math.max(insets.bottom, 12) + 12,
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
           },
         ]}>
-        <View style={styles.qtyBox}>
-          <Pressable
-            style={[styles.qtyBtn, { backgroundColor: colors.surfaceMuted }]}
-            onPress={() => setQuantity((q) => Math.max(1, q - 1))}
-            hitSlop={6}
-            accessibilityLabel="Diminuer la quantité">
-            <Minus size={16} color={colors.text} strokeWidth={LUCIDE_STROKE} />
-          </Pressable>
-          <ThemedText style={[styles.qtyTxt, { color: colors.text }]}>{quantity}</ThemedText>
-          <Pressable
-            style={[styles.qtyBtn, { backgroundColor: colors.primarySoft }]}
-            onPress={() =>
-              setQuantity((q) => {
-                const cap = stockAvailable || 999;
-                return Math.min(Math.max(1, cap), q + 1);
-              })
-            }
-            hitSlop={6}
-            accessibilityLabel="Augmenter la quantité">
-            <Plus size={16} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-          </Pressable>
-        </View>
         <Pressable
           style={[
             styles.addBtn,
@@ -515,13 +508,13 @@ export default function ProductDetailScreen() {
           onPress={() => (orderable ? onAddToCart() : null)}
           disabled={!orderable}
           accessibilityLabel="Ajouter au panier">
-          <ShoppingCart size={18} color={orderable ? colors.onPrimary : colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          <ShoppingCart size={20} color={orderable ? colors.onPrimary : colors.textMuted} strokeWidth={LUCIDE_STROKE} />
           <ThemedText
             style={[
               styles.addBtnTxt,
               { color: orderable ? colors.onPrimary : colors.textMuted },
             ]}>
-            {orderable ? `Ajouter · ${formatFcfa(totalPrice)}` : 'Indisponible'}
+            {orderable ? `Ajouter au panier · ${formatFcfa(totalPrice)}` : 'Indisponible'}
           </ThemedText>
         </Pressable>
       </View>
@@ -538,14 +531,14 @@ export default function ProductDetailScreen() {
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            contentOffset={{ x: galleryIndex * (Platform.OS === 'web' ? 400 : 400), y: 0 }}
+            contentOffset={{ x: galleryIndex * windowWidth, y: 0 }}
             onMomentumScrollEnd={(e) => {
               const x = e.nativeEvent.contentOffset.x;
               const w = e.nativeEvent.layoutMeasurement.width;
               if (w > 0) setGalleryIndex(Math.round(x / w));
             }}>
             {galleryImages.map((u, i) => (
-              <View key={`g-${i}`} style={styles.gallerySlide}>
+              <View key={`g-${i}`} style={[styles.gallerySlide, { width: windowWidth }]}>
                 <Image
                   source={{ uri: resolveRemoteImageUrl(u) || undefined }}
                   style={styles.galleryImg}

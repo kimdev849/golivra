@@ -1,4 +1,3 @@
-import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,18 +12,24 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react-native';
 
 import { CategoryPicker } from '@/components/category-picker';
+import { ListingReviewPanel } from '@/components/listing-review-panel';
+import {
+  MAX_GALLERY_PHOTOS,
+  OptionGroupsEditor,
+  pickMultipleVendorImages,
+  pickVendorImageAsset,
+  VendorPhotoGalleryField,
+} from '@/components/vendor-form-shared';
+import { VendorFormFooter } from '@/components/vendor-form-footer';
 import { DateField } from '@/components/date-field';
-import { MAX_GALLERY_PHOTOS, OptionGroupsEditor, pickMultipleVendorImages, pickVendorImageAsset } from '@/components/vendor-form-shared';
 import { ThemedText } from '@/components/themed-text';
 import { InlineFormError } from '@/components/inline-form-error';
-import { LUCIDE_STROKE } from '@/constants/icons';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { getSessionToken } from '@/lib/auth';
-import { uploadImageBase64 } from '@/lib/uploads';
+import { uploadVendorListingImages } from '@/lib/vendor-image-upload';
 import { buildProductApiBody } from '@/lib/vendor-product-payload';
 import {
   createArticleCategory,
@@ -42,9 +47,17 @@ import {
   type VendorProductFormValues,
 } from '@/lib/vendor-product-types';
 import type { VendorProduct } from '@/lib/vendor-types';
-import { validateCommerceName, validateDescription, validatePrice, validateProductName, validatePromoBlock, validateStock } from '@/lib/form-validation';
+import { validateCommerceName } from '@/lib/form-validation';
+import {
+  firstListingError,
+  validateAllProductSteps,
+  validateProductStep,
+} from '@/lib/vendor-listing-validation';
 
-const STEPS = ['Essentiel', 'Détails', 'Variantes', 'Publication'] as const;
+const DESC_MAX = 500;
+
+const STEPS = ['Essentiel', 'Détails', 'Variantes', 'Réglages', 'Vérifier'] as const;
+const REVIEW_STEP = STEPS.length - 1;
 
 const TYPE_CHOICES: { key: ProductTypeKind; label: string }[] = [
   { key: 'physique', label: 'Physique' },
@@ -143,66 +156,20 @@ export function VendorProductFormWizard({
 
   const selectedCategory = categories.find((c) => c.id === values.categorieId) ?? null;
 
-  const validateStep = (s: number): string | null => {
-    if (s === 0) {
-      const e1 = validateProductName(values.nom);
-      if (!e1.ok) return e1.message;
-      const e2 = validatePrice(values.prix);
-      if (!e2.ok) return e2.message;
-      if (!values.mainImageUri && !values.mainImageDataUrl) {
-        return 'Ajoutez au moins une photo principale.';
-      }
-    }
-    if (s === 1) {
-      const e3 = validateDescription(values.description, 500);
-      if (!e3.ok) return e3.message;
-      if (!values.stockIllimite) {
-        const e4 = validateStock(values.stock, false);
-        if (!e4.ok) return e4.message;
-      }
-    }
-    if (s === 3) {
-      const prixNum = Number(values.prix);
-      const promoCheck = validatePromoBlock({
-        prixNormal: prixNum,
-        prixPromo: values.prixPromo,
-        promoDebutAt: values.promoDebutAt,
-        promoFinAt: values.promoFinAt,
-      });
-      if (!promoCheck.ok) return promoCheck.message;
-    }
-    return null;
-  };
-
   const goNext = () => {
-    const err = validateStep(step);
+    if (step === REVIEW_STEP) {
+      void submit();
+      return;
+    }
+    const fieldErrs = validateProductStep(values, step);
+    const err = firstListingError(fieldErrs);
     if (err) {
-      showError('Champ manquant', err);
-      const fieldErrs: Record<string, string | null> = {};
-      if (step === 0) {
-        const e1 = validateProductName(values.nom);
-        if (!e1.ok) fieldErrs.nom = e1.message;
-        const e2 = validatePrice(values.prix);
-        if (!e2.ok) fieldErrs.prix = e2.message;
-      }
-      if (step === 1 && !values.stockIllimite) {
-        const e3 = validateStock(values.stock, false);
-        if (!e3.ok) fieldErrs.stock = e3.message;
-      }
-      if (step === 3) {
-        const promoCheck = validatePromoBlock({
-          prixNormal: Number(values.prix),
-          prixPromo: values.prixPromo,
-          promoDebutAt: values.promoDebutAt,
-          promoFinAt: values.promoFinAt,
-        });
-        if (!promoCheck.ok) fieldErrs[promoCheck.field] = promoCheck.message;
-      }
+      showError('Vérification', err);
       setStepErrors(fieldErrs);
       return;
     }
     setStepErrors({});
-    setStep((s) => Math.min(s + 1, STEPS.length - 1));
+    setStep((s) => Math.min(s + 1, REVIEW_STEP));
   };
 
   const goBack = () => {
@@ -211,36 +178,24 @@ export function VendorProductFormWizard({
   };
 
   const uploadAllImages = async (token: string) => {
-    let mainUrl: string | undefined;
-    const galleryUrls: string[] = [];
-
-    if (values.mainImageDataUrl) {
-      const up = await uploadImageBase64(token, { dataUrl: values.mainImageDataUrl, folder: 'products' });
-      mainUrl = up.url;
-    } else if (values.mainImageUri?.startsWith('http')) {
-      mainUrl = values.mainImageUri;
-    }
-
-    for (const item of values.gallery) {
-      if (item.dataUrl) {
-        const up = await uploadImageBase64(token, { dataUrl: item.dataUrl, folder: 'products' });
-        galleryUrls.push(up.url);
-      } else if (item.uri.startsWith('http')) {
-        galleryUrls.push(item.uri);
-      }
-    }
-
-    return { mainUrl, galleryUrls };
+    const uploaded = await uploadVendorListingImages(
+      token,
+      { uri: values.mainImageUri, dataUrl: values.mainImageDataUrl },
+      values.gallery,
+    );
+    return {
+      mainUrl: uploaded.mainUrl,
+      galleryUrls: uploaded.allUrls.filter((u) => u !== uploaded.mainUrl),
+    };
   };
 
   const submit = async () => {
-    for (let s = 0; s < STEPS.length; s++) {
-      const err = validateStep(s);
-      if (err) {
-        showError('Vérification', err);
-        setStep(s);
-        return;
-      }
+    const allErr = validateAllProductSteps(values, REVIEW_STEP);
+    if (allErr) {
+      showError('Vérification', firstListingError(allErr.errors) ?? 'Corrigez les champs signalés.');
+      setStep(allErr.step);
+      setStepErrors(allErr.errors);
+      return;
     }
 
     setSaving(true);
@@ -286,38 +241,34 @@ export function VendorProductFormWizard({
     }
   };
 
+  const prixNum = Number(values.prix) || 0;
+  const promoNum = values.prixPromo.trim() ? Number(values.prixPromo) : null;
+  const tagList = values.tagsText.split(',').map((t) => t.trim()).filter(Boolean);
+
+  const pickMain = async () => {
+    const img = await pickVendorImageAsset();
+    if (img) patch({ mainImageUri: img.uri, mainImageDataUrl: img.dataUrl });
+  };
+
+  const pickGallery = async () => {
+    const remaining = MAX_GALLERY_PHOTOS - values.gallery.length;
+    if (remaining <= 0) return;
+    const picked = await pickMultipleVendorImages(remaining);
+    if (picked.length) patch({ gallery: [...values.gallery, ...picked] });
+  };
+
   return (
     <View style={styles.root}>
       <FeedbackOverlay />
-      <View style={[styles.stepBar, { borderBottomColor: colors.border }]}>
-        {STEPS.map((label, i) => {
-          const reached = i <= step;
-          const current = i === step;
-          return (
-            <Pressable
-              key={label}
-              accessibilityRole="button"
-              accessibilityLabel={`Aller à l'étape ${i + 1} : ${label}`}
-              onPress={() => {
-                if (i === step) return;
-                setStepErrors({});
-                setStep(i);
-              }}
-              style={({ pressed }) => [styles.stepItem, pressed && { opacity: 0.6 }]}>
-              <View
-                style={[
-                  styles.stepDot,
-                  { backgroundColor: colors.border },
-                  reached && { backgroundColor: palette.primary },
-                  current && { borderWidth: 2, borderColor: colors.success },
-                ]}
-              />
-              <ThemedText style={[styles.stepLabel, current && { color: colors.text, fontWeight: '800' }]}>
-                {label}
-              </ThemedText>
-            </Pressable>
-          );
-        })}
+      <View style={styles.progressWrap}>
+        <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+          <View
+            style={[
+              styles.progressFill,
+              { width: `${((step + 1) / STEPS.length) * 100}%`, backgroundColor: palette.primary },
+            ]}
+          />
+        </View>
       </View>
 
       <KeyboardAvoidingView
@@ -330,58 +281,17 @@ export function VendorProductFormWizard({
         keyboardDismissMode="on-drag">
         {step === 0 ? (
           <>
-            <ThemedText style={[styles.sectionTitle, { color: palette.primaryDeep }]}>Informations principales</ThemedText>
-            <Pressable
-              style={[styles.heroImage, { backgroundColor: colors.surfaceMuted }]}
-              onPress={async () => {
-                const img = await pickVendorImageAsset();
-                if (img) patch({ mainImageUri: img.uri, mainImageDataUrl: img.dataUrl });
-              }}>
-              {values.mainImageUri ? (
-                <Image source={{ uri: values.mainImageUri }} style={styles.heroImg} contentFit="cover" />
-              ) : (
-                <ThemedText style={[styles.photoHint, { color: colors.textMuted }]}>+ Photo principale *</ThemedText>
-              )}
-            </Pressable>
-            <View style={styles.galleryHeader}>
-              <ThemedText style={[styles.galleryLabel, { color: colors.textSecondary }]}>
-                Galerie ({values.gallery.length}/{MAX_GALLERY_PHOTOS})
-              </ThemedText>
-              {values.gallery.length < MAX_GALLERY_PHOTOS ? (
-                <Pressable
-                  style={[styles.galleryAddBtn, { borderColor: palette.primary, backgroundColor: colors.surface }]}
-                  onPress={async () => {
-                    const remaining = MAX_GALLERY_PHOTOS - values.gallery.length;
-                    const picked = await pickMultipleVendorImages(remaining);
-                    if (picked.length) {
-                      patch({ gallery: [...values.gallery, ...picked] });
-                    }
-                  }}>
-                  <Plus size={16} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
-                  <ThemedText style={[styles.galleryAddTxt, { color: palette.primary }]}>
-                    {values.gallery.length === 0 ? 'Ajouter des photos' : 'Compléter'}
-                  </ThemedText>
-                </Pressable>
-              ) : null}
-            </View>
-            {values.gallery.length > 0 ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.galleryRow}>
-                {values.gallery.map((g, i) => (
-                  <View key={`${i}-${g.uri}`} style={styles.thumbWrap}>
-                    <Image source={{ uri: g.uri }} style={styles.thumb} contentFit="cover" />
-                    <Pressable
-                      style={styles.thumbRemove}
-                      onPress={() => patch({ gallery: values.gallery.filter((_, j) => j !== i) })}>
-                      <X size={14} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
-                    </Pressable>
-                  </View>
-                ))}
-              </ScrollView>
-            ) : (
-              <ThemedText style={[styles.galleryEmpty, { color: colors.textMuted }]}>
-                Aucune photo complémentaire. Vous pouvez en ajouter jusqu'à {MAX_GALLERY_PHOTOS} en une fois.
-              </ThemedText>
-            )}
+            <InlineFormError message={stepErrors.mainImage} colors={colors} />
+            <VendorPhotoGalleryField
+              mainUri={values.mainImageUri}
+              gallery={values.gallery}
+              onPickMain={pickMain}
+              onPickGallery={pickGallery}
+              onRemoveGallery={(i) => patch({ gallery: values.gallery.filter((_, j) => j !== i) })}
+              colors={colors}
+              accent={palette.primary}
+              mainRequired
+            />
             <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Nom du produit *</ThemedText>
             <TextInput
               style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
@@ -417,24 +327,26 @@ export function VendorProductFormWizard({
 
         {step === 1 ? (
           <>
-            <ThemedText style={[styles.sectionTitle, { color: palette.primaryDeep }]}>Détails</ThemedText>
             <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Description</ThemedText>
             <TextInput
               style={[styles.input, styles.area, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
               value={values.description}
-              onChangeText={(t) => patch({ description: t })}
+              onChangeText={(t) => { patch({ description: t }); setStepErrors((s) => ({ ...s, description: null })); }}
               multiline
-              placeholder="Décrivez votre produit pour rassurer le client…"
+              maxLength={DESC_MAX}
+              placeholder="Décrivez votre produit…"
               placeholderTextColor={colors.placeholder}
             />
+            <InlineFormError message={stepErrors.description} colors={colors} />
             <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Marque</ThemedText>
             <TextInput
               style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
               value={values.marque}
-              onChangeText={(t) => patch({ marque: t })}
+              onChangeText={(t) => { patch({ marque: t }); setStepErrors((s) => ({ ...s, marque: null })); }}
               placeholder="Samsung, Nike, Dior…"
               placeholderTextColor={colors.placeholder}
             />
+            <InlineFormError message={stepErrors.marque} colors={colors} />
             <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Type de produit</ThemedText>
             <ChipRow options={TYPE_CHOICES} value={values.typeProduit} onChange={(t) => patch({ typeProduit: t })} accent={palette.primary} colors={colors} />
             <ThemedText style={[styles.label, { color: colors.textSecondary }]}>État</ThemedText>
@@ -534,7 +446,7 @@ export function VendorProductFormWizard({
 
         {step === 2 ? (
           <>
-            <ThemedText style={[styles.sectionTitle, { color: palette.primaryDeep }]}>Variantes & options</ThemedText>
+            <InlineFormError message={stepErrors.options} colors={colors} />
             <OptionGroupsEditor
               groups={values.optionGroups}
               onChange={(optionGroups) => patch({ optionGroups })}
@@ -546,7 +458,6 @@ export function VendorProductFormWizard({
 
         {step === 3 ? (
           <>
-            <ThemedText style={[styles.sectionTitle, { color: palette.primaryDeep }]}>Publication</ThemedText>
             <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Prix promo (FCFA)</ThemedText>
             <TextInput
               style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
@@ -598,60 +509,54 @@ export function VendorProductFormWizard({
                 thumbColor={values.enVedette ? palette.primary : colors.surfaceMuted}
               />
             </View>
-            <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Tags (séparés par des virgules)</ThemedText>
+            <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Tags</ThemedText>
             <TextInput
               style={[styles.input, styles.area, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
               value={values.tagsText}
-              onChangeText={(t) => patch({ tagsText: t })}
+              onChangeText={(t) => { patch({ tagsText: t }); setStepErrors((s) => ({ ...s, tagsText: null })); }}
               multiline
               placeholder="samsung, promo, gaming…"
               placeholderTextColor={colors.placeholder}
             />
+            <InlineFormError message={stepErrors.tagsText} colors={colors} />
           </>
+        ) : null}
+
+        {step === REVIEW_STEP ? (
+          <ListingReviewPanel
+            colors={colors}
+            accent={palette.primary}
+            title="Vérifier avant publication"
+            nom={values.nom}
+            description={values.description}
+            categoryName={selectedCategory?.nom}
+            prix={prixNum}
+            prixPromo={promoNum}
+            mainImageUri={values.mainImageUri}
+            galleryUris={values.gallery.map((g) => g.uri)}
+            tags={tagList}
+            optionGroupCount={values.optionGroups.length}
+            estDisponible={values.estDisponible}
+            enVedette={values.enVedette}
+            errors={stepErrors}
+          />
         ) : null}
       </ScrollView>
       </KeyboardAvoidingView>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12), backgroundColor: colors.surface, borderTopColor: colors.border }]}>
-        <Pressable style={styles.footerBack} onPress={goBack}>
-          <ChevronLeft size={20} color={colors.text} strokeWidth={LUCIDE_STROKE} />
-          <ThemedText style={{ color: colors.text, fontWeight: '700' }}>
-            {step === 0 ? 'Annuler' : 'Retour'}
-          </ThemedText>
-        </Pressable>
-        {step < STEPS.length - 1 ? (
-          <View style={styles.footerRightCluster}>
-            {mode === 'edit' ? (
-              <Pressable
-                style={[styles.footerSaveNow, { borderColor: palette.primary }]}
-                onPress={() => void submit()}
-                disabled={saving}
-                accessibilityLabel="Enregistrer maintenant">
-                {saving ? (
-                  <ActivityIndicator color={palette.primary} />
-                ) : (
-                  <ThemedText style={[styles.footerSaveNowTxt, { color: palette.primary }]}>Enregistrer</ThemedText>
-                )}
-              </Pressable>
-            ) : null}
-            <Pressable style={[styles.footerNext, { backgroundColor: palette.primary }]} onPress={goNext}>
-              <ThemedText style={styles.footerNextTxt}>Suivant</ThemedText>
-              <ChevronRight size={20} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
-            </Pressable>
-          </View>
-        ) : (
-          <Pressable
-            style={[styles.footerNext, { backgroundColor: palette.primaryDeep, opacity: saving ? 0.7 : 1 }]}
-            onPress={() => void submit()}
-            disabled={saving}>
-            {saving ? (
-              <ActivityIndicator color={colors.onPrimary} />
-            ) : (
-              <ThemedText style={styles.footerNextTxt}>{mode === 'edit' ? 'Enregistrer' : 'Publier'}</ThemedText>
-            )}
-          </Pressable>
-        )}
-      </View>
+      <VendorFormFooter
+        step={step}
+        totalSteps={STEPS.length}
+        mode={mode}
+        saving={saving}
+        onCancel={onCancel}
+        onBack={goBack}
+        onNext={goNext}
+        colors={colors}
+        accent={palette.primary}
+        accentDeep={palette.primaryDeep}
+        bottomInset={insets.bottom}
+      />
 
       <CategoryPicker
         visible={catPickerOpen}
@@ -689,6 +594,26 @@ export function VendorProductFormWizard({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  progressWrap: {
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 4,
+    gap: 8,
+  },
+  progressTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
   stepBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -704,7 +629,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   stepLabel: { fontSize: 10, textAlign: 'center' },
-  sectionTitle: { fontSize: 16, fontWeight: '800', marginTop: 8, marginBottom: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: '800', marginTop: 8, marginBottom: 8 },
+  hint: { fontSize: 13, lineHeight: 18, marginBottom: 10 },
+  groupCard: { borderWidth: 1, borderRadius: 12, padding: 12, gap: 4 },
+  groupTitle: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
   label: { fontSize: 12, fontWeight: '800', marginBottom: 6, marginTop: 10 },
   labelInline: { fontSize: 14, fontWeight: '700' },
   input: {
@@ -771,7 +699,6 @@ const styles = StyleSheet.create({
   },
   selectTxt: { fontSize: 15 },
   linkTxt: { fontWeight: '700', fontSize: 13, marginTop: 8 },
-  hint: { fontSize: 13, lineHeight: 19, marginBottom: 12 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     paddingHorizontal: 12,

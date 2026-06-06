@@ -1,9 +1,10 @@
 import type { VendorProduct } from '@/lib/vendor-types';
 import { tagsToText } from '@/lib/vendor-product-types';
 import { DEFAULT_MENU_ITEM_FORM, type MenuItemFormValues } from '@/lib/vendor-menu-item-types';
+import { galleryAssetsFromUrls, splitMainAndGalleryUrls } from '@/lib/vendor-image-urls';
 
 export function menuItemToFormValues(product: VendorProduct): MenuItemFormValues {
-  const existing = Array.isArray(product.imagesUrls) ? product.imagesUrls : [];
+  const { main, gallery } = splitMainAndGalleryUrls(product.imageUrl, product.imagesUrls);
   return {
     ...DEFAULT_MENU_ITEM_FORM,
     nom: product.nom,
@@ -20,8 +21,8 @@ export function menuItemToFormValues(product: VendorProduct): MenuItemFormValues
     tagsText: tagsToText(product.tags),
     allergenes: Array.isArray(product.allergenes) ? [...product.allergenes] : [],
     optionGroups: product.optionGroups?.length ? product.optionGroups : [],
-    mainImageUri: product.imageUrl ?? null,
+    mainImageUri: main,
     mainImageDataUrl: null,
-    gallery: existing.map((uri) => ({ uri, dataUrl: '' })),
+    gallery: galleryAssetsFromUrls(gallery),
   };
 }

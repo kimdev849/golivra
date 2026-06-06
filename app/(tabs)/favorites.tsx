@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -20,13 +20,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { ListingCard } from '@/components/listing-card';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { TAB_BAR_CONTENT_PADDING_BOTTOM } from '@/constants/layout';
 import type { EnterprisePublic, ProductPublic } from '@/lib/catalog';
 import { fetchAllEnterprises, peekAllEnterprises } from '@/lib/client-data';
 import { fetchProductFeed } from '@/lib/catalog';
-import { formatFcfa } from '@/lib/format';
-import { getEffectiveUnitPrice } from '@/lib/product-promo';
 import {
   getFavoriteEnterpriseIds,
   getFavoriteProducts,
@@ -34,6 +33,7 @@ import {
   type FavoriteProductRef,
 } from '@/lib/favorites';
 import { resolveRemoteImageUrl } from '@/lib/images';
+import { productDetailHref } from '@/lib/listing-utils';
 import { useAppColors } from '@/hooks/use-app-colors';
 
 type TabKey = 'commerces' | 'produits';
@@ -193,6 +193,7 @@ export default function FavoritesScreen() {
 
       {tab === 'commerces' ? (
         <FlatList
+          key="favorites-enterprises"
           data={enterprises}
           keyExtractor={(item) => `ent-${item.id}`}
           contentContainerStyle={[styles.list, { paddingBottom: bottomPad }]}
@@ -274,10 +275,9 @@ export default function FavoritesScreen() {
         />
       ) : (
         <FlatList
+          key="favorites-products"
           data={favProducts}
           keyExtractor={(item) => `p-${item.kind}-${item.id}`}
-          numColumns={2}
-          columnWrapperStyle={styles.gridRow}
           contentContainerStyle={[styles.list, { paddingBottom: bottomPad }]}
           ListEmptyComponent={
             loadingProd ? (
@@ -315,68 +315,15 @@ export default function FavoritesScreen() {
           refreshControl={
             <RefreshControl refreshing={refreshingProd} onRefresh={onRefreshProd} tintColor={colors.primary} />
           }
-          renderItem={({ item, index }) => {
-            const kind = item.kind === 'article' ? 'article' : 'plat';
-            const basePrice = Number(getEffectiveUnitPrice(item) ?? item.prix ?? 0);
-            const isPromo = item.prix_promo != null && Number(item.prix_promo) < Number(item.prix);
-            const fallbackImage =
-              Array.isArray(item.images_urls) && item.images_urls.length > 0
-                ? item.images_urls[0]
-                : null;
-            const imageUrl = item.image_url || fallbackImage || null;
-            const image = resolveRemoteImageUrl(imageUrl);
-            const VendorIcon = kind === 'article' ? Store : UtensilsCrossed;
-            return (
-              <Pressable
-                onPress={() => router.push(`/(tabs)/product/${item.id}?kind=${kind}` as never)}
-                android_ripple={{ color: colors.primaryMuted }}
-                style={[
-                  styles.productCard,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                    marginLeft: index % 2 === 0 ? 0 : 10,
-                  },
-                ]}>
-                <View style={[styles.productImgWrap, { backgroundColor: colors.primarySoft }]}>
-                  {image ? (
-                    <Image source={{ uri: image }} style={styles.productImg} contentFit="cover" />
-                  ) : (
-                    <VendorIcon size={32} color={colors.primary} strokeWidth={1.2} />
-                  )}
-                  <Pressable
-                    style={[styles.productFavBtn, { backgroundColor: colors.surface }]}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      void onUnfavProduct(item);
-                    }}
-                    hitSlop={6}
-                    accessibilityLabel="Retirer des favoris">
-                    <Heart size={14} color={colors.error} fill={colors.error} strokeWidth={LUCIDE_STROKE} />
-                  </Pressable>
-                </View>
-                <View style={styles.productBody}>
-                  <ThemedText style={[styles.productName, { color: colors.text }]} numberOfLines={2}>
-                    {item.nom || 'Produit'}
-                  </ThemedText>
-                  {isPromo ? (
-                    <View style={styles.productPriceRow}>
-                      <ThemedText style={[styles.productPrice, { color: colors.primary }]}>
-                        {formatFcfa(Number(item.prix_promo))}
-                      </ThemedText>
-                      <ThemedText style={[styles.productOldPrice, { color: colors.textMuted }]}>
-                        {formatFcfa(Number(item.prix))}
-                      </ThemedText>
-                    </View>
-                  ) : (
-                    <ThemedText style={[styles.productPrice, { color: colors.text }]}>
-                      {formatFcfa(basePrice)}
-                    </ThemedText>
-                  )}
-                </View>
-              </Pressable>
-            );
-          }}
+          renderItem={({ item }) => (
+            <ListingCard
+              product={item}
+              variant="feed"
+              onPress={() => router.push(productDetailHref(item) as never)}
+              isFav
+              onToggleFav={() => void onUnfavProduct(item)}
+            />
+          )}
         />
       )}
     </ThemedView>

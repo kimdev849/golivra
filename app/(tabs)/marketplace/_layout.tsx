@@ -18,27 +18,7 @@ export default function MarketplaceStackLayout() {
       <Stack.Screen
         name="[enterpriseId]"
         options={{
-          headerShown: true,
-          headerTitle: '',
-          headerBackTitle: '',
-          headerTintColor: GOLIVRA_GREEN,
-          headerStyle: { backgroundColor: colors.surface },
-          headerShadowVisible: false,
-          headerLeft: () => (
-            <Pressable
-              onPress={() => router.back()}
-              hitSlop={12}
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              accessibilityLabel="Retour">
-              <ChevronLeft size={26} color={GOLIVRA_GREEN} strokeWidth={LUCIDE_STROKE} />
-            </Pressable>
-          ),
+          headerShown: false,
         }}
       />
     </Stack>

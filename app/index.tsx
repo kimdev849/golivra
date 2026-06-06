@@ -139,7 +139,7 @@ export default function LandingScreen() {
             hitSlop={8}>
             <ThemedText style={styles.signupText}>
               Pas encore de compte ?{' '}
-              <ThemedText style={styles.signupLink}>S'inscrire</ThemedText>
+              <ThemedText style={styles.signupLink}>{"S'inscrire"}</ThemedText>
             </ThemedText>
           </Pressable>
         </Link>

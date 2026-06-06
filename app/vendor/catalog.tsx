@@ -2,11 +2,12 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
+import { Plus } from 'lucide-react-native';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { VendorAddProductFab } from '@/components/vendor-add-product-fab';
 import { VendorScreenHeader } from '@/components/vendor-screen-header';
+import { VendorTabHeader } from '@/components/vendor-tab-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { VENDOR_TAB_BAR_PADDING_BOTTOM } from '@/constants/vendor-layout';
@@ -38,8 +39,7 @@ export default function VendorCatalogScreen() {
   const [query, setQuery] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const tabBarHeight = Math.max(insets.bottom, 10) + VENDOR_TAB_BAR_PADDING_BOTTOM;
-  const fabBottom = tabBarHeight + 12;
-  const fabClearance = fabBottom + 76;
+  const fabClearance = tabBarHeight + 20;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -103,7 +103,19 @@ export default function VendorCatalogScreen() {
   return (
     <ThemedView style={styles.screen}>
       <FeedbackOverlay />
-      <VendorScreenHeader title="CATALOGUE" />
+      <VendorTabHeader
+        title="Catalogue"
+        right={
+          <Pressable
+            onPress={() => router.push(VENDOR_HREF.addProduct)}
+            style={({ pressed }) => [
+              styles.headerAddBtn,
+              { backgroundColor: palette.primary, opacity: pressed ? 0.8 : 1 }
+            ]}>
+            <Plus size={22} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
+          </Pressable>
+        }
+      />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scroll, { paddingBottom: fabClearance }]}>
@@ -184,17 +196,19 @@ export default function VendorCatalogScreen() {
           </View>
         )}
       </ScrollView>
-      <VendorAddProductFab
-        label={commerceType === 'restaurant' ? 'Ajouter un plat' : 'Ajouter un produit'}
-        bottom={fabBottom}
-        onPress={() => router.push(VENDOR_HREF.addProduct)}
-      />
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  headerAddBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   scroll: { paddingHorizontal: 18, paddingTop: 4 },
   search: {
     flexDirection: 'row',

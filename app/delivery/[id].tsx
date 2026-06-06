@@ -278,7 +278,7 @@ export default function DeliveryDetailScreen() {
               <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Livreur</ThemedText>
             </View>
             <ThemedText style={{ color: colors.textMuted, fontSize: 14 }}>
-              Aucun livreur n'a encore été assigné à cette livraison.
+              {"Aucun livreur n'a encore été assigné à cette livraison."}
             </ThemedText>
           </View>
         )}

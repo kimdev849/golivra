@@ -1,4 +1,3 @@
-import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,19 +12,24 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react-native';
 
 import { CategoryPicker } from '@/components/category-picker';
-import { DateField } from '@/components/date-field';
-import { MAX_GALLERY_PHOTOS, OptionGroupsEditor, pickMultipleVendorImages, pickVendorImageAsset } from '@/components/vendor-form-shared';
+import { ListingReviewPanel } from '@/components/listing-review-panel';
+import {
+  MAX_GALLERY_PHOTOS,
+  OptionGroupsEditor,
+  pickMultipleVendorImages,
+  pickVendorImageAsset,
+  VendorPhotoGalleryField,
+} from '@/components/vendor-form-shared';
+import { VendorFormFooter } from '@/components/vendor-form-footer';
 import { ThemedText } from '@/components/themed-text';
 import { InlineFormError } from '@/components/inline-form-error';
-import { LUCIDE_STROKE } from '@/constants/icons';
+import { DateField } from '@/components/date-field';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
-import { formatFcfa } from '@/lib/format';
 import { getSessionToken } from '@/lib/auth';
-import { uploadImageBase64 } from '@/lib/uploads';
+import { uploadVendorListingImages } from '@/lib/vendor-image-upload';
 import { buildMenuItemApiBody } from '@/lib/vendor-menu-item-payload';
 import {
   ALLERGENE_CHOICES,
@@ -41,7 +45,15 @@ import {
 } from '@/lib/vendor-api';
 import type { ArticleCategory } from '@/lib/vendor-product-types';
 import type { VendorProduct } from '@/lib/vendor-types';
-import { validateCommerceName, validateDescription, validatePrice, validateProductName, validatePromoBlock, validateStock } from '@/lib/form-validation';
+import { validateCommerceName } from '@/lib/form-validation';
+import {
+  firstListingError,
+  validateAllMenuItemSteps,
+  validateMenuItemStep,
+} from '@/lib/vendor-listing-validation';
+
+const DESC_MAX = 500;
+const REVIEW_STEP = MENU_ITEM_STEPS.length - 1;
 
 type Props = {
   enterpriseId: string;
@@ -98,68 +110,20 @@ export function VendorMenuItemFormWizard({
 
   const selectedCategory = categories.find((c) => c.id === values.categorieId) ?? null;
 
-  const validateStep = (s: number): string | null => {
-    if (s === 0) {
-      const e1 = validateProductName(values.nom);
-      if (!e1.ok) return e1.message;
-      const e2 = validateDescription(values.description, 500);
-      if (!e2.ok) return e2.message;
-    }
-    if (s === 1) {
-      const e3 = validatePrice(values.prix);
-      if (!e3.ok) return e3.message;
-      const prixNum = Number(values.prix);
-      const promoCheck = validatePromoBlock({
-        prixNormal: prixNum,
-        prixPromo: values.prixPromo,
-        promoDebutAt: values.promoDebutAt,
-        promoFinAt: values.promoFinAt,
-      });
-      if (!promoCheck.ok) return promoCheck.message;
-    }
-    if (s === 2) {
-      if (!values.mainImageUri && !values.mainImageDataUrl) {
-        return 'Ajoutez une photo du plat.';
-      }
-    }
-    if (s === 4 && values.limiterQuantite) {
-      const e5 = validateStock(values.stock, true);
-      if (!e5.ok) return e5.message;
-    }
-    return null;
-  };
-
   const goNext = () => {
-    const err = validateStep(step);
+    if (step === REVIEW_STEP) {
+      void submit();
+      return;
+    }
+    const fieldErrs = validateMenuItemStep(values, step);
+    const err = firstListingError(fieldErrs);
     if (err) {
-      showError('Champ manquant', err);
-      const fieldErrs: Record<string, string | null> = {};
-      if (step === 0) {
-        const e1 = validateProductName(values.nom);
-        if (!e1.ok) fieldErrs.nom = e1.message;
-        const e2 = validateDescription(values.description, 500);
-        if (!e2.ok) fieldErrs.description = e2.message;
-      }
-      if (step === 1) {
-        const e3 = validatePrice(values.prix);
-        if (!e3.ok) fieldErrs.prix = e3.message;
-        const promoCheck = validatePromoBlock({
-          prixNormal: Number(values.prix),
-          prixPromo: values.prixPromo,
-          promoDebutAt: values.promoDebutAt,
-          promoFinAt: values.promoFinAt,
-        });
-        if (!promoCheck.ok) fieldErrs[promoCheck.field] = promoCheck.message;
-      }
-      if (step === 4 && values.limiterQuantite) {
-        const e5 = validateStock(values.stock, true);
-        if (!e5.ok) fieldErrs.stock = e5.message;
-      }
+      showError('Vérification', err);
       setStepErrors(fieldErrs);
       return;
     }
     setStepErrors({});
-    setStep((s) => Math.min(s + 1, MENU_ITEM_STEPS.length - 1));
+    setStep((s) => Math.min(s + 1, REVIEW_STEP));
   };
 
   const goBack = () => {
@@ -176,13 +140,12 @@ export function VendorMenuItemFormWizard({
   };
 
   const submit = async () => {
-    for (let s = 0; s < MENU_ITEM_STEPS.length; s++) {
-      const err = validateStep(s);
-      if (err) {
-        showError('Vérification', err);
-        setStep(s);
-        return;
-      }
+    const allErr = validateAllMenuItemSteps(values, REVIEW_STEP);
+    if (allErr) {
+      showError('Vérification', firstListingError(allErr.errors) ?? 'Corrigez les champs signalés.');
+      setStep(allErr.step);
+      setStepErrors(allErr.errors);
+      return;
     }
 
     setSaving(true);
@@ -190,25 +153,15 @@ export function VendorMenuItemFormWizard({
       const token = await getSessionToken();
       if (!token) throw new Error('Session expirée.');
 
-      let mainUrl: string | undefined;
-      if (values.mainImageDataUrl) {
-        const up = await uploadImageBase64(token, { dataUrl: values.mainImageDataUrl, folder: 'products' });
-        mainUrl = up.url;
-      } else if (values.mainImageUri?.startsWith('http')) {
-        mainUrl = values.mainImageUri;
-      }
+      const uploaded = await uploadVendorListingImages(token, {
+        uri: values.mainImageUri,
+        dataUrl: values.mainImageDataUrl,
+      }, values.gallery);
 
-      const galleryUrls: string[] = [];
-      for (const item of values.gallery) {
-        if (item.dataUrl) {
-          const up = await uploadImageBase64(token, { dataUrl: item.dataUrl, folder: 'products' });
-          galleryUrls.push(up.url);
-        } else if (item.uri.startsWith('http')) {
-          galleryUrls.push(item.uri);
-        }
-      }
-
-      const body = buildMenuItemApiBody(values, { mainUrl, galleryUrls });
+      const body = buildMenuItemApiBody(values, {
+        mainUrl: uploaded.mainUrl,
+        galleryUrls: uploaded.allUrls.filter((u) => u !== uploaded.mainUrl),
+      });
       const saved =
         mode === 'edit' && productId
           ? await updateVendorProduct(token, enterpriseId, productId, body)
@@ -247,15 +200,26 @@ export function VendorMenuItemFormWizard({
 
   const prixNum = Number(values.prix) || 0;
   const promoNum = values.prixPromo.trim() ? Number(values.prixPromo) : null;
-  const stepTitle = MENU_ITEM_STEPS[step] ?? '';
+  const tagList = values.tagsText.split(',').map((t) => t.trim()).filter(Boolean);
+
+  const pickMain = async () => {
+    const img = await pickVendorImageAsset();
+    if (img) patch({ mainImageUri: img.uri, mainImageDataUrl: img.dataUrl });
+  };
+
+  const pickGallery = async () => {
+    const remaining = MAX_GALLERY_PHOTOS - values.gallery.length;
+    if (remaining <= 0) return;
+    const picked = await pickMultipleVendorImages(remaining);
+    if (picked.length) {
+      patch({ gallery: [...values.gallery, ...picked] });
+    }
+  };
 
   return (
     <View style={styles.root}>
       <FeedbackOverlay />
       <View style={styles.progressWrap}>
-        <ThemedText style={[styles.progressTitle, { color: palette.primaryDeep }]}>
-          Étape {step + 1} / {MENU_ITEM_STEPS.length} — {stepTitle}
-        </ThemedText>
         <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
           <View
             style={[
@@ -264,37 +228,6 @@ export function VendorMenuItemFormWizard({
             ]}
           />
         </View>
-      </View>
-      <View style={styles.stepBar}>
-        {MENU_ITEM_STEPS.map((label, i) => {
-          const reached = i <= step;
-          const current = i === step;
-          return (
-            <Pressable
-              key={label}
-              accessibilityRole="button"
-              accessibilityLabel={`Aller à l'étape ${i + 1} : ${label}`}
-              onPress={() => {
-                if (i === step) return;
-                setStepErrors({});
-                setStep(i);
-              }}
-              style={({ pressed }) => [styles.stepItem, pressed && { opacity: 0.6 }]}>
-              <View
-                style={[
-                  styles.stepDot,
-                  { backgroundColor: colors.border },
-                  reached && { backgroundColor: palette.primary },
-                  current && { borderWidth: 2, borderColor: colors.success, transform: [{ scale: 1.25 }] },
-                ]}>
-                <ThemedText style={[styles.stepNum, reached && { color: colors.onPrimary }]}>{i + 1}</ThemedText>
-              </View>
-              <ThemedText style={[styles.stepLabel, current && { color: colors.text, fontWeight: '800' }]}>
-                {label}
-              </ThemedText>
-            </Pressable>
-          );
-        })}
       </View>
 
       <KeyboardAvoidingView
@@ -307,7 +240,6 @@ export function VendorMenuItemFormWizard({
         keyboardDismissMode="on-drag">
         {step === 0 ? (
           <>
-            <ThemedText style={[styles.sectionTitle, { color: palette.primaryDeep }]}>Identité du plat</ThemedText>
             <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Nom du plat *</ThemedText>
             <TextInput
               style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
@@ -323,6 +255,7 @@ export function VendorMenuItemFormWizard({
               value={values.description}
               onChangeText={(t) => { patch({ description: t }); setStepErrors((s) => ({ ...s, description: null })); }}
               multiline
+              maxLength={DESC_MAX}
               placeholder="Ingrédients, accompagnements…"
               placeholderTextColor={colors.placeholder}
             />
@@ -341,7 +274,6 @@ export function VendorMenuItemFormWizard({
 
         {step === 1 ? (
           <>
-            <ThemedText style={[styles.sectionTitle, { color: palette.primaryDeep }]}>Prix</ThemedText>
             <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Prix normal (FCFA) *</ThemedText>
             <TextInput
               style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
@@ -390,63 +322,23 @@ export function VendorMenuItemFormWizard({
 
         {step === 2 ? (
           <>
-            <ThemedText style={[styles.sectionTitle, { color: palette.primaryDeep }]}>Photo du plat</ThemedText>
-            <Pressable
-              style={[styles.heroImage, { backgroundColor: colors.surfaceMuted }]}
-              onPress={async () => {
-                const img = await pickVendorImageAsset();
-                if (img) patch({ mainImageUri: img.uri, mainImageDataUrl: img.dataUrl });
-              }}>
-              {values.mainImageUri ? (
-                <Image source={{ uri: values.mainImageUri }} style={styles.heroImg} contentFit="cover" />
-              ) : (
-                <ThemedText style={[styles.photoHint, { color: colors.textMuted }]}>+ Ajouter une photo *</ThemedText>
-              )}
-            </Pressable>
-            <View style={styles.galleryHeader}>
-              <ThemedText style={[styles.galleryLabel, { color: colors.textSecondary }]}>
-                Galerie ({values.gallery.length}/{MAX_GALLERY_PHOTOS})
-              </ThemedText>
-              {values.gallery.length < MAX_GALLERY_PHOTOS ? (
-                <Pressable
-                  style={[styles.galleryAddBtn, { borderColor: palette.primary, backgroundColor: colors.surface }]}
-                  onPress={async () => {
-                    const remaining = MAX_GALLERY_PHOTOS - values.gallery.length;
-                    const picked = await pickMultipleVendorImages(remaining);
-                    if (picked.length) {
-                      patch({ gallery: [...values.gallery, ...picked] });
-                    }
-                  }}>
-                  <ThemedText style={[styles.galleryAddTxt, { color: palette.primary }]}>
-                    {values.gallery.length === 0 ? 'Ajouter des photos' : 'Compléter'}
-                  </ThemedText>
-                </Pressable>
-              ) : null}
-            </View>
-            {values.gallery.length > 0 ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.galleryRow}>
-                {values.gallery.map((g, i) => (
-                  <View key={`${i}-${g.uri}`} style={styles.thumbWrap}>
-                    <Image source={{ uri: g.uri }} style={styles.thumb} contentFit="cover" />
-                    <Pressable
-                      style={styles.thumbRemove}
-                      onPress={() => patch({ gallery: values.gallery.filter((_, j) => j !== i) })}>
-                      <X size={14} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
-                    </Pressable>
-                  </View>
-                ))}
-              </ScrollView>
-            ) : (
-              <ThemedText style={[styles.galleryEmpty, { color: colors.textMuted }]}>
-                Aucune photo complémentaire. Vous pouvez en ajouter jusqu'à {MAX_GALLERY_PHOTOS} en une fois.
-              </ThemedText>
-            )}
+            <InlineFormError message={stepErrors.mainImage} colors={colors} />
+            <VendorPhotoGalleryField
+              mainUri={values.mainImageUri}
+              gallery={values.gallery}
+              onPickMain={pickMain}
+              onPickGallery={pickGallery}
+              onRemoveGallery={(i) => patch({ gallery: values.gallery.filter((_, j) => j !== i) })}
+              colors={colors}
+              accent={palette.primary}
+              mainRequired
+            />
           </>
         ) : null}
 
         {step === 3 ? (
           <>
-            <ThemedText style={[styles.sectionTitle, { color: palette.primaryDeep }]}>Options du plat</ThemedText>
+            <InlineFormError message={stepErrors.options} colors={colors} />
             <OptionGroupsEditor
               groups={values.optionGroups}
               onChange={(optionGroups) => patch({ optionGroups })}
@@ -459,7 +351,6 @@ export function VendorMenuItemFormWizard({
 
         {step === 4 ? (
           <>
-            <ThemedText style={[styles.sectionTitle, { color: palette.primaryDeep }]}>Publication</ThemedText>
             <View style={styles.switchRow}>
               <ThemedText style={[styles.labelInline, { color: colors.text }]}>Plat disponible</ThemedText>
               <Switch
@@ -504,18 +395,19 @@ export function VendorMenuItemFormWizard({
               </>
             ) : (
               <ThemedText style={[styles.stockHint, { color: colors.textMuted }]}>
-                Sans limite de stock — le plat reste commandable tant qu’il est marqué disponible.
+                Sans limite de stock.
               </ThemedText>
             )}
-            <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Tags (séparés par des virgules)</ThemedText>
+            <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Tags</ThemedText>
             <TextInput
               style={[styles.input, styles.area, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
               value={values.tagsText}
-              onChangeText={(t) => patch({ tagsText: t })}
+              onChangeText={(t) => { patch({ tagsText: t }); setStepErrors((s) => ({ ...s, tagsText: null })); }}
               multiline
-              placeholder="épicé, populaire, nouveau…"
+              placeholder="épicé, populaire…"
               placeholderTextColor={colors.placeholder}
             />
+            <InlineFormError message={stepErrors.tagsText} colors={colors} />
             <ThemedText style={[styles.label, { color: colors.textSecondary }]}>Allergènes</ThemedText>
             <View style={styles.chipRow}>
               {ALLERGENE_CHOICES.map((a) => {
@@ -530,107 +422,44 @@ export function VendorMenuItemFormWizard({
                 );
               })}
             </View>
-            <View style={[styles.previewCard, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}>
-              <ThemedText style={[styles.previewTitle, { color: colors.textSecondary }]}>Aperçu</ThemedText>
-              {values.mainImageUri ? (
-                <Image source={{ uri: values.mainImageUri }} style={styles.previewImg} contentFit="cover" />
-              ) : null}
-              <ThemedText type="defaultSemiBold" style={[styles.previewNom, { color: colors.text }]}>
-                {values.nom.trim() || '—'}
-              </ThemedText>
-              {selectedCategory ? (
-                <ThemedText style={[styles.previewMeta, { color: colors.textMuted }]}>{selectedCategory.nom}</ThemedText>
-              ) : null}
-              <ThemedText style={[styles.previewPrice, { color: colors.text }]}>
-                {promoNum && promoNum > 0 ? (
-                  <>
-                    <ThemedText style={[styles.promoPrice, { color: colors.success }]}>{formatFcfa(promoNum)}</ThemedText>
-                    {'  '}
-                    <ThemedText style={[styles.oldPrice, { color: colors.textMuted }]}>{formatFcfa(prixNum)}</ThemedText>
-                  </>
-                ) : (
-                  formatFcfa(prixNum)
-                )}
-              </ThemedText>
-              {values.optionGroups.length > 0 ? (
-                <ThemedText style={[styles.previewMeta, { color: colors.textMuted }]}>
-                  {values.optionGroups.length} groupe(s) d'options
-                </ThemedText>
-              ) : null}
-            </View>
-            <View style={styles.previewCard}>
-              <ThemedText style={styles.previewTitle}>Aperçu</ThemedText>
-              {values.mainImageUri ? (
-                <Image source={{ uri: values.mainImageUri }} style={styles.previewImg} contentFit="cover" />
-              ) : null}
-              <ThemedText type="defaultSemiBold" style={styles.previewNom}>
-                {values.nom.trim() || '—'}
-              </ThemedText>
-              {selectedCategory ? (
-                <ThemedText style={styles.previewMeta}>{selectedCategory.nom}</ThemedText>
-              ) : null}
-              <ThemedText style={styles.previewPrice}>
-                {promoNum && promoNum > 0 ? (
-                  <>
-                    <ThemedText style={styles.promoPrice}>{formatFcfa(promoNum)}</ThemedText>
-                    {'  '}
-                    <ThemedText style={styles.oldPrice}>{formatFcfa(prixNum)}</ThemedText>
-                  </>
-                ) : (
-                  formatFcfa(prixNum)
-                )}
-              </ThemedText>
-              {values.optionGroups.length > 0 ? (
-                <ThemedText style={styles.previewMeta}>
-                  {values.optionGroups.length} groupe(s) d’options
-                </ThemedText>
-              ) : null}
-            </View>
           </>
+        ) : null}
+
+        {step === REVIEW_STEP ? (
+          <ListingReviewPanel
+            colors={colors}
+            accent={palette.primary}
+            title="Vérifier avant publication"
+            nom={values.nom}
+            description={values.description}
+            categoryName={selectedCategory?.nom}
+            prix={prixNum}
+            prixPromo={promoNum}
+            mainImageUri={values.mainImageUri}
+            galleryUris={values.gallery.map((g) => g.uri)}
+            tags={tagList}
+            optionGroupCount={values.optionGroups.length}
+            estDisponible={values.estDisponible}
+            enVedette={values.enVedette}
+            errors={stepErrors}
+          />
         ) : null}
       </ScrollView>
       </KeyboardAvoidingView>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12), backgroundColor: colors.surface, borderTopColor: colors.border }]}>
-        <Pressable style={styles.footerBack} onPress={goBack}>
-          <ChevronLeft size={20} color={colors.text} strokeWidth={LUCIDE_STROKE} />
-          <ThemedText style={{ color: colors.text, fontWeight: '700' }}>
-            {step === 0 ? 'Annuler' : 'Retour'}
-          </ThemedText>
-        </Pressable>
-        {step < MENU_ITEM_STEPS.length - 1 ? (
-          <View style={styles.footerRightCluster}>
-            {mode === 'edit' ? (
-              <Pressable
-                style={[styles.footerSaveNow, { borderColor: palette.primary }]}
-                onPress={() => void submit()}
-                disabled={saving}
-                accessibilityLabel="Enregistrer maintenant">
-                {saving ? (
-                  <ActivityIndicator color={palette.primary} />
-                ) : (
-                  <ThemedText style={[styles.footerSaveNowTxt, { color: palette.primary }]}>Enregistrer</ThemedText>
-                )}
-              </Pressable>
-            ) : null}
-            <Pressable style={[styles.footerNext, { backgroundColor: palette.primary }]} onPress={goNext}>
-              <ThemedText style={styles.footerNextTxt}>Suivant</ThemedText>
-              <ChevronRight size={20} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
-            </Pressable>
-          </View>
-        ) : (
-          <Pressable
-            style={[styles.footerNext, { backgroundColor: palette.primaryDeep, opacity: saving ? 0.7 : 1 }]}
-            onPress={() => void submit()}
-            disabled={saving}>
-            {saving ? (
-              <ActivityIndicator color={colors.onPrimary} />
-            ) : (
-              <ThemedText style={styles.footerNextTxt}>{mode === 'edit' ? 'Enregistrer' : 'Publier'}</ThemedText>
-            )}
-          </Pressable>
-        )}
-      </View>
+      <VendorFormFooter
+        step={step}
+        totalSteps={MENU_ITEM_STEPS.length}
+        mode={mode}
+        saving={saving}
+        onCancel={onCancel}
+        onBack={goBack}
+        onNext={goNext}
+        colors={colors}
+        accent={palette.primary}
+        accentDeep={palette.primaryDeep}
+        bottomInset={insets.bottom}
+      />
 
       <CategoryPicker
         visible={catPickerOpen}
@@ -707,7 +536,10 @@ const styles = StyleSheet.create({
   stepNum: { fontSize: 11, fontWeight: '800' },
   stepNumOn: {},
   stepLabel: { fontSize: 10, textAlign: 'center' },
-  sectionTitle: { fontSize: 16, fontWeight: '800', marginTop: 8, marginBottom: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: '800', marginTop: 8, marginBottom: 8 },
+  hint: { fontSize: 13, lineHeight: 18, marginBottom: 10 },
+  groupCard: { borderWidth: 1, borderRadius: 12, padding: 12, gap: 4 },
+  groupTitle: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
   label: { fontSize: 12, fontWeight: '800', marginBottom: 6, marginTop: 10 },
   labelInline: { fontSize: 14, fontWeight: '700' },
   input: {

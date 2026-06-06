@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 import { getSessionToken } from '@/lib/auth';
 import {
@@ -16,7 +16,7 @@ export type FavoriteProductRef = { produit_id: string; produit_kind: 'plat' | 'a
 
 async function readIds(): Promise<string[]> {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    const raw = await SecureStore.getItemAsync(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -27,12 +27,12 @@ async function readIds(): Promise<string[]> {
 }
 
 async function writeIds(ids: string[]): Promise<void> {
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
+  await SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify(ids));
 }
 
 async function readProductRefs(): Promise<FavoriteProductRef[]> {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY_PRODUCTS);
+    const raw = await SecureStore.getItemAsync(STORAGE_KEY_PRODUCTS);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -51,7 +51,7 @@ async function readProductRefs(): Promise<FavoriteProductRef[]> {
 }
 
 async function writeProductRefs(refs: FavoriteProductRef[]): Promise<void> {
-  await AsyncStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(refs));
+  await SecureStore.setItemAsync(STORAGE_KEY_PRODUCTS, JSON.stringify(refs));
 }
 
 export async function getFavoriteEnterpriseIds(): Promise<string[]> {

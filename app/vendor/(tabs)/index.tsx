@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Bell, ChevronRight, Truck } from 'lucide-react-native';
+import { Bell, ChevronRight, Truck, TrendingUp, Package, CheckCircle2, Clock } from 'lucide-react-native';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -15,7 +15,6 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useUnreadNotifications } from '@/hooks/use-unread-notifications';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
 import { formatFcfa } from '@/lib/format';
-import type { VendorPalette } from '@/lib/vendor-theme';
 import { VENDOR_HREF, hrefVendorOrder } from '@/lib/vendor-nav';
 import type { VendorOrderStatus } from '@/lib/vendor-types';
 import { vendorOrderStatusLabel as statusLabel } from '@/lib/ux-copy';
@@ -46,9 +45,8 @@ export default function VendorDashboardScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
-  const colorScheme = useColorScheme();
   const { shop, orders } = useVendor();
-  const { palette, labels, commerceType } = useVendorTheme();
+  const { palette, labels } = useVendorTheme();
   const { unreadCount } = useUnreadNotifications();
   const recent = orders.slice(0, 4);
   const bottom = Math.max(insets.bottom, 10) + VENDOR_TAB_BAR_PADDING_BOTTOM;
@@ -103,25 +101,41 @@ export default function VendorDashboardScreen() {
         </View>
 
         <Pressable style={styles.revenuePress} onPress={() => router.push(VENDOR_HREF.statistics)}>
-          <LinearGradient colors={[...palette.gradient]} style={[styles.revenueCard, { shadowColor: colors.primary }]}>
+          <LinearGradient 
+            colors={[...palette.gradient]} 
+            start={{ x: 0, y: 0 }} 
+            end={{ x: 1, y: 1 }} 
+            style={[styles.revenueCard, { shadowColor: palette.primary }]}>
             <View style={styles.revenueTop}>
+              <View style={styles.revenueIconWrap}>
+                <TrendingUp size={20} color="#FFFFFF" strokeWidth={LUCIDE_STROKE} />
+              </View>
               <ThemedText style={styles.revenueLabel}>{labels.dashboardRevenueLabel}</ThemedText>
-              <ChevronRight size={22} color="rgba(255,255,255,0.85)" />
+              <ChevronRight size={22} color="rgba(255,255,255,0.8)" style={{ marginLeft: 'auto' }} />
             </View>
             <ThemedText style={styles.revenueAmount}>{formatFcfa(todayRevenue)}</ThemedText>
-            <ThemedText style={styles.revenueTrend}>
-              {orders.length === 0 ? 'Aucune commande pour le moment' : `${orders.length} commande(s) au total`}
-            </ThemedText>
+            <View style={styles.revenueBottom}>
+              <ThemedText style={styles.revenueTrend}>
+                {orders.length === 0 ? 'Aucune commande' : `${orders.length} commande(s) au total`}
+              </ThemedText>
+              <View style={styles.revenueGlow} />
+            </View>
           </LinearGradient>
         </Pressable>
 
         <View style={styles.statsRow}>
-          {labels.dashboardStatCards.map((c) => (
-            <View key={c.label} style={[styles.statCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
-              <ThemedText style={[styles.statValue, { color: colors.text }]}>{c.value}</ThemedText>
-              <ThemedText style={[styles.statLabel, { color: colors.textMuted }]}>{c.label}</ThemedText>
-            </View>
-          ))}
+          {labels.dashboardStatCards.map((c, i) => {
+            const Icon = i === 0 ? Package : i === 1 ? Clock : CheckCircle2;
+            return (
+              <View key={c.label} style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={[styles.statIconWrap, { backgroundColor: colors.primarySoft }]}>
+                  <Icon size={16} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
+                </View>
+                <ThemedText style={[styles.statValue, { color: colors.text }]}>{c.value}</ThemedText>
+                <ThemedText style={[styles.statLabel, { color: colors.textMuted }]}>{c.label}</ThemedText>
+              </View>
+            );
+          })}
         </View>
 
         <Pressable
@@ -132,17 +146,17 @@ export default function VendorDashboardScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <ThemedText type="defaultSemiBold" style={[styles.deliveryTitle, { color: palette.primaryDeep }]}>
-              Vos livraisons en cours
+              Livraisons en cours
             </ThemedText>
-            <ThemedText style={[styles.deliverySub, { color: colors.textMuted }]}>
-              Internes (commandes client) et externes (créées par vous). Livreur GoLivra assigné automatiquement.
+            <ThemedText style={[styles.deliverySub, { color: colors.textMuted }]} numberOfLines={2}>
+              Suivez vos expéditions et vos livreurs en temps réel.
             </ThemedText>
           </View>
-          <ChevronRight size={22} color={palette.primary} />
+          <ChevronRight size={20} color={palette.primary} />
         </Pressable>
 
         {labels.dashboardExtra ? (
-          <View style={[styles.extraCard, { borderColor: palette.trackStroke, backgroundColor: colors.primarySoft }]}>
+          <View style={[styles.extraCard, { borderColor: palette.trackStroke, backgroundColor: colors.surfaceMuted }]}>
             <ThemedText type="defaultSemiBold" style={[styles.extraTitle, { color: colors.text }]}>
               {labels.dashboardExtra.title}
             </ThemedText>
@@ -161,8 +175,8 @@ export default function VendorDashboardScreen() {
           <ThemedText type="defaultSemiBold" style={[styles.sectionTitle, { color: colors.text }]}>
             Commandes récentes
           </ThemedText>
-          <Pressable onPress={() => router.push(VENDOR_HREF.ordersTab)}>
-            <ThemedText style={[styles.seeAll, { color: colors.primary }]}>Voir tout</ThemedText>
+          <Pressable onPress={() => router.push(VENDOR_HREF.ordersTab)} hitSlop={8}>
+            <ThemedText style={[styles.seeAll, { color: colors.primary }]}>Tout voir</ThemedText>
           </Pressable>
         </View>
 
@@ -191,14 +205,19 @@ export default function VendorDashboardScreen() {
                     </ThemedText>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <ThemedText type="defaultSemiBold" style={[styles.orderRef, { color: colors.text }]}>
-                      #{o.ref}
+                    <View style={styles.orderRefRow}>
+                      <ThemedText type="defaultSemiBold" style={[styles.orderRef, { color: colors.text }]}>
+                        #{o.ref}
+                      </ThemedText>
+                      <View style={[styles.pill, { backgroundColor: st.bg }]}>
+                        <ThemedText style={[styles.pillText, { color: st.text }]}>{statusLabel(o.statut)}</ThemedText>
+                      </View>
+                    </View>
+                    <ThemedText style={[styles.orderPrice, { color: colors.textMuted }]}>
+                      {o.clientNom} • {formatFcfa(o.prixTotal)}
                     </ThemedText>
-                    <ThemedText style={[styles.orderPrice, { color: colors.textMuted }]}>{formatFcfa(o.prixTotal)}</ThemedText>
                   </View>
-                  <View style={[styles.pill, { backgroundColor: st.bg }]}>
-                    <ThemedText style={[styles.pillText, { color: st.text }]}>{statusLabel(o.statut)}</ThemedText>
-                  </View>
+                  <ChevronRight size={18} color={colors.textMuted} />
                 </Pressable>
               );
             })}
@@ -211,27 +230,27 @@ export default function VendorDashboardScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  scroll: { paddingHorizontal: 18 },
+  scroll: { paddingHorizontal: 18, gap: 16 },
   topRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 12,
-    marginBottom: 18,
+    marginBottom: 4,
   },
   topActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  greeting: { flex: 1, fontSize: 22, fontWeight: '800', lineHeight: 28 },
+  greeting: { flex: 1, fontSize: 22, fontWeight: '900', lineHeight: 28 },
   notifBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
   },
   notifBadge: {
     position: 'absolute',
@@ -243,115 +262,158 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
+    borderWidth: 2,
   },
   notifBadgeText: {
     color: '#FFFFFF',
     fontSize: 10,
-    fontWeight: '800',
-    lineHeight: 12,
+    fontWeight: '900',
   },
   onlinePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 999,
+    borderRadius: 12,
     borderWidth: 1,
+    gap: 6,
   },
-  onlineDot: { width: 8, height: 8, borderRadius: 4 },
+  onlineDot: { width: 6, height: 6, borderRadius: 3 },
   onlineText: { fontSize: 12, fontWeight: '800' },
-  revenuePress: { marginBottom: 16, borderRadius: 18 },
+  revenuePress: { marginBottom: 4 },
   revenueCard: {
-    borderRadius: 18,
-    padding: 18,
-    shadowColor: GOLIVRA_BRAND_SHADOW,
+    borderRadius: 24,
+    padding: 20,
+    overflow: 'hidden',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
     elevation: 6,
   },
-  revenueTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  revenueLabel: { color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: '600' },
-  revenueAmount: { color: '#FFFFFF', fontSize: 28, fontWeight: '800', marginTop: 8 },
-  revenueTrend: { color: 'rgba(255,255,255,0.88)', fontSize: 13, fontWeight: '600', marginTop: 6 },
+  revenueTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  revenueIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  revenueLabel: { color: 'rgba(255,255,255,0.85)', fontSize: 14, fontWeight: '700' },
+  revenueAmount: { color: '#FFFFFF', fontSize: 32, fontWeight: '900', marginBottom: 6 },
+  revenueBottom: { position: 'relative' },
+  revenueTrend: { color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: '600' },
+  revenueGlow: {
+    position: 'absolute',
+    right: -60,
+    bottom: -60,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  statsRow: { flexDirection: 'row', gap: 10 },
+  statCard: {
+    flex: 1,
+    borderRadius: 20,
+    padding: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  statIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  statValue: { fontSize: 18, fontWeight: '900', marginBottom: 2 },
+  statLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   deliveryCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
     gap: 12,
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   deliveryIcon: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deliveryTitle: { fontSize: 15 },
-  deliverySub: { fontSize: 12, marginTop: 3, lineHeight: 17 },
-  statsRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  statCard: {
-    flex: 1,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  statValue: { fontSize: 20, fontWeight: '800' },
-  statLabel: { fontSize: 11, fontWeight: '700', marginTop: 4, textAlign: 'center' },
+  deliveryTitle: { fontSize: 16, fontWeight: '800', marginBottom: 2 },
+  deliverySub: { fontSize: 13, fontWeight: '500', lineHeight: 18 },
   extraCard: {
-    borderRadius: 14,
+    borderRadius: 20,
+    padding: 16,
     borderWidth: 1,
-    padding: 14,
-    marginBottom: 20,
   },
-  extraTitle: { fontSize: 14, marginBottom: 10 },
+  extraTitle: { fontSize: 15, fontWeight: '800', marginBottom: 12 },
   extraRow: { flexDirection: 'row', gap: 12 },
   extraCell: { flex: 1 },
-  extraVal: { fontSize: 20, fontWeight: '800' },
-  extraLab: { fontSize: 12, fontWeight: '700', marginTop: 4 },
+  extraVal: { fontSize: 16, fontWeight: '900' },
+  extraLab: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', opacity: 0.7 },
   sectionHead: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginTop: 12,
   },
-  sectionTitle: { fontSize: 17 },
+  sectionTitle: { fontSize: 18, fontWeight: '900' },
   seeAll: { fontSize: 14, fontWeight: '800' },
   emptyBox: {
+    borderRadius: 20,
     padding: 24,
-    borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
+    gap: 4,
   },
   emptyText: { fontSize: 15, fontWeight: '700' },
-  emptyHint: { fontSize: 13, textAlign: 'center' },
+  emptyHint: { fontSize: 13, textAlign: 'center', lineHeight: 18, opacity: 0.7 },
   orderRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: 1,
     gap: 12,
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: StyleSheet.hairlineWidth,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
   },
   thumbPh: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  thumbLetter: { fontSize: 16, fontWeight: '800' },
-  orderRef: { fontSize: 14 },
-  orderPrice: { fontSize: 13, marginTop: 2 },
-  pill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
-  pillText: { fontSize: 11, fontWeight: '800' },
+  thumbLetter: { fontSize: 18, fontWeight: '900' },
+  orderRefRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
+  orderRef: { fontSize: 15, fontWeight: '800' },
+  orderPrice: { fontSize: 13, fontWeight: '500' },
+  pill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  pillText: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
 });
 

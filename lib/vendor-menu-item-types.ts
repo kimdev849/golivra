@@ -1,6 +1,6 @@
 import type { ProductOptionGroup } from '@/lib/vendor-product-types';
 
-export const MENU_ITEM_STEPS = ['Infos', 'Prix', 'Photo', 'Options', 'Publier'] as const;
+export const MENU_ITEM_STEPS = ['Infos', 'Prix', 'Photos', 'Options', 'Réglages', 'Vérifier'] as const;
 
 export const ALLERGENE_CHOICES = [
   'arachide',

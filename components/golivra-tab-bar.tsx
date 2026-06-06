@@ -15,7 +15,7 @@ import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { shouldShowTabBar } from '@/lib/tab-bar-visibility';
 
-const TAB_ORDER = ['index', 'explore', 'marketplace', 'profile'] as const;
+const TAB_ORDER = ['index', 'explore', 'favorites', 'profile'] as const;
 
 function triggerTabHaptic() {
   if (process.env.EXPO_OS === 'ios') {
@@ -34,7 +34,7 @@ function SideTab({
   isFocused: boolean;
   color: string;
   inactiveColor: string;
-  Icon: React.ComponentType<{ focused: boolean; color: string; size: number; strokeWidth?: number }> | undefined;
+  Icon: any;
   title: string;
   onPress: () => void;
 }) {
@@ -48,11 +48,9 @@ function SideTab({
       onPress={onPress}
       style={styles.sideTap}
       hitSlop={{ top: 8, bottom: 12, left: 6, right: 6 }}>
-      <View style={styles.iconWrap}>
-        {Icon ? (
-          <Icon focused={isFocused} color={labelColor} size={23} strokeWidth={LUCIDE_STROKE} />
-        ) : null}
-      </View>
+      {Icon ? (
+        <Icon focused={isFocused} color={labelColor} size={22} strokeWidth={LUCIDE_STROKE} />
+      ) : null}
       <Text style={[styles.sideLabel, { color: labelColor, fontWeight: isFocused ? '800' : '600' }]} numberOfLines={1}>
         {title}
       </Text>
@@ -84,13 +82,13 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
   );
 
   const leftTabs = orderedRoutes.filter((r) => r.name === 'index' || r.name === 'explore');
-  const rightTabs = orderedRoutes.filter((r) => r.name === 'marketplace' || r.name === 'profile');
+  const rightTabs = orderedRoutes.filter((r) => r.name === 'favorites' || r.name === 'profile');
   const cartRoute = state.routes.find((r) => r.name === 'cart');
   const focusedRouteName = state.routes[state.index]?.name;
   const cartFocused = cartRoute ? focusedRouteName === cartRoute.name : false;
 
-  const trackBg = colors.tabBarBg;
-  const trackBorder = colors.tabBarBorder;
+  const trackBg = isDark ? colors.surfaceElevated : '#FFFFFF';
+  const trackBorder = isDark ? colors.border : 'rgba(13,82,55,0.08)';
   const fabRingColor = isDark ? colors.backgroundAlt : colors.background;
 
   const renderSideTab = (route: (typeof state.routes)[number]) => {
@@ -154,6 +152,7 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
                 backgroundColor: trackBg,
                 borderColor: trackBorder,
                 shadowColor: isDark ? '#000000' : colors.primaryDeep,
+                borderWidth: 1,
               },
               Platform.OS === 'ios' ? styles.trackShadowIos : styles.trackShadowAndroid,
             ]}>
@@ -176,7 +175,6 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
               }}
               style={styles.fabPress}
               hitSlop={{ top: 16, bottom: 8, left: 16, right: 16 }}>
-              <View style={[styles.fabGlow, cartFocused && styles.fabGlowActive]} />
               <LinearGradient
                 colors={brandGradient3(colors)}
                 start={{ x: 0, y: 0 }}
@@ -202,7 +200,7 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
 }
 
 const styles = StyleSheet.create({
-  root: { paddingTop: 6, overflow: 'visible', position: 'relative' },
+  root: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingTop: 6, overflow: 'visible' },
   rootPointer: { pointerEvents: 'box-none' },
   boxPointer: { pointerEvents: 'box-none' },
   barArea: { paddingHorizontal: 16, alignItems: 'center', overflow: 'visible' },
@@ -248,19 +246,11 @@ const styles = StyleSheet.create({
   cartGap: { width: 76 },
   sideTap: {
     flex: 1,
-    maxWidth: '50%',
     alignItems: 'center',
-    gap: 0,
-    paddingVertical: 2,
+    gap: 3,
+    paddingVertical: 4,
   },
-  iconWrap: {
-    width: 40,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  sideLabel: { fontSize: 10, marginTop: 1, letterSpacing: -0.2 },
+  sideLabel: { fontSize: 10, letterSpacing: -0.15 },
   fabSlot: {
     position: 'absolute',
     left: 0,
@@ -271,14 +261,6 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   fabPress: { borderRadius: 36 },
-  fabGlow: {
-    position: 'absolute',
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'rgba(11, 107, 69, 0.0)',
-  },
-  fabGlowActive: { backgroundColor: 'rgba(11, 107, 69, 0.08)' },
   fab: {
     width: 58,
     height: 58,

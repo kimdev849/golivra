@@ -63,7 +63,7 @@ export default function VendorTabsLayout() {
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.surface }]}>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
       {pendingModeration ? (
         <View style={[styles.moderationBanner, { backgroundColor: colors.warningSoft, borderBottomWidth: 1, borderBottomColor: colors.border }]}>
           <ThemedText style={[styles.moderationTitle, { color: colors.warning }]}>Compte en attente</ThemedText>
@@ -80,6 +80,12 @@ export default function VendorTabsLayout() {
           tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
           tabBarInactiveTintColor: Colors[colorScheme ?? 'light'].tabIconDefault,
           tabBarHideOnKeyboard: true,
+          tabBarStyle: {
+            position: 'absolute',
+            borderTopWidth: 0,
+            elevation: 0,
+            backgroundColor: 'transparent',
+          },
         }}>
         <Tabs.Screen
           name="index"

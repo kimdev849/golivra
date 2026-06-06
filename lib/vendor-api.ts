@@ -1,6 +1,7 @@
 import { apiFetch } from '@/lib/api';
 import type { DeliveryAddressFields } from '@/lib/format-address';
 import type { ArticleCategory, ProductOptionGroup } from '@/lib/vendor-product-types';
+import { normalizeImageUrlList } from '@/lib/vendor-image-urls';
 import type {
   VendorEngagementInput,
   VendorOrder,
@@ -78,7 +79,7 @@ function mapApiProduct(p: ApiProduct): VendorProduct {
     enLigne: p.est_disponible !== false,
     description: p.description ?? null,
     imageUrl: p.image_url ?? null,
-    imagesUrls: p.images_urls ?? [],
+    imagesUrls: normalizeImageUrlList(p.images_urls),
     reference: p.reference ?? null,
     unite: p.unite ?? null,
     enVedette: p.est_en_vedette === true,

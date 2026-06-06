@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 import { apiFetch } from '@/lib/api';
 import { clearSessionSnapshot, saveSessionSnapshot } from '@/lib/session-store';
@@ -32,7 +32,7 @@ export function getSessionTokenSync(): string | null {
 export async function hydrateSessionToken(): Promise<string | null> {
   if (tokenHydrated) return memoryToken;
   try {
-    memoryToken = await AsyncStorage.getItem(TOKEN_KEY);
+    memoryToken = await SecureStore.getItemAsync(TOKEN_KEY);
   } catch {
     memoryToken = null;
   }
@@ -48,14 +48,14 @@ export async function getSessionToken(): Promise<string | null> {
 export async function setSessionToken(token: string): Promise<void> {
   memoryToken = token;
   tokenHydrated = true;
-  await AsyncStorage.setItem(TOKEN_KEY, token);
+  await SecureStore.setItemAsync(TOKEN_KEY, token);
 }
 
 export async function clearSessionToken(): Promise<void> {
   memoryToken = null;
   tokenHydrated = true;
   try {
-    await AsyncStorage.removeItem(TOKEN_KEY);
+    await SecureStore.deleteItemAsync(TOKEN_KEY);
   } catch {
     /* ignore */
   }

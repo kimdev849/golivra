@@ -1,5 +1,9 @@
 import { apiFetch } from '@/lib/api';
-import { fetchEnterpriseByIdCached, fetchProductsForEnterpriseCached } from '@/lib/client-data';
+import {
+  fetchEnterpriseByIdCached,
+  fetchEnterprisesByType,
+  fetchProductsForEnterpriseCached,
+} from '@/lib/client-data';
 import { getSessionToken } from '@/lib/auth';
 
 export type EnterprisePublic = {
@@ -69,18 +73,63 @@ export type ProductFeedParams = {
   offset?: number;
 };
 
-export async function fetchEnterpriseById(id: string, force = false): Promise<EnterprisePublic> {
-  return fetchEnterpriseByIdCached(id, force);
+export type CatalogSearchType = 'all' | 'plat' | 'article' | 'restaurant' | 'boutique';
+
+export type CatalogSearchResult = {
+  products: ProductPublic[];
+  enterprises: EnterprisePublic[];
+};
+
+function isPromoProduct(p: ProductPublic): boolean {
+  return p.prix_promo != null && Number(p.prix_promo) < Number(p.prix);
 }
 
-export async function fetchProductsForEnterprise(enterpriseId: string, force = false): Promise<ProductPublic[]> {
-  return fetchProductsForEnterpriseCached(enterpriseId, force);
+function applyFeedFilters(items: ProductPublic[], params: ProductFeedParams): ProductPublic[] {
+  let list = items;
+  if (params.type === 'plat') list = list.filter((p) => p.kind !== 'article');
+  if (params.type === 'article') list = list.filter((p) => p.kind === 'article');
+  if (params.promo) list = list.filter(isPromoProduct);
+  const offset = Math.max(0, params.offset ?? 0);
+  const limit = params.limit ?? list.length;
+  return list.slice(offset, offset + limit);
+}
+
+/** Repli local si /feed indisponible (ex. cache PostgREST incomplet côté Supabase). */
+async function fetchProductFeedFromEnterprises(params: ProductFeedParams = {}): Promise<ProductPublic[]> {
+  const [restaurants, boutiques] = await Promise.all([
+    fetchEnterprisesByType('restaurant'),
+    fetchEnterprisesByType('boutique'),
+  ]);
+  const enterprises = [...restaurants, ...boutiques];
+  const batches = await Promise.all(
+    enterprises.map(async (e) => {
+      try {
+        const prods = await fetchProductsForEnterprise(e.id);
+        return prods.map((p) => ({
+          ...p,
+          enterprise_nom: e.nom,
+          enterprise_type: e.type,
+          enterprise_image_url: e.image_url ?? null,
+        }));
+      } catch {
+        return [] as ProductPublic[];
+      }
+    }),
+  );
+  return applyFeedFilters(batches.flat(), params);
+}
+
+function shouldFallbackFeed(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  const code = error instanceof Error ? (error as Error & { code?: string }).code : undefined;
+  return (
+    code === 'SCHEMA_INCOMPLET' ||
+    /schema|cache api|colonne.*absente|SCHEMA_INCOMPLET/i.test(msg)
+  );
 }
 
 /**
  * Feed public de produits/dishes, agrege depuis TOUS les commerces actifs.
- * Utilise par l'accueil client pour la grille 2 colonnes. Renvoie un tableau
- * plat de produits enrichis avec enterprise_nom/type/image_url.
  */
 export async function fetchProductFeed(params: ProductFeedParams = {}): Promise<ProductPublic[]> {
   const search = new URLSearchParams();
@@ -89,9 +138,72 @@ export async function fetchProductFeed(params: ProductFeedParams = {}): Promise<
   if (params.limit != null) search.set('limit', String(params.limit));
   if (params.offset != null) search.set('offset', String(params.offset));
   const qs = search.toString();
-  return apiFetch<ProductPublic[]>(`/products/feed${qs ? `?${qs}` : ''}`, {
-    skipIncidentReport: true,
-  });
+  try {
+    return await apiFetch<ProductPublic[]>(`/products/feed${qs ? `?${qs}` : ''}`, {
+      skipIncidentReport: true,
+    });
+  } catch (error) {
+    if (shouldFallbackFeed(error)) {
+      return fetchProductFeedFromEnterprises(params);
+    }
+    // Repli si le feed serveur est indisponible (500, route absente, etc.)
+    try {
+      return await fetchProductFeedFromEnterprises(params);
+    } catch {
+      throw error;
+    }
+  }
+}
+
+/** Recherche serveur unifiée (produits + commerces). */
+export async function searchCatalog(
+  query: string,
+  type: CatalogSearchType = 'all',
+  limit = 24,
+): Promise<CatalogSearchResult> {
+  const q = query.trim();
+  if (q.length < 2) return { products: [], enterprises: [] };
+
+  const search = new URLSearchParams();
+  search.set('q', q);
+  if (type !== 'all') search.set('type', type);
+  search.set('limit', String(limit));
+
+  try {
+    return await apiFetch<CatalogSearchResult>(`/products/search?${search.toString()}`, {
+      skipIncidentReport: true,
+    });
+  } catch {
+    const [feed, restaurants, boutiques] = await Promise.all([
+      fetchProductFeedFromEnterprises({ limit: 200 }),
+      type === 'all' || type === 'restaurant' ? fetchEnterprisesByType('restaurant') : Promise.resolve([]),
+      type === 'all' || type === 'boutique' ? fetchEnterprisesByType('boutique') : Promise.resolve([]),
+    ]);
+    const needle = q.toLowerCase();
+    const matchText = (s: string | null | undefined) => (s ?? '').toLowerCase().includes(needle);
+    const products = feed.filter(
+      (p) =>
+        matchText(p.nom) ||
+        matchText(p.description) ||
+        matchText(p.enterprise_nom) ||
+        (Array.isArray(p.tags) && p.tags.some((t) => matchText(t))),
+    );
+    const enterprises = [...restaurants, ...boutiques].filter(
+      (e) => matchText(e.nom) || matchText(e.description) || matchText(e.adresse) || matchText(e.categorie_nom),
+    );
+    return {
+      products: products.slice(0, limit),
+      enterprises: enterprises.slice(0, 12),
+    };
+  }
+}
+
+export async function fetchEnterpriseById(id: string, force = false): Promise<EnterprisePublic> {
+  return fetchEnterpriseByIdCached(id, force);
+}
+
+export async function fetchProductsForEnterprise(enterpriseId: string, force = false): Promise<ProductPublic[]> {
+  return fetchProductsForEnterpriseCached(enterpriseId, force);
 }
 
 /**
@@ -102,11 +214,14 @@ export async function fetchProductFeed(params: ProductFeedParams = {}): Promise<
 export async function fetchProductById(
   productId: string,
   kind: 'plat' | 'article',
+  enterpriseId?: string,
 ): Promise<ProductPublic | null> {
-  // Strategie simple: requeter le feed avec une grande limite et filtrer.
-  // Les UUIDs sont uniques donc 1 match garanti. Pas de nouvel endpoint
-  // dedie pour eviter la duplication de logique.
-  const list = await fetchProductFeed({ type: kind, limit: 100 });
+  if (enterpriseId) {
+    const fromEnterprise = await fetchProductsForEnterprise(enterpriseId);
+    const found = fromEnterprise.find((p) => p.id === productId);
+    if (found) return found;
+  }
+  const list = await fetchProductFeed({ type: kind, limit: 200 });
   return list.find((p) => p.id === productId) ?? null;
 }
 

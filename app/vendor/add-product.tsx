@@ -35,8 +35,7 @@ export default function VendorAddProductScreen() {
           palette={palette}
           mode="create"
           onCancel={() => router.back()}
-          onSaved={async (created) => {
-            setProducts((prev) => [...prev, created]);
+          onSaved={async () => {
             router.replace(VENDOR_HREF.productsTab);
             void refresh();
           }}
@@ -47,15 +46,14 @@ export default function VendorAddProductScreen() {
 
   return (
     <ThemedView style={{ flex: 1 }}>
-      <VendorScreenHeader title="Ajouter un plat" subtitle="5 étapes · menu du restaurant" />
+      <VendorScreenHeader title="Ajouter un plat" />
       <View style={{ flex: 1 }} key={`menu-wizard-${shop.id}`}>
         <VendorMenuItemFormWizard
           enterpriseId={shop.id}
           palette={palette}
           mode="create"
           onCancel={() => router.back()}
-          onSaved={async (created) => {
-            setProducts((prev) => [...prev, created]);
+          onSaved={async () => {
             router.replace(VENDOR_HREF.productsTab);
             void refresh();
           }}

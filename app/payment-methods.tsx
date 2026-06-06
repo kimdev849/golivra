@@ -27,7 +27,7 @@ export default function PaymentMethodsScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scroll, { paddingBottom: bottomPad }]}>
         <ThemedText style={[styles.intro, { color: colors.textSecondary }]}>
-          Sur GoLivra, le règlement des commandes se fait uniquement par Mobile Money : Airtel Money ou MTN Mobile Money. Vous choisissez l'opérateur au moment de valider le panier.
+          {"Sur GoLivra, le règlement des commandes se fait uniquement par Mobile Money : Airtel Money ou MTN Mobile Money. Vous choisissez l'opérateur au moment de valider le panier."}
         </ThemedText>
 
         {CLIENT_PAYMENT_METHODS.map((m) => (
@@ -37,7 +37,7 @@ export default function PaymentMethodsScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <ThemedText type="defaultSemiBold" style={[styles.cardTitle, { color: colors.primaryDeep }]}>{m.label}</ThemedText>
-              <ThemedText style={[styles.cardBody, { color: colors.textMuted }]}>Paiement mobile sécurisé via votre compte {m.shortLabel}. Pas de carte bancaire ni paiement en espèces dans l'application.</ThemedText>
+              <ThemedText style={[styles.cardBody, { color: colors.textMuted }]}>{"Paiement mobile sécurisé via votre compte "}{m.shortLabel}{". Pas de carte bancaire ni paiement en espèces dans l'application."}</ThemedText>
             </View>
           </View>
         ))}

@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import * as Haptics from 'expo-haptics';
 
 import {
   ActionFeedbackOverlay,
@@ -11,7 +12,9 @@ type FeedbackConfig = {
   title: string;
   message?: string;
   primaryLabel?: string;
+  secondaryLabel?: string;
   onPrimary?: () => void;
+  onSecondary?: () => void;
 };
 
 const initial = {
@@ -20,7 +23,9 @@ const initial = {
   title: '',
   message: undefined as string | undefined,
   primaryLabel: 'OK',
+  secondaryLabel: undefined as string | undefined,
   onPrimary: undefined as (() => void) | undefined,
+  onSecondary: undefined as (() => void) | undefined,
 };
 
 export function useActionFeedback() {
@@ -31,13 +36,24 @@ export function useActionFeedback() {
   }, []);
 
   const open = useCallback((config: FeedbackConfig) => {
+    // Feedback haptique basé sur le variant
+    if (config.variant === 'success') {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else if (config.variant === 'error') {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } else if (config.variant === 'confirm' || config.variant === 'info') {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+
     setState({
       visible: true,
       variant: config.variant,
       title: config.title,
       message: config.message,
       primaryLabel: config.primaryLabel ?? 'OK',
+      secondaryLabel: config.secondaryLabel,
       onPrimary: config.onPrimary,
+      onSecondary: config.onSecondary,
     });
   }, []);
 
@@ -68,6 +84,28 @@ export function useActionFeedback() {
     [open],
   );
 
+  const showConfirm = useCallback(
+    (config: {
+      title: string;
+      message?: string;
+      primaryLabel?: string;
+      secondaryLabel?: string;
+      onPrimary: () => void;
+      onSecondary?: () => void;
+    }) => {
+      open({
+        variant: 'confirm',
+        title: config.title,
+        message: config.message,
+        primaryLabel: config.primaryLabel,
+        secondaryLabel: config.secondaryLabel,
+        onPrimary: config.onPrimary,
+        onSecondary: config.onSecondary,
+      });
+    },
+    [open],
+  );
+
   const FeedbackOverlay = useCallback(
     () => (
       <ActionFeedbackOverlay
@@ -76,12 +114,14 @@ export function useActionFeedback() {
         title={state.title}
         message={state.message}
         primaryLabel={state.primaryLabel}
+        secondaryLabel={state.secondaryLabel}
         onPrimary={state.onPrimary}
+        onSecondary={state.onSecondary}
         onDismiss={dismiss}
       />
     ),
     [state, dismiss],
   );
 
-  return { showSuccess, showError, showInfo, dismiss, FeedbackOverlay };
+  return { showSuccess, showError, showInfo, showConfirm, dismiss, FeedbackOverlay };
 }

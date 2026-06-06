@@ -39,7 +39,6 @@ export default function AuthScreen() {
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const formWidth = Math.min(width - 40, 420);
   const phoneE164 = toCgE164(loginPhone);
   const canSubmit = Boolean(phoneE164) && Boolean(password) && password.length >= 6 && !isSubmitting;
 
@@ -202,7 +201,7 @@ export default function AuthScreen() {
               <Link href="/signup/choose" asChild>
                 <Pressable hitSlop={8}>
                   <ThemedText style={[styles.signupHintLink, { color: colors.primary }]}>
-                    S'inscrire
+                    {"S'inscrire"}
                   </ThemedText>
                 </Pressable>
               </Link>

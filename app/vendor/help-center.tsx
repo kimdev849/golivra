@@ -38,7 +38,7 @@ export default function VendorHelpCenterScreen() {
       <VendorScreenHeader title="CENTRE D'AIDE" />
       <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: insets.bottom + 24 }}>
         <ThemedText style={[styles.intro, { color: colors.textSecondary }]}>
-          Questions fréquentes et canaux pour joindre l\'équipe GoLivra.
+          {"Questions fréquentes et canaux pour joindre l'équipe GoLivra."}
         </ThemedText>
 
         <View style={[styles.contactCard, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}>

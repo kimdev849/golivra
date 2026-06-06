@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Keyboard,
@@ -27,11 +27,11 @@ import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { registerAccount, registerVendorAccount, persistAuthSession } from '@/lib/auth';
 import { fetchEnterpriseCategories, type EnterpriseCategory } from '@/lib/enterprise';
-import { requestOtp, verifyOtp } from '@/lib/otp';
+import { requestOtp } from '@/lib/otp';
 import { formatCgPhone, toCgE164 } from '@/lib/phone';
 import { uploadImageForSignup } from '@/lib/uploads';
 import { VENDOR_HREF } from '@/lib/vendor-nav';
-import { UX_ERRORS, friendlyErrorMessage } from '@/lib/ux-copy';
+import { friendlyErrorMessage } from '@/lib/ux-copy';
 import { validateAddress, validateCommerceName, validateDescription, validateOtp, validatePassword, validatePersonName, validatePhoneCg } from '@/lib/form-validation';
 
 type Profile = 'client' | 'vendeur';
@@ -66,7 +66,6 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
   const router = useRouter();
   const colors = useAppColors();
   const { showSuccess, FeedbackOverlay } = useActionFeedback();
-  const isDark = useColorScheme() === 'dark';
   const { width } = useWindowDimensions();
   const [profile, setProfile] = useState<Profile>(forcedProfile ?? (variant === 'default' ? 'client' : 'vendeur'));
   const [commerceKind, setCommerceKind] = useState<CommerceKind | null>(variant === 'default' ? null : variant);
@@ -94,6 +93,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
+  const signupDoneRef = useRef(false);
   const formWidth = Math.min(width - 40, 460);
   const phoneE164 = toCgE164(phone);
 
@@ -188,15 +188,16 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
   };
 
   const handleVerifyAndRegister = async () => {
+    if (signupDoneRef.current) return;
     setError(null);
     if (!otpSent) { setError('Demandez d’abord le code par SMS.'); return; }
     const otpCheck = validateOtp(otp);
     if (!otpCheck.ok) { setError(otpCheck.message); return; }
     const v = validateAccountForOtp();
     if (v) { setError(v); return; }
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await verifyOtp({ telephone: phoneE164!, code: otp.trim() });
       const userNom = profile === 'vendeur' ? businessName.trim() : fullName.trim();
       let finalProfileImageUrl = profileImageUrl;
       let finalBusinessImageUrl = businessImageUrl;
@@ -206,9 +207,6 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
         catch { finalBusinessImageUrl = null; }
       }
 
-      // VENDEUR : un SEUL appel atomique qui crée user + commerce ensemble.
-      // En cas d'échec d'un côté, le backend rollback l'autre → on ne se
-      // retrouve JAMAIS avec un utilisateur orphelin (ou inversement).
       if (profile === 'vendeur') {
         if (!commerceKind) { setError("Type de commerce introuvable."); return; }
         const trimmedAddress = businessAddress.trim();
@@ -230,9 +228,12 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
             imageDataUrl: !finalBusinessImageUrl && businessImageDataUrl ? businessImageDataUrl : undefined,
           },
         });
+        if (!result?.token) {
+          throw new Error('Compte créé mais session invalide. Connectez-vous avec votre numéro et mot de passe.');
+        }
         const { enterprise: _ent, ...session } = result;
         await persistAuthSession(session);
-        // L'upload de l'image de profil peut se faire après (non-bloquant)
+        signupDoneRef.current = true;
         if (profileImageDataUrl && !finalProfileImageUrl) {
           void uploadImageForSignup(session.token, { dataUrl: profileImageDataUrl, folder: 'profiles' })
             .catch(() => undefined);
@@ -245,21 +246,36 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
         return;
       }
 
-      // CLIENT : inscription simple (pas de commerce)
       const session = await registerAccount({
         nom: userNom, telephone: phoneE164!, motDePasse: password, otpCode: otp.trim(), imageUrl: finalProfileImageUrl || null,
         role: 'client',
       });
+      if (!session?.token) {
+        throw new Error('Compte créé mais session invalide. Connectez-vous avec votre numéro et mot de passe.');
+      }
       await persistAuthSession(session);
+      signupDoneRef.current = true;
       if (profileImageDataUrl && !finalProfileImageUrl) {
         void uploadImageForSignup(session.token, { dataUrl: profileImageDataUrl, folder: 'profiles' })
           .catch(() => undefined);
       }
-      router.replace('/(tabs)');
+      showSuccess('Compte créé', 'Bienvenue sur GoLivra !', {
+        primaryLabel: 'Explorer',
+        onPrimary: () => router.replace('/(tabs)'),
+      });
     } catch (e) {
+      if (signupDoneRef.current) return;
       const reqId = (e as { requestId?: string })?.requestId;
+      const rawMsg = e instanceof Error ? e.message : String(e);
+      const lower = rawMsg.toLowerCase();
+      if (lower.includes('déjà enregistré') || lower.includes('deja enregistre')) {
+        setError('Ce numéro est déjà inscrit. Connectez-vous avec votre mot de passe.');
+        return;
+      }
       const msg = friendlyErrorMessage(e, 'La création du compte a échoué.');
-      console.warn('[signup] échec inscription', { reqId, message: msg });
+      if (__DEV__) {
+        console.warn('[signup] échec inscription', { reqId, message: msg });
+      }
       setError(reqId ? `${msg} (ref. ${reqId.slice(0, 8)})` : msg);
     }
     finally { setIsSubmitting(false); }
@@ -483,7 +499,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
               )}
 
               <Pressable style={({ pressed }) => [styles.secondaryButton, { backgroundColor: colors.primarySoft }, pressed ? styles.buttonPressed : undefined]} onPress={() => router.replace('/auth')}>
-                <ThemedText style={[styles.secondaryButtonText, { color: colors.primary }]}>J'ai déjà un compte</ThemedText>
+                <ThemedText style={[styles.secondaryButtonText, { color: colors.primary }]}>{"J'ai déjà un compte"}</ThemedText>
               </Pressable>
 
               <ThemedText style={[styles.formHint, { color: colors.textMuted }]}>Vos données sont traitées conformément à notre politique de confidentialité.</ThemedText>
