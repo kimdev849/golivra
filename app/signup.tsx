@@ -290,14 +290,12 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
       <KeyboardAvoidingView style={styles.keyboardContainer} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}>
         <ScrollView contentContainerStyle={[styles.scrollContent, Platform.OS === 'android' ? styles.scrollContentAndroid : undefined, keyboardVisible ? styles.scrollContentWithKeyboard : undefined]} keyboardShouldPersistTaps="always" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}>
           <View style={[styles.header, { backgroundColor: colors.background }]}>
-            {variant !== 'default' ? (
-              <View style={styles.headerTopRow}>
-                <Pressable style={styles.backButton} onPress={() => router.replace('/auth')}>
-                  <MaterialIcons name="arrow-back-ios-new" size={18} color={colors.primary} />
-                  <ThemedText style={[styles.backButtonText, { color: colors.primary }]}>Retour</ThemedText>
-                </Pressable>
-              </View>
-            ) : null}
+            <View style={styles.headerTopRow}>
+              <Pressable style={styles.backButton} onPress={() => router.replace('/auth')}>
+                <MaterialIcons name="arrow-back-ios-new" size={18} color={colors.primary} />
+                <ThemedText style={[styles.backButtonText, { color: colors.primary }]}>Retour</ThemedText>
+              </Pressable>
+            </View>
             <View style={[styles.logoBadge, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Image source={require('@/assets/images/logo25292922882.png')} style={styles.appIcon} contentFit="contain" />
             </View>
