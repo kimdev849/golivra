@@ -49,6 +49,19 @@ export function validateMenuItemStep(values: MenuItemFormValues, step: number): 
     if (!values.mainImageUri && !values.mainImageDataUrl) {
       errors.mainImage = 'Ajoutez une photo du plat.';
     }
+    const total = (values.mainImageUri || values.mainImageDataUrl ? 1 : 0) + values.gallery.length;
+    if (total > 8) {
+      errors.gallery = 'Un plat ne peut pas avoir plus de 8 photos.';
+    }
+    // Check for duplicates
+    const allUris = [
+      ...(values.mainImageUri ? [values.mainImageUri] : []),
+      ...values.gallery.map(g => g.uri)
+    ];
+    const uniqueUris = new Set(allUris);
+    if (uniqueUris.size !== allUris.length) {
+      errors.gallery = 'Des photos dupliquées ont été détectées.';
+    }
   }
 
   if (step === 3) {
@@ -83,6 +96,19 @@ export function validateProductStep(values: VendorProductFormValues, step: numbe
     if (!prix.ok) errors.prix = prix.message;
     if (!values.mainImageUri && !values.mainImageDataUrl) {
       errors.mainImage = 'Ajoutez au moins une photo principale.';
+    }
+    const total = (values.mainImageUri || values.mainImageDataUrl ? 1 : 0) + values.gallery.length;
+    if (total > 8) {
+      errors.gallery = 'Un article ne peut pas avoir plus de 8 photos.';
+    }
+    // Check for duplicates
+    const allUris = [
+      ...(values.mainImageUri ? [values.mainImageUri] : []),
+      ...values.gallery.map(g => g.uri)
+    ];
+    const uniqueUris = new Set(allUris);
+    if (uniqueUris.size !== allUris.length) {
+      errors.gallery = 'Des photos dupliquées ont été détectées.';
     }
   }
 

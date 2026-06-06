@@ -204,15 +204,47 @@ export function VendorMenuItemFormWizard({
 
   const pickMain = async () => {
     const img = await pickVendorImageAsset();
-    if (img) patch({ mainImageUri: img.uri, mainImageDataUrl: img.dataUrl });
+    if (img) {
+      // Check if this image is already in gallery
+      const isDuplicate = values.gallery.some(g => g.uri === img.uri);
+      if (isDuplicate) {
+        showError('Doublon', 'Cette image est déjà présente dans la galerie.');
+        return;
+      }
+      patch({ mainImageUri: img.uri, mainImageDataUrl: img.dataUrl });
+    }
   };
 
   const pickGallery = async () => {
-    const remaining = MAX_GALLERY_PHOTOS - values.gallery.length;
-    if (remaining <= 0) return;
+    const currentTotal = (values.mainImageUri || values.mainImageDataUrl ? 1 : 0) + values.gallery.length;
+    const remaining = MAX_GALLERY_PHOTOS - currentTotal;
+    
+    if (remaining <= 0) {
+      showError('Limite atteinte', `Vous ne pouvez pas ajouter plus de ${MAX_GALLERY_PHOTOS} photos.`);
+      return;
+    }
+
     const picked = await pickMultipleVendorImages(remaining);
     if (picked.length) {
-      patch({ gallery: [...values.gallery, ...picked] });
+      const newGallery = [...values.gallery];
+      let duplicatesCount = 0;
+
+      for (const p of picked) {
+        const isMainDuplicate = values.mainImageUri === p.uri;
+        const isGalleryDuplicate = newGallery.some(g => g.uri === p.uri);
+        
+        if (isMainDuplicate || isGalleryDuplicate) {
+          duplicatesCount++;
+        } else {
+          newGallery.push(p);
+        }
+      }
+
+      if (duplicatesCount > 0) {
+        showError('Doublons ignorés', `${duplicatesCount} image(s) déjà présente(s) ont été ignorée(s).`);
+      }
+      
+      patch({ gallery: newGallery });
     }
   };
 

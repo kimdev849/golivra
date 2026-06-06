@@ -20,29 +20,38 @@ async function uploadOne(token: string, item: { uri: string; dataUrl: string }):
 }
 
 /**
- * Upload photo principale + galerie. Retourne toutes les URLs HTTPS prêtes pour l'API.
+ * Upload photo principale + galerie en parallèle pour plus de rapidité.
  */
 export async function uploadVendorListingImages(
   token: string,
   main: { uri: string | null; dataUrl: string | null },
   gallery: VendorImageAsset[],
 ): Promise<UploadedListingImages> {
+  // 1. Upload de l'image principale en priorité
   let mainUrl: string | undefined;
-  const galleryUrls: string[] = [];
-
   if (main.uri || main.dataUrl) {
-    const url = await uploadOne(token, {
+    mainUrl = (await uploadOne(token, {
       uri: main.uri ?? '',
       dataUrl: main.dataUrl ?? '',
-    });
-    if (url) mainUrl = url;
+    })) || undefined;
   }
 
+  // 2. Upload de la galerie en parallèle
+  const galleryPromises = gallery.map(item => uploadOne(token, item));
+  const results = await Promise.all(galleryPromises);
+
+  const galleryUrls: string[] = [];
   let failed = 0;
-  for (const item of gallery) {
-    const url = await uploadOne(token, item);
-    if (url && url !== mainUrl) galleryUrls.push(url);
-    else if (!url) failed += 1;
+
+  for (const url of results) {
+    if (url) {
+      // Éviter de dupliquer l'image principale dans la galerie si elle a été choisie deux fois
+      if (url !== mainUrl) {
+        galleryUrls.push(url);
+      }
+    } else {
+      failed++;
+    }
   }
 
   if (failed > 0) {

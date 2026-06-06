@@ -114,7 +114,10 @@ export function ActionFeedbackOverlay({
             <Pressable
               style={[
                 styles.primaryBtn,
-                { backgroundColor: isSuccess || isInfo || isConfirm ? colors.primary : colors.error, flex: secondaryLabel ? 1 : 0 },
+                { 
+                  backgroundColor: isSuccess || isInfo || isConfirm ? colors.primary : colors.error,
+                  flex: 1 // Toujours prendre la largeur disponible
+                },
               ]}
               onPress={handlePrimary}
               android_ripple={{ color: 'rgba(255,255,255,0.25)' }}>
