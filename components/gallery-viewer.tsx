@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Dimensions, FlatList, Modal, Pressable, StyleSheet, View, type ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ImageZoomViewer } from '@/components/image-zoom-viewer';
 import { ThemedText } from '@/components/themed-text';
 import { LUCIDE_STROKE } from '@/constants/icons';
 
@@ -31,6 +32,7 @@ type Props = {
 export function GalleryViewer({ visible, images, initialIndex = 0, onClose, colors }: Props) {
   const insets = useSafeAreaInsets();
   const [index, setIndex] = useState(Math.max(0, Math.min(initialIndex, Math.max(images.length - 1, 0))));
+  const [zoomIndex, setZoomIndex] = useState<number | null>(null);
   const listRef = useRef<FlatList<string>>(null);
 
   useEffect(() => {
@@ -93,49 +95,23 @@ export function GalleryViewer({ visible, images, initialIndex = 0, onClose, colo
           getItemLayout={(_, i) => ({ length: SCREEN_WIDTH, offset: SCREEN_WIDTH * i, index: i })}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
-          renderItem={({ item }) => (
-            <View style={styles.slide}>
+          renderItem={({ item, index: i }) => (
+            <Pressable
+              style={styles.slide}
+              onPress={() => setZoomIndex(i)}
+              accessibilityRole="imagebutton"
+              accessibilityLabel="Agrandir la photo">
               <Image source={{ uri: item }} style={styles.img} contentFit="contain" />
-            </View>
+            </Pressable>
           )}
         />
-
-        {images.length > 1 ? (
-          <>
-            {index > 0 ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Photo précédente"
-                onPress={goPrev}
-                hitSlop={10}
-                style={({ pressed }) => [styles.arrow, styles.arrowLeft, pressed && { opacity: 0.6 }]}>
-                <ChevronLeft size={32} color="#FFF" strokeWidth={LUCIDE_STROKE} />
-              </Pressable>
-            ) : null}
-            {index < images.length - 1 ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Photo suivante"
-                onPress={goNext}
-                hitSlop={10}
-                style={({ pressed }) => [styles.arrow, styles.arrowRight, pressed && { opacity: 0.6 }]}>
-                <ChevronRight size={32} color="#FFF" strokeWidth={LUCIDE_STROKE} />
-              </Pressable>
-            ) : null}
-            <View style={styles.dots}>
-              {images.map((_, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.dot,
-                    i === index ? styles.dotActive : styles.dotInactive,
-                  ]}
-                />
-              ))}
-            </View>
-          </>
-        ) : null}
       </View>
+
+      <ImageZoomViewer
+        visible={zoomIndex != null}
+        source={zoomIndex != null ? images[zoomIndex] : null}
+        onClose={() => setZoomIndex(null)}
+      />
     </Modal>
   );
 }

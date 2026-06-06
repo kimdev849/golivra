@@ -24,6 +24,7 @@ import { ProductPrice } from '@/components/product-price';
 import { ScreenEmptyState, ScreenLoadState } from '@/components/screen-load-state';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { ZoomableImage } from '@/components/zoomable-image';
 import { createEnterpriseDetailStyles } from '@/constants/enterprise-detail-styles';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
@@ -220,7 +221,13 @@ export default function EnterpriseDetailScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.heroWrap}>
           {hero ? (
-            <Image source={{ uri: hero }} style={styles.heroImg} contentFit="cover" transition={200} />
+            <ZoomableImage
+              source={{ uri: hero }}
+              style={styles.heroImg}
+              contentFit="cover"
+              transition={200}
+              caption={enterprise?.nom ?? null}
+            />
           ) : (
             <View style={[styles.heroImg, styles.heroPh]}>
               {enterprise.type === 'restaurant' ? (

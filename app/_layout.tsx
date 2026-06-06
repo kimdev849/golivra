@@ -5,7 +5,8 @@ import Constants from 'expo-constants';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform, View } from 'react-native';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { BiometricAppGate } from '@/components/biometric-app-gate';
@@ -37,7 +38,7 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-function RootNavigation({ onReady }: { onReady: () => void }) {
+function RootNavigation() {
   const { colors, isDark } = useAppTheme();
 
   useEffect(() => {
@@ -77,9 +78,7 @@ function RootNavigation({ onReady }: { onReady: () => void }) {
 
   return (
     <NavThemeProvider value={navTheme}>
-      <Stack 
-        screenOptions={stackScreenOptions(colors)}
-        onLayout={onReady}>
+      <Stack screenOptions={stackScreenOptions(colors)}>
         <Stack.Screen name="index" />
         <Stack.Screen name="auth" options={stackAuthOptions()} />
         <Stack.Screen name="forgot-password" />
@@ -135,8 +134,8 @@ function useSilentReconnectRefresh() {
 }
 
 function RootLayout() {
-  const [appReady, setAppReady] = (require('react') as any).useState(false);
-  const [splashVisible, setSplashVisible] = (require('react') as any).useState(true);
+  const [appReady, setAppReady] = useState(false);
+  const [splashVisible, setSplashVisible] = useState(true);
 
   useEffect(() => {
     const init = async () => {
@@ -151,19 +150,23 @@ function RootLayout() {
 
   useSilentReconnectRefresh();
 
+  if (!appReady) return null;
+
   return (
     <QueryClientProvider client={queryClient}>
-      <AppThemeProvider>
-        <BiometricAppGate>
-          <View style={{ flex: 1 }}>
-            {splashVisible && (
-              <CustomSplashScreen onAnimationComplete={() => setSplashVisible(false)} />
-            )}
-            <OfflineBanner />
-            <RootNavigation onReady={() => {}} />
-          </View>
-        </BiometricAppGate>
-      </AppThemeProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <AppThemeProvider>
+          <BiometricAppGate>
+            <View style={{ flex: 1 }}>
+              {splashVisible && (
+                <CustomSplashScreen onAnimationComplete={() => setSplashVisible(false)} />
+              )}
+              <OfflineBanner />
+              <RootNavigation />
+            </View>
+          </BiometricAppGate>
+        </AppThemeProvider>
+      </GestureHandlerRootView>
     </QueryClientProvider>
   );
 }

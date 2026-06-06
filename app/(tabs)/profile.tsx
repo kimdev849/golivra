@@ -1,6 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import Constants from 'expo-constants';
 import { Image } from 'expo-image';
+import { ZoomableImage } from '@/components/zoomable-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import type { LucideIcon } from 'lucide-react-native';
@@ -142,7 +143,12 @@ export default function ProfileScreen() {
                 <>
                   <View style={[styles.avatarWrap, { backgroundColor: colors.primarySoft, borderColor: colors.surface }]}>
                     {avatarUri ? (
-                      <Image source={{ uri: avatarUri }} style={styles.avatarImg} contentFit="cover" />
+                      <ZoomableImage
+                        source={{ uri: avatarUri }}
+                        style={styles.avatarImg}
+                        contentFit="cover"
+                        caption={me?.nom ?? null}
+                      />
                     ) : (
                       <User size={34} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
                     )}
