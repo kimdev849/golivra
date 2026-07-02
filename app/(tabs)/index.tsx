@@ -30,6 +30,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HomeActiveOrderWidget } from '@/components/home-active-order-widget';
+import { HomeCampaignBanner } from '@/components/home-campaign-banner';
 import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { TAB_BAR_CONTENT_PADDING_BOTTOM } from '@/constants/layout';
@@ -51,6 +52,7 @@ import { toggleFavoriteProduct } from '@/lib/favorites';
 import { productDetailHref } from '@/lib/listing-utils';
 import { getEffectiveUnitPrice } from '@/lib/product-promo';
 import { formatFcfa } from '@/lib/format';
+import { fetchActiveCampaigns } from '@/lib/campaigns';
 import { trackInteraction } from '@/lib/tracking';
 
 // ─── Constants ────────────────────────────────────────────────────
@@ -260,6 +262,14 @@ export default function HomeScreen() {
   const colors = useAppColors();
   const { unreadCount } = useUnreadNotifications();
   const { heroOrder, isLoading: loadingOrders, refetch: refetchOrders } = useActiveOrders();
+
+  // ── Campagnes marketing actives (offre du jour) ────────
+  const { data: activeCampaigns = [] } = useQuery({
+    queryKey: ['active-campaigns'],
+    queryFn: () => fetchActiveCampaigns(),
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 15,
+  });
 
   const flatListRef = useRef<FlatList>(null);
   const [search, setSearch] = useState('');
@@ -584,7 +594,18 @@ export default function HomeScreen() {
       {/* ─────────────────────────────────────────────────────
           BANNER — shown only on home (no search, no filter)
       ───────────────────────────────────────────────────── */}
-      {!searchActive && category === 'all' ? (
+      {/* ── Campagnes marketing actives (offre du jour) ── */}
+      {!searchActive && category === 'all' && activeCampaigns.length > 0 ? (
+        <HomeCampaignBanner
+          campaigns={activeCampaigns}
+          onPress={(campaign) => {
+            if (campaign.type === 'promo') {
+              handleCategoryPress('promo');
+            }
+          }}
+          colors={colors}
+        />
+      ) : !searchActive && category === 'all' ? (
         <View style={styles.bannerWrap}>
           <LinearGradient
             colors={['#0C4F36', '#155C3F']}
@@ -594,13 +615,13 @@ export default function HomeScreen() {
             {/* Text side */}
             <View style={styles.bannerTextSide}>
               <View style={styles.bannerPillWrap}>
-                <Text style={styles.bannerPillTxt}>Offre du jour</Text>
+                <Text style={styles.bannerPillTxt}>Bienvenue sur GoLivra</Text>
               </View>
-              <Text style={styles.bannerTitle}>Profitez jusqu'à{'\n'}-25% sur vos{'\n'}restaurants préférés.</Text>
+              <Text style={styles.bannerTitle}>Commandez près de{'\n'}chez vous en{'\n'}quelques clics.</Text>
               <Pressable
                 style={styles.bannerBtn}
-                onPress={() => { handleCategoryPress('promo'); }}>
-                <Text style={styles.bannerBtnTxt}>Découvrir</Text>
+                onPress={() => { handleCategoryPress('restaurant'); }}>
+                <Text style={styles.bannerBtnTxt}>Explorer</Text>
               </Pressable>
             </View>
             {/* Food image side */}
@@ -612,12 +633,6 @@ export default function HomeScreen() {
               />
             </View>
           </LinearGradient>
-          {/* Dots */}
-          <View style={styles.bannerDots}>
-            <View style={[styles.bannerDot, styles.bannerDotActive, { backgroundColor: colors.primary }]} />
-            <View style={[styles.bannerDot, { backgroundColor: colors.borderStrong }]} />
-            <View style={[styles.bannerDot, { backgroundColor: colors.borderStrong }]} />
-          </View>
         </View>
       ) : null}
 

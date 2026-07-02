@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
+import { AppToastHost } from '@/components/app-toast-host';
 import { BiometricAppGate } from '@/components/biometric-app-gate';
 import { OfflineBanner } from '@/components/offline-banner';
 import { CustomSplashScreen } from '@/components/splash-screen';
@@ -166,6 +167,7 @@ function RootLayout() {
               )}
               <OfflineBanner />
               <RootNavigation />
+              <AppToastHost />
             </View>
           </BiometricAppGate>
         </AppThemeProvider>
