@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { Bell, ChevronLeft, Package } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -87,48 +87,52 @@ export default function NotificationsScreen() {
         ) : <View style={styles.headerSpacer} />}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scroll, { paddingBottom: bottomPad }]}>
-        <ThemedText style={[styles.intro, { color: colors.textSecondary }]}>
-          Vos alertes commandes, paiements et livraisons GoLivra.{unreadCount > 0 ? ` (${unreadCount} non lue${unreadCount > 1 ? 's' : ''})` : ''}
-        </ThemedText>
-
-        {loading ? (
-          <View style={styles.loader}><ActivityIndicator size="large" color={colors.primary} /><ThemedText style={[styles.muted, { color: colors.textMuted }]}>Chargement…</ThemedText></View>
-        ) : error ? (
-          <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.errorSoft }]}>
-            <ThemedText style={[styles.errText, { color: colors.error }]}>{error}</ThemedText>
-            <Pressable style={[styles.retry, { backgroundColor: colors.primary }]} onPress={() => void load()}>
-              <ThemedText style={styles.retryText}>Réessayer</ThemedText>
-            </Pressable>
-          </View>
-        ) : items.length === 0 ? (
-          <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-            <View style={[styles.emptyIcon, { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong }]}>
-              <Bell size={28} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-            </View>
-            <ThemedText style={[styles.cardTitle, { color: colors.primaryDeep }]}>Aucune notification</ThemedText>
-            <ThemedText style={[styles.cardBody, { color: colors.textMuted }]}>Vous serez informé ici des événements importants sur vos commandes.</ThemedText>
-            <Pressable style={[styles.retry, { backgroundColor: colors.primary }]} onPress={() => router.push('/(tabs)/marketplace')}>
-              <ThemedText style={styles.retryText}>Parcourir le marketplace</ThemedText>
-            </Pressable>
-          </View>
-        ) : (
-          <View style={{ gap: 12 }}>
-            {items.map((n) => (
-              <Pressable key={n.id} style={({ pressed }) => [styles.row, { borderColor: !n.est_lue ? colors.successSoft : colors.border, backgroundColor: !n.est_lue ? colors.successSoft : colors.surface }, pressed && styles.rowPressed]} onPress={() => void handleOpen(n)} android_ripple={{ color: colors.primaryMuted }}>
-                <View style={[styles.rowIcon, { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong }]}>
-                  <Package size={22} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-                </View>
-                <View style={{ flex: 1, gap: 6 }}>
-                  <ThemedText type="defaultSemiBold" style={[styles.rowTitle, { color: colors.text }]}>{n.titre}</ThemedText>
-                  {n.corps ? <ThemedText style={[styles.body, { color: colors.textSecondary }]}>{n.corps}</ThemedText> : null}
-                  {n.created_at ? <ThemedText style={[styles.when, { color: colors.textMuted }]}>{formatWhen(n.created_at)}</ThemedText> : null}
-                </View>
+      <FlatList
+        data={items}
+        keyExtractor={(n) => n.id}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomPad }]}
+        ListHeaderComponent={
+          <ThemedText style={[styles.intro, { color: colors.textSecondary }]}>
+            Vos alertes commandes, paiements et livraisons GoLivra.{unreadCount > 0 ? ` (${unreadCount} non lue${unreadCount > 1 ? 's' : ''})` : ''}
+          </ThemedText>
+        }
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.loader}><ActivityIndicator size="large" color={colors.primary} /><ThemedText style={[styles.muted, { color: colors.textMuted }]}>Chargement…</ThemedText></View>
+          ) : error ? (
+            <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.errorSoft }]}>
+              <ThemedText style={[styles.errText, { color: colors.error }]}>{error}</ThemedText>
+              <Pressable style={[styles.retry, { backgroundColor: colors.primary }]} onPress={() => void load()}>
+                <ThemedText style={styles.retryText}>Réessayer</ThemedText>
               </Pressable>
-            ))}
-          </View>
+            </View>
+          ) : (
+            <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+              <View style={[styles.emptyIcon, { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong }]}>
+                <Bell size={28} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+              </View>
+              <ThemedText style={[styles.cardTitle, { color: colors.primaryDeep }]}>Aucune notification</ThemedText>
+              <ThemedText style={[styles.cardBody, { color: colors.textMuted }]}>Vous serez informé ici des événements importants sur vos commandes.</ThemedText>
+              <Pressable style={[styles.retry, { backgroundColor: colors.primary }]} onPress={() => router.push('/(tabs)/marketplace')}>
+                <ThemedText style={styles.retryText}>Parcourir le marketplace</ThemedText>
+              </Pressable>
+            </View>
+          )
+        }
+        renderItem={({ item: n }) => (
+          <Pressable style={({ pressed }) => [styles.row, { borderColor: !n.est_lue ? colors.successSoft : colors.border, backgroundColor: !n.est_lue ? colors.successSoft : colors.surface }, pressed && styles.rowPressed]} onPress={() => void handleOpen(n)} android_ripple={{ color: colors.primaryMuted }}>
+            <View style={[styles.rowIcon, { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong }]}>
+              <Package size={22} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+            </View>
+            <View style={{ flex: 1, gap: 6 }}>
+              <ThemedText type="defaultSemiBold" style={[styles.rowTitle, { color: colors.text }]}>{n.titre}</ThemedText>
+              {n.corps ? <ThemedText style={[styles.body, { color: colors.textSecondary }]}>{n.corps}</ThemedText> : null}
+              {n.created_at ? <ThemedText style={[styles.when, { color: colors.textMuted }]}>{formatWhen(n.created_at)}</ThemedText> : null}
+            </View>
+          </Pressable>
         )}
-      </ScrollView>
+      />
     </ThemedView>
   );
 }

@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import { safeGetItem, safeSetItem } from '@/lib/safe-store';
 import type { Href } from 'expo-router';
 
 import { getSessionToken, hydrateSessionToken } from '@/lib/auth';
@@ -22,14 +22,14 @@ export async function warmAppCaches(): Promise<void> {
 
 export async function isOnboardingComplete(): Promise<boolean> {
   try {
-    return (await SecureStore.getItemAsync(ONBOARDING_SEEN_KEY)) === '1';
+    return (await safeGetItem(ONBOARDING_SEEN_KEY)) === '1';
   } catch {
     return false;
   }
 }
 
 export async function markOnboardingComplete(): Promise<void> {
-  await SecureStore.setItemAsync(ONBOARDING_SEEN_KEY, '1');
+  await safeSetItem(ONBOARDING_SEEN_KEY, '1');
 }
 
 export async function resolveBootstrapTarget(): Promise<BootstrapTarget> {

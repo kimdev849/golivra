@@ -5,26 +5,36 @@
   },
   "build": {
     "development": {
-      "developmentClient": true,
+      "node": "22.13.1",
       "distribution": "internal",
+      "channel": "development",
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://golivraback.onrender.com"
       }
     },
     "preview": {
+      "node": "22.13.1",
       "distribution": "internal",
+      "channel": "preview",
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://golivraback.onrender.com",
-        "SENTRY_ORG": "golivra",
-        "SENTRY_PROJECT": "react-native"
+        "EXPO_PUBLIC_API_BASE_URL": "https://golivraback.onrender.com"
       }
     },
     "production": {
+      "node": "22.13.1",
       "autoIncrement": true,
+      "channel": "production",
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://golivraback.onrender.com",
-        "SENTRY_ORG": "golivra",
-        "SENTRY_PROJECT": "react-native"
+        "EXPO_PUBLIC_API_BASE_URL": "https://golivraback.onrender.com"
       }
     }
   },

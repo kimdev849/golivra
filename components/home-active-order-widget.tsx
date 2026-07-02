@@ -5,10 +5,11 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { LUCIDE_STROKE } from '@/constants/icons';
+import { ZoomableImage } from '@/components/zoomable-image';
 import { useAppColors } from '@/hooks/use-app-colors';
+import { type ClientOrderListItemZod } from '@/lib/schemas';
 import { resolveRemoteImageUrl } from '@/lib/images';
-import { compactOrderRef, orderEtaMinutes } from '@/lib/order-status';
-import type { ClientOrderListItemZod } from '@/lib/schemas';
+import { orderEtaMinutes, compactOrderRef } from '@/lib/order-status';
 import { orderStatusLabel } from '@/lib/ux-copy';
 
 type Props = {

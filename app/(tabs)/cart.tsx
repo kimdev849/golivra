@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { Info, Minus, Plus, ShoppingBag, Smartphone, Trash2, Truck } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 
 import { DeliveryAddressForm, type DeliveryAddressFormValue } from '@/components/delivery-address-form';
 import { ProductPrice } from '@/components/product-price';
@@ -143,7 +144,10 @@ export default function CartScreen() {
   }, []);
 
   const refreshMeta = useCallback(async (c: CartState | null) => {
-    void fetchPublicPricing().then(setPricing).catch(() => undefined);
+    // Ne pas re-fetch le pricing à chaque focus — TTL 60s
+    if (!pricing) {
+      void fetchPublicPricing().then(setPricing).catch(() => undefined);
+    }
     if (c && c.segments.length > 0) {
       void syncStockFromCart(c);
       void loadPrincipalAddress();
@@ -152,7 +156,7 @@ export default function CartScreen() {
       setProductById({});
       setEnterpriseById({});
     }
-  }, [syncStockFromCart, loadPrincipalAddress]);
+  }, [syncStockFromCart, loadPrincipalAddress, pricing]);
 
   useFocusEffect(
     useCallback(() => {
@@ -240,6 +244,7 @@ export default function CartScreen() {
 
   const changeQty = (enterpriseId: string, productId: string, q: number, lineStock?: number) => {
     if (!cart) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const cap = stockCap(productId, lineStock);
     const next = updateLineQuantitySync(cart, enterpriseId, productId, q, cap);
     void saveCart(next);
@@ -381,7 +386,7 @@ export default function CartScreen() {
       <FeedbackOverlay />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}>
         <ScrollView
           keyboardShouldPersistTaps="handled"
@@ -664,7 +669,7 @@ export default function CartScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
-      <FeedbackOverlay />
+      {FeedbackOverlay()}
     </ThemedView>
   );
 }

@@ -6,6 +6,7 @@ import { Plus, X } from 'lucide-react-native';
 import { ThemedText } from '@/components/themed-text';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import type { AppPalette } from '@/constants/app-palette';
+import { ZoomableImage } from '@/components/zoomable-image';
 
 export const MAX_GALLERY_PHOTOS = 8;
 
@@ -126,7 +127,7 @@ export function VendorPhotoGalleryField({
         style={[styles.hero, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
         onPress={() => void onPickMain()}>
         {mainUri ? (
-          <Image source={{ uri: mainUri }} style={styles.heroImg} contentFit="cover" />
+          <ZoomableImage source={{ uri: mainUri }} style={styles.heroImg} contentFit="cover" />
         ) : (
           <View style={styles.heroEmpty}>
             <Plus size={28} color={accent} strokeWidth={LUCIDE_STROKE} />
@@ -140,7 +141,7 @@ export function VendorPhotoGalleryField({
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {gallery.map((g, i) => (
           <View key={`${g.uri}-${i}`} style={styles.thumbWrap}>
-            <Image source={{ uri: g.uri }} style={styles.thumb} contentFit="cover" />
+            <ZoomableImage source={{ uri: g.uri }} style={styles.thumb} contentFit="cover" />
             <Pressable style={styles.thumbRemove} onPress={() => onRemoveGallery(i)} hitSlop={6}>
               <X size={14} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
             </Pressable>

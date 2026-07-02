@@ -1,5 +1,5 @@
 import * as LocalAuthentication from 'expo-local-authentication';
-import * as SecureStore from 'expo-secure-store';
+import { safeGetItem, safeSetItem, safeDeleteItem } from '@/lib/safe-store';
 import { Platform } from 'react-native';
 
 const BIOMETRIC_ENABLED_KEY = 'golivra_biometric_lock_enabled';
@@ -18,7 +18,7 @@ export async function isBiometricHardwareAvailable(): Promise<boolean> {
 export async function getBiometricLockEnabled(): Promise<boolean> {
   if (Platform.OS === 'web') return false;
   try {
-    const v = await SecureStore.getItemAsync(BIOMETRIC_ENABLED_KEY);
+    const v = await safeGetItem(BIOMETRIC_ENABLED_KEY);
     return v === '1';
   } catch {
     return false;
@@ -30,10 +30,10 @@ export async function setBiometricLockEnabled(enabled: boolean): Promise<void> {
   if (enabled) {
     const ok = await promptBiometricUnlock('Activez Face ID / empreinte pour GoLivra');
     if (!ok) throw new Error('Authentification biométrique refusée.');
-    await SecureStore.setItemAsync(BIOMETRIC_ENABLED_KEY, '1');
+    await safeSetItem(BIOMETRIC_ENABLED_KEY, '1');
     return;
   }
-  await SecureStore.deleteItemAsync(BIOMETRIC_ENABLED_KEY);
+    await safeDeleteItem(BIOMETRIC_ENABLED_KEY);
 }
 
 export async function promptBiometricUnlock(reason: string): Promise<boolean> {
@@ -64,7 +64,7 @@ export async function biometricLockLabel(): Promise<string> {
 export async function clearBiometricLockOnLogout(): Promise<void> {
   if (Platform.OS === 'web') return;
   try {
-    await SecureStore.deleteItemAsync(BIOMETRIC_ENABLED_KEY);
+  await safeDeleteItem(BIOMETRIC_ENABLED_KEY);
   } catch {
     /* ignore */
   }

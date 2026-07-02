@@ -95,12 +95,6 @@ export function installGlobalErrorReporting(): void {
       severity: 'error',
       metadata: { isFatal: Boolean(isFatal) },
     });
-    try {
-      const Sentry = require('@sentry/react-native');
-      Sentry.captureException(error);
-    } catch {
-      /* Sentry optionnel */
-    }
     previous?.(error, isFatal);
   });
 }

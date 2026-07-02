@@ -1,0 +1,62 @@
+﻿node.exe : Ôÿà eas-cli@20.1.0 is now available.
+Au caractère Ligne:1 : 1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Ôÿà eas-cli@20.1.0 is now available.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+To upgrade, run:
+npm install -g eas-cli
+Proceeding with outdated version.
+
+- Fetching the buildÔÇª
+ÔêÜ Found a matching build for the project @kimjaver/golivra
+{
+  "id": "ab3c9656-56c2-46ec-8ca1-727893d8a01d",
+  "status": "ERRORED",
+  "platform": "ANDROID",
+  "error": {
+    "errorCode": "EAS_BUILD_UNKNOWN_GRADLE_ERROR",
+    "message": "Gradle build failed with unknown error. See logs for the \"Run gradlew\" phase for more information."
+  },
+  "artifacts": {},
+  "fingerprint": {
+    "id": "019ec022-08bf-7e49-b55f-60eb904f31c5",
+    "hash": "e64d403023a865d7f6c8da0da5bf7d0f625c90c8"
+  },
+  "initiatingActor": {
+    "id": "3d8efb37-a176-4867-b31b-4d82a9c35a13",
+    "displayName": "kimjaver"
+  },
+  "logFiles": [
+    "https://storage.googleapis.com/eas-workflows-production/logs/e05e349a-fb96-4adb-ae4c-e8be602b1537/ab3c9656-56c2-46ec-8ca1-727893d8a01d/2026-06-13T08%3A38%3A39Z-f5e4501c-2927-4678-8034-3d7b64cfe15e.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260613%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260613T094304Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=1cca5d3db7c21e8711dbfc4709b0c8f6decaad45e1fac03ca3ccebc2bf8029fc6a504e224d84cac428f57a2a98d2d4425709513a69d76a95096111082720d27ef9206ea083878ba44c594de98a32dad933100b997118be49aad61137540cde1f9f23b208cd18e2b9be1002c37befc8c6e05116486cd296a742450eb3a832921999f4df9f8f98d51329dfe4e331919c3d828693bb804815e0ba326f4c34f2a8e6b0a6fce9cb63071e5a980546dbf8358567880511ade5bcded73b9d23ffc2b57df630ff4a5e4db76a8f9ef540de6ed006ec31b94d0a8efc4bce41cdb31e47974b6573fedb484fef14d6d506cdf716d9ca7189f9bdca27b1e36399d9322369ec58"
+  ],
+  "project": {
+    "id": "e05e349a-fb96-4adb-ae4c-e8be602b1537",
+    "name": "golivra",
+    "slug": "golivra",
+    "ownerAccount": {
+      "id": "ef704f4b-a246-47ef-86a3-6e64a2ecaefb",
+      "name": "kimjaver"
+    }
+  },
+  "distribution": "INTERNAL",
+  "buildProfile": "preview",
+  "sdkVersion": "54.0.0",
+  "appVersion": "1.0.0",
+  "appBuildVersion": "2",
+  "runtimeVersion": "1.0.0",
+  "gitCommitHash": "1590105011b58933d78c11068a371e0eb5bfca92",
+  "gitCommitMessage": "fix(signup): affiche le bouton Retour aussi pour l'inscription client\n\nLe bloc d'en-t├¬te du SignupScreenBase conditionnait l'affichage du\nbouton Retour sur variant !== 'default', ce qui le masquait pour\nl'inscription client (variant='default' dans SignupClientOnlyScreen)\nalors qu'il ├®tait visible pour les variants 'boutique' et 'restaurant'.\n\nLe bouton n'a aucune raison d'├¬tre d├®pendant du variant : tous les\n├®crans d'inscription doivent permettre de revenir ├á /auth.\nSuppression de la condition pour rendre le bouton inconditionnel.",
+  "priority": "NORMAL",
+  "createdAt": "2026-06-13T08:38:36.435Z",
+  "updatedAt": "2026-06-13T08:45:24.086Z",
+  "completedAt": "2026-06-13T08:45:23.915Z",
+  "expirationDate": "2026-06-27T08:38:36.473Z",
+  "isForIosSimulator": false,
+  "metrics": {
+    "buildWaitTime": 2625,
+    "buildQueueTime": 4447,
+    "buildDuration": 400408
+  }
+}

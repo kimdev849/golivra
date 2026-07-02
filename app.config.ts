@@ -13,21 +13,6 @@ function normalizeApiOrigin(raw: string | undefined): string {
 const apiBaseUrl = normalizeApiOrigin(process.env.EXPO_PUBLIC_API_BASE_URL);
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? '';
-const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN?.trim() ?? '';
-const sentryOrg = process.env.SENTRY_ORG?.trim() || 'golivra';
-const sentryProject = process.env.SENTRY_PROJECT?.trim() || 'react-native';
-
-type PluginEntry = string | [string] | [string, Record<string, unknown>];
-
-function withoutSentryPlugin(plugins: ExpoConfig['plugins']): PluginEntry[] {
-  const list: PluginEntry[] = Array.isArray(plugins)
-    ? (plugins as PluginEntry[])
-    : [];
-  return list.filter((p) => {
-    if (p === '@sentry/react-native') return false;
-    return !(Array.isArray(p) && p[0] === '@sentry/react-native');
-  });
-}
 
 /** Autorise HTTP uniquement en dev local (émulateur / LAN). Jamais en build EAS production. */
 const allowCleartext =
@@ -42,17 +27,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ...base,
     name: 'GoLivra',
     slug: base.slug ?? 'golivra',
-    plugins: [
-      ...withoutSentryPlugin(base.plugins),
-      [
-        '@sentry/react-native',
-        {
-          organization: sentryOrg,
-          project: sentryProject,
-          url: 'https://de.sentry.io/',
-        },
-      ],
-    ],
     android: {
       ...base.android,
       package: base.android?.package ?? 'kimjaver.golivra',
@@ -69,7 +43,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       apiBaseUrl,
       supabaseUrl,
       supabaseAnonKey,
-      sentryDsn,
       eas: {
         ...(typeof base.extra === 'object' && base.extra && 'eas' in base.extra
           ? (base.extra as { eas?: object }).eas

@@ -1,9 +1,8 @@
-# Configuration Temps Réel & Sentry - GoLivra
+# Configuration Temps Réel - GoLivra
 
 ## ✅ Ce qui a été fait
 
 ### 1. Installation des dépendances
-- `@sentry/react-native` : Suivi des erreurs
 - `@supabase/supabase-js` : Client Supabase pour le temps réel
 - `react-native-url-polyfill` : Polyfill URL pour React Native
 
@@ -23,15 +22,14 @@ Hook React pour écouter les commandes en temps réel.
 ### 3. Fichiers modifiés
 
 #### `app/_layout.tsx`
-- Initialisation de Sentry avec le DSN configuré
-- Capture automatique des erreurs en production
+- Initialisation globale de l'application
 
 #### `app/vendor/(tabs)/orders.tsx`
 - Intégration du hook `useRealtimeOrders`
 - Les commandes se mettent à jour automatiquement sans rafraîchissement manuel
 
 #### `.env.local` et `.env.example`
-- Ajout des variables `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_SENTRY_DSN`
+- Ajout des variables `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`
 
 ---
 
@@ -56,17 +54,7 @@ Hook React pour écouter les commandes en temps réel.
    EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR...
    ```
 
-### Étape 2 : Configurer Sentry (Optionnel mais recommandé)
-
-1. Crée un compte sur [sentry.io](https://sentry.io)
-2. Crée un projet **React Native**
-3. Copie le **DSN** fourni
-4. Mets à jour `.env.local` :
-   ```bash
-   EXPO_PUBLIC_SENTRY_DSN=https://ton-dsn@sentry.io/123456
-   ```
-
-### Étape 3 : Redémarrer l'application
+### Étape 2 : Redémarrer l'application
 
 ```bash
 # Arrête le serveur Expo
@@ -87,17 +75,6 @@ npx expo start -c
    - Le hook reçoit l'événement et appelle `refresh()`
    - L'écran se met à jour **automatiquement** (plus besoin de bouton "Rafraîchir")
 
-### Sentry (Erreurs)
-1. Si l'application plante chez un utilisateur
-2. Sentry capture l'erreur avec la stack trace
-3. Tu reçois une notification sur [sentry.io](https://sentry.io)
-4. Tu peux voir :
-   - L'erreur exacte
-   - L'appareil et la version OS
-   - L'écran où c'est arrivé
-   - Les actions de l'utilisateur avant le crash
-
----
 
 ## 🧪 Tester le temps réel
 
@@ -114,7 +91,6 @@ npx expo start -c
 
 - Le temps réel ne fonctionne que si l'entreprise est connectée (`shop?.id`)
 - Le hook se désabonne automatiquement quand on quitte l'écran (pas de fuite de mémoire)
-- Sentry n'est actif qu'en production (`NODE_ENV === 'production'`)
 - Les variables d'environnement doivent être définies dans `.env.local` (dev) ou EAS Secrets (build)
 
 ---
@@ -123,7 +99,6 @@ npx expo start -c
 
 - [ ] Ajouter le temps réel sur le **Dashboard Vendeur** (`app/vendor/(tabs)/index.tsx`)
 - [ ] Ajouter le temps réel pour les **livraisons** (`app/vendor/(tabs)/deliveries.tsx`)
-- [ ] Configurer les **alertes Sentry** (email/SMS en cas d'erreur critique)
 - [ ] Ajouter des **tests** pour le hook `useRealtimeOrders`
 
 ---
@@ -139,7 +114,3 @@ npx expo start -c
 2. Vérifie que `enterprise_id` est bien filtré
 3. Regarde la console : tu devrais voir `🔔 Realtime: Changement détecté...`
 
-### Sentry ne remonte rien
-- Vérifie que `NODE_ENV === 'production'` (ou retire cette condition pour tester en dev)
-- Vérifie que le DSN est correct
-- Fais un test avec `Sentry.captureMessage('Test')`

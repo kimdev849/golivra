@@ -1,7 +1,5 @@
-import * as Sentry from '@sentry/react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider as NavThemeProvider } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import Constants from 'expo-constants';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -25,15 +23,6 @@ import {
   handleInitialNotification,
 } from '@/lib/notifications-service';
 
-const sentryDsn =
-  process.env.EXPO_PUBLIC_SENTRY_DSN?.trim() ||
-  String((Constants.expoConfig?.extra as { sentryDsn?: string } | undefined)?.sentryDsn ?? '').trim();
-
-Sentry.init({
-  dsn: sentryDsn || undefined,
-  tracesSampleRate: 1.0,
-  enabled: Boolean(sentryDsn) && !__DEV__,
-});
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -159,15 +148,12 @@ function RootLayout() {
 
   useSilentReconnectRefresh();
 
-  if (!appReady) return null;
-
   const handleSplashDone = useCallback(() => {
     setSplashVisible(false);
-    // Notifie expo-splash-screen qu'on peut masquer le splash natif. Cela
-    // libère le keep-awake interne et évite l'erreur "Unable to activate
-    // keep awake" au prochain démarrage ou reload Metro.
     SplashScreen.hideAsync().catch(() => {});
   }, []);
+
+  if (!appReady) return null;
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -188,5 +174,5 @@ function RootLayout() {
   );
 }
 
-export default Sentry.wrap(RootLayout);
+export default RootLayout;
 

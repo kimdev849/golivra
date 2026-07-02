@@ -1,20 +1,13 @@
-const path = require('path');
 const { getDefaultConfig } = require('expo/metro-config');
-const { resolve } = require('metro-resolver');
 
-/** Metro web/Android fails to resolve lucide's ESM barrel (`*.mjs` subpaths). Force the CJS entry. */
-const lucideReactNativeMain = path.resolve(
-  __dirname,
-  'node_modules/lucide-react-native/dist/cjs/lucide-react-native.js'
-);
-
+/** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
 
-config.resolver.resolveRequest = (context, moduleName, platform) => {
-  if (moduleName === 'lucide-react-native') {
-    return { type: 'sourceFile', filePath: lucideReactNativeMain };
-  }
-  return resolve(context, moduleName, platform);
-};
+// lucide-react-native et autres paquets ESM
+if (!config.resolver.sourceExts.includes('mjs')) {
+  config.resolver.sourceExts.push('mjs');
+}
+// Compatibilité Metro + certaines libs (lucide, etc.)
+config.resolver.unstable_enablePackageExports = false;
 
 module.exports = config;

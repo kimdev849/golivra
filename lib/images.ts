@@ -1,10 +1,17 @@
+export type ResizeOptions = {
+  width?: number;
+  height?: number;
+  quality?: number;
+  format?: 'webp' | 'origin';
+};
+
 /**
- * URL affichable pour Expo Image (HTTP/S ou data URL renvoyée par l’API).
+ * URL affichable pour Expo Image (HTTP/S ou data URL renvoyée par l'API).
  * Inclut le support pour le redimensionnement dynamique via Supabase Storage.
  */
 export function resolveRemoteImageUrl(
   url: string | null | undefined,
-  options?: { width?: number; height?: number; quality?: number; format?: 'webp' | 'origin' }
+  options?: ResizeOptions
 ): string | null {
   if (!url?.trim()) return null;
   const u = url.trim();

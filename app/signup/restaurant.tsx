@@ -1,4 +1,4 @@
-import { SignupCommerceScreen } from '@/app/signup';
+import { SignupCommerceScreen } from '../signup';
 
 export default function RestaurantSignupScreen() {
   return <SignupCommerceScreen kind="restaurant" />;

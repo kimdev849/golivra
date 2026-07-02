@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { VendorMenuItemFormWizard } from '@/components/vendor-menu-item-form-wizard';
@@ -9,6 +9,7 @@ import { VendorScreenHeader } from '@/components/vendor-screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useVendor } from '@/contexts/vendor-context';
+import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
 import { getSessionToken } from '@/lib/auth';
 import { menuItemToFormValues } from '@/lib/vendor-menu-item-form-init';
@@ -96,25 +97,26 @@ function BoutiqueProductEdit({
   onDelete: () => Promise<void>;
 }) {
   const router = useRouter();
+  const { showConfirm, showError, FeedbackOverlay } = useActionFeedback();
   const initialValues = useMemo(() => productToFormValues(existing), [existing]);
 
   const confirmDelete = () => {
-    Alert.alert('Supprimer', `Supprimer « ${existing.nom} » ?`, [
-      { text: 'Annuler', style: 'cancel' },
-      {
-        text: 'Supprimer',
-        style: 'destructive',
-        onPress: () => {
-          void onDelete().catch((e: unknown) =>
-            Alert.alert('Erreur', e instanceof Error ? e.message : 'Échec'),
-          );
-        },
+    showConfirm({
+      title: 'Supprimer',
+      message: `Supprimer « ${existing.nom} » ?`,
+      primaryLabel: 'Supprimer',
+      secondaryLabel: 'Annuler',
+      onPrimary: () => {
+        void onDelete().catch((e: unknown) =>
+          showError('Erreur', e instanceof Error ? e.message : 'Échec'),
+        );
       },
-    ]);
+    });
   };
 
   return (
     <ThemedView style={styles.screen}>
+      <FeedbackOverlay />
       <VendorScreenHeader title="Modifier le produit" />
       <View style={{ flex: 1 }}>
         <VendorProductFormWizard
@@ -152,25 +154,26 @@ function RestaurantMenuItemEdit({
   onDelete: () => Promise<void>;
 }) {
   const router = useRouter();
+  const { showConfirm, showError, FeedbackOverlay } = useActionFeedback();
   const initialValues = useMemo(() => menuItemToFormValues(existing), [existing]);
 
   const confirmDelete = () => {
-    Alert.alert('Supprimer', `Supprimer « ${existing.nom} » ?`, [
-      { text: 'Annuler', style: 'cancel' },
-      {
-        text: 'Supprimer',
-        style: 'destructive',
-        onPress: () => {
-          void onDelete().catch((e: unknown) =>
-            Alert.alert('Erreur', e instanceof Error ? e.message : 'Échec'),
-          );
-        },
+    showConfirm({
+      title: 'Supprimer',
+      message: `Supprimer « ${existing.nom} » ?`,
+      primaryLabel: 'Supprimer',
+      secondaryLabel: 'Annuler',
+      onPrimary: () => {
+        void onDelete().catch((e: unknown) =>
+          showError('Erreur', e instanceof Error ? e.message : 'Échec'),
+        );
       },
-    ]);
+    });
   };
 
   return (
     <ThemedView style={styles.screen}>
+      <FeedbackOverlay />
       <VendorScreenHeader title="Modifier le plat" />
       <View style={{ flex: 1 }}>
         <VendorMenuItemFormWizard

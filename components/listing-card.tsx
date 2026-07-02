@@ -9,6 +9,7 @@ import type { ProductPublic } from '@/lib/catalog';
 import { formatFcfa } from '@/lib/format';
 import { getProductPhotoCount, getProductPrimaryImage, productKind } from '@/lib/listing-utils';
 import { getEffectiveUnitPrice } from '@/lib/product-promo';
+import type { ResizeOptions } from '@/lib/images';
 
 type Props = {
   product: ProductPublic;
@@ -25,14 +26,16 @@ type Props = {
 export function ListingCard({ product, onPress, isFav = false, onToggleFav, variant = 'grid' }: Props) {
   const colors = useAppColors();
   const kind = productKind(product);
-  const image = getProductPrimaryImage(product);
-  const photoCount = getProductPhotoCount(product);
+  const isGrid = variant === 'grid';
+  const isFeed = variant === 'feed';
+  const imgWidth = isGrid ? 350 : isFeed ? 600 : 400;
+  const imgOpts: ResizeOptions = { width: imgWidth, format: 'webp', quality: 80 };
+  const image = getProductPrimaryImage(product, imgOpts);
+  const photoCount = getProductPhotoCount(product, imgOpts);
   const basePrice = Number(getEffectiveUnitPrice(product) ?? product.prix ?? 0);
   const isPromo =
     product.prix_promo != null && Number(product.prix_promo) < Number(product.prix);
   const PlaceholderIcon = kind === 'article' ? Store : UtensilsCrossed;
-  const isGrid = variant === 'grid';
-  const isFeed = variant === 'feed';
 
   return (
     <Pressable
@@ -56,7 +59,7 @@ export function ListingCard({ product, onPress, isFav = false, onToggleFav, vari
           { backgroundColor: colors.primarySoft },
         ]}>
         {image ? (
-          <Image source={{ uri: image }} style={styles.image} contentFit="cover" transition={200} />
+          <Image source={{ uri: image }} style={styles.image} contentFit="cover" transition={200} recyclingKey={image} />
         ) : (
           <View style={styles.imagePlaceholder}>
             <PlaceholderIcon size={isGrid ? 28 : 36} color={colors.primary} strokeWidth={1.2} />

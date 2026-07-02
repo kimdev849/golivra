@@ -9,11 +9,25 @@ const DISK_CACHE_KEY = 'golivra_persistent_cache_v1';
 let diskHydrated = false;
 let diskWriteTimer: ReturnType<typeof setTimeout> | null = null;
 
+/** Taille max du cache mémoire (en nombre d'entrées). Au-delà, les plus anciennes sont évincées. */
+const MAX_CACHE_ENTRIES = 200;
+
+function evictIfNeeded(): void {
+  if (store.size <= MAX_CACHE_ENTRIES) return;
+  // Trier par date et supprimer les plus anciennes
+  const entries = Array.from(store.entries()).sort((a, b) => a[1].at - b[1].at);
+  const toRemove = entries.slice(0, store.size - MAX_CACHE_ENTRIES);
+  for (const [key] of toRemove) {
+    store.delete(key);
+  }
+}
+
 function shouldPersistToDisk(key: string): boolean {
   return (
     key.startsWith('enterprises:') ||
     key.startsWith('enterprise:') ||
     key.startsWith('products:') ||
+    key.startsWith('product:') ||
     key.startsWith('categories:') ||
     key.startsWith('auth:me:') ||
     key.startsWith('orders:')
@@ -67,6 +81,7 @@ export function peekCached<T>(key: string, ttlMs?: number): T | null {
 
 export function setCached<T>(key: string, data: T): void {
   store.set(key, { data, at: Date.now() });
+  evictIfNeeded();
   if (shouldPersistToDisk(key)) scheduleDiskFlush();
 }
 

@@ -206,6 +206,17 @@ export async function fetchProductsForEnterprise(enterpriseId: string, force = f
   return fetchProductsForEnterpriseCached(enterpriseId, force);
 }
 
+/** Cache en mémoire pour les produits individuels (révisite instantanée). */
+const productMemoryCache = new Map<string, { data: ProductPublic; at: number }>();
+const PRODUCT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+export function peekProductById(productId: string): ProductPublic | null {
+  const hit = productMemoryCache.get(productId);
+  if (!hit) return null;
+  if (Date.now() - hit.at > PRODUCT_CACHE_TTL) return null;
+  return hit.data;
+}
+
 /**
  * Fetch un produit par son id (cross-commerces) avec une seule requete.
  * Si on connait deja l'entreprise, preferer fetchProductsForEnterprise
@@ -219,10 +230,21 @@ export async function fetchProductById(
   if (enterpriseId) {
     const fromEnterprise = await fetchProductsForEnterprise(enterpriseId);
     const found = fromEnterprise.find((p) => p.id === productId);
-    if (found) return found;
+    if (found) {
+      productMemoryCache.set(productId, { data: found, at: Date.now() });
+      return found;
+    }
   }
+  // Vérifier le cache mémoire d'abord
+  const cached = peekProductById(productId);
+  if (cached) return cached;
+
   const list = await fetchProductFeed({ type: kind, limit: 200 });
-  return list.find((p) => p.id === productId) ?? null;
+  const found = list.find((p) => p.id === productId);
+  if (found) {
+    productMemoryCache.set(productId, { data: found, at: Date.now() });
+  }
+  return found ?? null;
 }
 
 /**

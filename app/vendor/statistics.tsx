@@ -342,10 +342,6 @@ function EngagementCard({
   );
 }
 
-const Package = ({ size, color, strokeWidth }: any) => (
-  <ShoppingBag size={size} color={color} strokeWidth={strokeWidth} />
-);
-
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   dd: { 

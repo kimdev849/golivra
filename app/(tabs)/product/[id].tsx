@@ -1,12 +1,11 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -22,19 +21,24 @@ import {
   ShoppingCart,
   Store,
   UtensilsCrossed,
+  X,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { useQuery } from '@tanstack/react-query';
 
-import { ScreenEmptyState, ScreenLoadState } from '@/components/screen-load-state';
+import { GalleryViewer } from '@/components/gallery-viewer';
+import { ScreenEmptyState } from '@/components/screen-load-state';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { DETAIL_SCREEN_PADDING_BOTTOM } from '@/constants/layout';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
-import { fetchProductById, trackProductClick, type ProductPublic } from '@/lib/catalog';
+import { fetchProductById, peekProductById, trackProductClick, type ProductPublic } from '@/lib/catalog';
 import { trackInteraction } from '@/lib/tracking';
-import { resolveRemoteImageUrl } from '@/lib/images';
+import { resolveRemoteImageUrl, type ResizeOptions } from '@/lib/images';
 import { getEffectiveUnitPrice } from '@/lib/product-promo';
 import { formatFcfa } from '@/lib/format';
 import {
@@ -44,6 +48,10 @@ import {
 } from '@/lib/product-stock';
 import { addProductToCartPrompt } from '@/lib/cart-local';
 import { isFavoriteProduct, toggleFavoriteProduct } from '@/lib/favorites';
+import { getProductGalleryUrls } from '@/lib/listing-utils';
+
+const IMG_HERO: ResizeOptions = { width: 800, format: 'webp', quality: 85 };
+const IMG_THUMB: ResizeOptions = { width: 200, format: 'webp', quality: 80 };
 
 type SelectedOptionChoice = { groupIndex: number; choiceIndex: number };
 
@@ -67,7 +75,6 @@ export default function ProductDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
-  const { width: windowWidth } = useWindowDimensions();
   const { showSuccess, showError, FeedbackOverlay } = useActionFeedback();
   const params = useLocalSearchParams<{ id: string; kind?: string }>();
 
@@ -75,76 +82,47 @@ export default function ProductDetailScreen() {
   const kindParam = typeof params.kind === 'string' ? params.kind.toLowerCase() : '';
   const kind: 'plat' | 'article' = kindParam === 'article' ? 'article' : 'plat';
 
-  const [product, setProduct] = useState<ProductPublic | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [isFav, setIsFav] = useState(false);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [selectedOptions, setSelectedOptions] = useState<SelectedOptionChoice[]>([]);
   const [note, setNote] = useState('');
-
   const [selectedGalleryIndex, setSelectedGalleryIndex] = useState(0);
 
-  useEffect(() => {
-    if (product) {
-      void trackInteraction({
-        type: 'view_product',
-        targetId: product.id,
-        targetType: 'product',
-        categoryId: product.categorie_id ?? undefined,
-      });
-    }
-  }, [product]);
-
-  const load = useCallback(
-    async (force = false) => {
-      if (!productId) return;
-      setError(null);
-      
-      // Tentative de récupération depuis le cache via l'entreprise si connue
-      const cached = product; // Déjà chargé ou en mémoire
-      if (!cached && !force) setLoading(true);
-
-      try {
-        const p = await fetchProductById(productId, kind);
-        if (p) {
-          setProduct(p);
-          const fav = await isFavoriteProduct(p.id, kind);
-          setIsFav(fav);
-          void trackProductClick(p.entreprise_id, p.id);
-        }
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Produit introuvable.');
-      } finally {
-        setLoading(false);
-      }
+  const { data: product, isLoading, error } = useQuery({
+    queryKey: ['product', productId, kind],
+    queryFn: async () => {
+      // Utiliser l'enterprise_id du cache mémoire pour accélérer (évite le scan complet du feed)
+      const cached = peekProductById(productId);
+      const p = await fetchProductById(productId, kind, cached?.entreprise_id);
+      return p ?? Promise.reject(new Error('Produit introuvable.'));
     },
-    [productId, kind, product],
-  );
+    staleTime: 1000 * 60 * 3,
+    placeholderData: () => peekProductById(productId) ?? undefined,
+    enabled: !!productId,
+  });
 
+  const trackedProductId = useRef<string | null>(null);
   useEffect(() => {
-    // Reset state when product changes to avoid "flash" of previous product
-    setProduct(null);
-    setLoading(true);
-    setQuantity(1);
-    setSelectedOptions([]);
-    setNote('');
-    setSelectedGalleryIndex(0);
-    void load();
-  }, [productId, kind]); // Removed load from dependencies to avoid infinite loop if it's not stable
+    if (!product) return;
+    if (trackedProductId.current === product.id) return;
+    trackedProductId.current = product.id;
+    void (async () => {
+      const fav = await isFavoriteProduct(product.id, kind);
+      setIsFav(fav);
+    })();
+    void trackInteraction({
+      type: 'view_product',
+      targetId: product.id,
+      targetType: 'product',
+      categoryId: product.categorie_id ?? undefined,
+    });
+  }, [product, kind]);
 
   const galleryImages = useMemo(() => {
     if (!product) return [] as string[];
-    const list: string[] = [];
-    if (product.image_url) list.push(product.image_url);
-    if (Array.isArray(product.images_urls)) {
-      for (const u of product.images_urls) {
-        if (u && !list.includes(u)) list.push(u);
-      }
-    }
-    return list;
+    return getProductGalleryUrls(product, IMG_HERO);
   }, [product]);
 
   const basePrice = product ? Number(getEffectiveUnitPrice(product) ?? product.prix ?? 0) : 0;
@@ -197,21 +175,21 @@ export default function ProductDetailScreen() {
     });
   };
 
-  if (loading) {
+  if (isLoading && !product) {
     return (
       <ThemedView style={[styles.screen, { backgroundColor: colors.background }]}>
-        <ScreenLoadState message="Chargement du produit…" />
+        <ProductDetailSkeleton colors={colors} />
         {FeedbackOverlay()}
       </ThemedView>
     );
   }
 
-  if (error || !product) {
+  if ((error || !product) && !isLoading) {
     return (
       <ThemedView style={[styles.screen, { backgroundColor: colors.background }]}>
         <ScreenEmptyState
           title="Produit introuvable"
-          body={error || "Ce produit n'existe plus ou a été retiré."}
+          body={error instanceof Error ? error.message : "Ce produit n'existe plus ou a été retiré."}
           retryLabel="Retour à l'accueil"
           onRetry={() => router.replace('/(tabs)')}
         />
@@ -219,6 +197,8 @@ export default function ProductDetailScreen() {
       </ThemedView>
     );
   }
+
+  if (!product) return null;
 
   const EnterpriseBadge = () => (
     <Pressable
@@ -231,7 +211,7 @@ export default function ProductDetailScreen() {
       <View style={[styles.vendorIcon, { backgroundColor: colors.primarySoft }]}>
         {product.enterprise_image_url ? (
           <Image
-            source={{ uri: resolveRemoteImageUrl(product.enterprise_image_url) || undefined }}
+            source={{ uri: resolveRemoteImageUrl(product.enterprise_image_url, { width: 80, format: 'webp', quality: 80 }) || undefined }}
             style={styles.vendorIconImg}
             contentFit="cover"
           />
@@ -271,10 +251,11 @@ export default function ProductDetailScreen() {
               }}>
               <Image
                 key={`${productId}-${selectedGalleryIndex}`}
-                source={{ uri: resolveRemoteImageUrl(galleryImages[selectedGalleryIndex]) || undefined }}
+                source={{ uri: galleryImages[selectedGalleryIndex] }}
                 style={styles.heroImg}
                 contentFit="cover"
                 transition={200}
+                recyclingKey={galleryImages[selectedGalleryIndex]}
               />
             </Pressable>
           ) : (
@@ -340,9 +321,11 @@ export default function ProductDetailScreen() {
                   { borderColor: i === selectedGalleryIndex ? colors.primary : 'transparent' },
                 ]}>
                 <Image
-                  source={{ uri: resolveRemoteImageUrl(u) || undefined }}
+                  source={{ uri: u }}
                   style={styles.thumbImg}
                   contentFit="cover"
+                  recyclingKey={u}
+                  transition={150}
                 />
               </Pressable>
             ))}
@@ -531,41 +514,14 @@ export default function ProductDetailScreen() {
         </Pressable>
       </View>
 
-      {/* gallery modal */}
-      {galleryOpen ? (
-        <View style={[styles.galleryOverlay, { backgroundColor: 'rgba(0,0,0,0.96)' }]}>
-          <Pressable
-            style={[styles.galleryClose, { top: insets.top + 8 }]}
-            onPress={() => setGalleryOpen(false)}>
-            <ThemedText style={styles.galleryCloseTxt}>Fermer</ThemedText>
-          </Pressable>
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            contentOffset={{ x: galleryIndex * windowWidth, y: 0 }}
-            onMomentumScrollEnd={(e) => {
-              const x = e.nativeEvent.contentOffset.x;
-              const w = e.nativeEvent.layoutMeasurement.width;
-              if (w > 0) setGalleryIndex(Math.round(x / w));
-            }}>
-            {galleryImages.map((u, i) => (
-              <View key={`g-${i}`} style={[styles.gallerySlide, { width: windowWidth }]}>
-                <Image
-                  source={{ uri: resolveRemoteImageUrl(u) || undefined }}
-                  style={styles.galleryImg}
-                  contentFit="contain"
-                />
-              </View>
-            ))}
-          </ScrollView>
-          {galleryImages.length > 1 ? (
-            <ThemedText style={styles.galleryCounter}>
-              {galleryIndex + 1} / {galleryImages.length}
-            </ThemedText>
-          ) : null}
-        </View>
-      ) : null}
+      {/* gallery modal plein écran (swipe + zoom) */}
+      <GalleryViewer
+        visible={galleryOpen}
+        images={galleryImages}
+        initialIndex={galleryIndex}
+        caption={product?.nom ?? null}
+        onClose={() => setGalleryOpen(false)}
+      />
       {FeedbackOverlay()}
     </ThemedView>
   );
@@ -740,36 +696,43 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   addBtnTxt: { fontSize: 15, fontWeight: '800' },
-  galleryOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 50,
-  },
-  galleryClose: {
-    position: 'absolute',
-    right: 16,
-    zIndex: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 999,
-  },
-  galleryCloseTxt: { color: '#FFF', fontWeight: '700', fontSize: 13 },
-  gallerySlide: { width: 400, alignItems: 'center', justifyContent: 'center' },
-  galleryImg: { width: '100%', height: '100%' },
-  galleryCounter: {
-    position: 'absolute',
-    bottom: 32,
-    alignSelf: 'center',
-    color: '#FFF',
-    fontWeight: '700',
-    fontSize: 14,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
 });
+
+function ProductDetailSkeleton({ colors }: { colors: ReturnType<typeof useAppColors> }) {
+  return (
+    <ScrollView showsVerticalScrollIndicator={false}>
+      {/* Hero image skeleton */}
+      <Skeleton width="100%" height={360} borderRadius={0} />
+      {/* Thumbnails */}
+      <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10 }}>
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} width={60} height={60} borderRadius={10} />
+        ))}
+      </View>
+      <View style={{ padding: 18, gap: 18 }}>
+        {/* Title */}
+        <Skeleton width="85%" height={24} borderRadius={6} />
+        <Skeleton width="40%" height={22} borderRadius={6} />
+        {/* Vendor */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Skeleton width={40} height={40} borderRadius={20} />
+          <View style={{ gap: 6, flex: 1 }}>
+            <Skeleton width="60%" height={14} borderRadius={4} />
+            <Skeleton width="40%" height={12} borderRadius={4} />
+          </View>
+        </View>
+        {/* Description */}
+        <View style={{ gap: 8 }}>
+          <Skeleton width="35%" height={16} borderRadius={4} />
+          <Skeleton width="100%" height={14} borderRadius={4} />
+          <Skeleton width="90%" height={14} borderRadius={4} />
+          <Skeleton width="65%" height={14} borderRadius={4} />
+        </View>
+        {/* Options */}
+        <Skeleton width="100%" height={80} borderRadius={12} />
+        {/* Button */}
+        <Skeleton width="100%" height={52} borderRadius={14} />
+      </View>
+    </ScrollView>
+  );
+}

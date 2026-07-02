@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, hasSupabaseKeys } from '@/lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 type UseRealtimeOrdersProps = {
@@ -14,8 +14,8 @@ type UseRealtimeOrdersProps = {
  */
 export function useRealtimeOrders({ enterpriseId, refreshOrders, token }: UseRealtimeOrdersProps) {
   useEffect(() => {
-    // Ne pas lancer si pas d'entreprise ou pas connecté
-    if (!enterpriseId || !token) return;
+    // Ne pas lancer si pas d'entreprise, pas connecté ou clés manquantes
+    if (!enterpriseId || !token || !hasSupabaseKeys) return;
 
     let channel: RealtimeChannel | null = null;
 

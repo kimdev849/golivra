@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +18,7 @@
         "backgroundImage": "./assets/images/icon.png",
         "monochromeImage": "./assets/images/icon.png"
       },
-      "edgeToEdgeEnabled": true,
+      "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
       "package": "kimjaver.golivra"
     },
@@ -68,7 +68,10 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/e05e349a-fb96-4adb-ae4c-e8be602b1537"
+      "url": "https://u.expo.dev/e05e349a-fb96-4adb-ae4c-e8be602b1537",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 10000
     }
   }
 }

@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, View, useWindowDimensions, type ImageSourcePropT
 import Carousel from 'react-native-reanimated-carousel';
 
 import { ThemedText } from '@/components/themed-text';
+import { ZoomableImage } from '@/components/zoomable-image';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -56,7 +57,7 @@ export function HomeHeroCarousel({ slides, heroIndex, onIndexChange, onCta }: Pr
             onPress={onCta}
             android_ripple={{ color: 'rgba(255,255,255,0.12)' }}>
             <View style={[styles.card, { height: heroHeight }]}>
-              <Image
+              <ZoomableImage
                 source={item.image}
                 style={StyleSheet.absoluteFillObject}
                 contentFit="cover"

@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react-native';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { VendorScreenHeader } from '@/components/vendor-screen-header';
@@ -33,7 +33,7 @@ export default function VendorCatalogScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
-  const { showError, showSuccess, FeedbackOverlay } = useActionFeedback();
+  const { showError, showSuccess, showConfirm, FeedbackOverlay } = useActionFeedback();
   const { shop, products, setProducts, refresh } = useVendor();
   const { commerceType, palette } = useVendorTheme();
   const [query, setQuery] = useState('');
@@ -70,34 +70,29 @@ export default function VendorCatalogScreen() {
   const confirmDelete = (id: string, nom: string) => {
     if (!shop?.id) return;
     triggerHaptic();
-    Alert.alert(
-      'Supprimer',
-      `Supprimer définitivement « ${nom} » ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: async () => {
-            const prev = products;
-            setProducts((p) => p.filter((x) => x.id !== id));
-            setBusyId(id);
-            try {
-              const token = await getSessionToken();
-              if (!token) throw new Error('Session expirée');
-              await deleteVendorProduct(token, shop.id, id);
-              void refresh();
-              showSuccess('Produit supprimé', `« ${nom} » a été retiré du catalogue.`);
-            } catch (e) {
-              setProducts(prev);
-              showError('Erreur', e instanceof Error ? e.message : 'Suppression impossible.');
-            } finally {
-              setBusyId(null);
-            }
-          },
-        },
-      ],
-    );
+    showConfirm({
+      title: 'Supprimer',
+      message: `Supprimer définitivement « ${nom} » ?`,
+      primaryLabel: 'Supprimer',
+      secondaryLabel: 'Annuler',
+      onPrimary: async () => {
+        const prev = products;
+        setProducts((p) => p.filter((x) => x.id !== id));
+        setBusyId(id);
+        try {
+          const token = await getSessionToken();
+          if (!token) throw new Error('Session expirée');
+          await deleteVendorProduct(token, shop.id, id);
+          void refresh();
+          showSuccess('Produit supprimé', `« ${nom} » a été retiré du catalogue.`);
+        } catch (e) {
+          setProducts(prev);
+          showError('Erreur', e instanceof Error ? e.message : 'Suppression impossible.');
+        } finally {
+          setBusyId(null);
+        }
+      },
+    });
   };
 
   return (

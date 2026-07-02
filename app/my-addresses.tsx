@@ -2,7 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, MapPin, Trash2 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DeliveryAddressForm, type DeliveryAddressFormValue } from '@/components/delivery-address-form';
@@ -21,7 +21,7 @@ export default function MyAddressesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
-  const { showError, FeedbackOverlay } = useActionFeedback();
+  const { showError, showConfirm, FeedbackOverlay } = useActionFeedback();
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<UserAddress[]>([]);
   const [editing, setEditing] = useState(false);
@@ -44,22 +44,30 @@ export default function MyAddressesScreen() {
 
   const saveNew = async () => {
     const e = deliveryAddressError(form);
-    if (e) { Alert.alert('Adresse invalide', e); return; }
+    if (e) { showError('Adresse invalide', e); return; }
     setSaving(true);
     try {
       const token = await getSessionToken();
       if (!token) throw new Error('Session expirée.');
       await createUserAddress(token, { ...form, est_principale: rows.length === 0 });
       setEditing(false); setForm(emptyForm()); await load();
-    } catch (e) { Alert.alert('Erreur', e instanceof Error ? e.message : 'Enregistrement impossible.'); }
+    } catch (e) { showError('Erreur', e instanceof Error ? e.message : 'Enregistrement impossible.'); }
     finally { setSaving(false); }
   };
 
   const remove = (id: string) => {
-    Alert.alert('Supprimer', 'Retirer cette adresse ?', [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Supprimer', style: 'destructive', onPress: () => { void (async () => { const token = await getSessionToken(); if (!token) return; await deleteUserAddress(token, id); await load(); })(); } },
-    ]);
+    showConfirm({
+      title: 'Supprimer',
+      message: 'Retirer cette adresse ?',
+      primaryLabel: 'Supprimer',
+      secondaryLabel: 'Annuler',
+      onPrimary: async () => {
+        const token = await getSessionToken();
+        if (!token) return;
+        await deleteUserAddress(token, id);
+        await load();
+      },
+    });
   };
 
   return (

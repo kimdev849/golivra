@@ -37,7 +37,6 @@ Scripts npm : `npm run build:android`, `npm run build:preview`.
 | `EXPO_PUBLIC_API_BASE_URL` | Oui (défaut Render dans `eas.json`) |
 | `EXPO_PUBLIC_SUPABASE_URL` | Oui pour le temps réel |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Oui |
-| `EXPO_PUBLIC_SENTRY_DSN` | Recommandé en prod |
 
 ## Après changement de `.env`
 

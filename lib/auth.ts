@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import { safeGetItem, safeSetItem, safeDeleteItem } from '@/lib/safe-store';
 
 import { apiFetch } from '@/lib/api';
 import { clearSessionSnapshot, saveSessionSnapshot } from '@/lib/session-store';
@@ -32,7 +32,7 @@ export function getSessionTokenSync(): string | null {
 export async function hydrateSessionToken(): Promise<string | null> {
   if (tokenHydrated) return memoryToken;
   try {
-    memoryToken = await SecureStore.getItemAsync(TOKEN_KEY);
+    memoryToken = await safeGetItem(TOKEN_KEY);
   } catch {
     memoryToken = null;
   }
@@ -48,14 +48,14 @@ export async function getSessionToken(): Promise<string | null> {
 export async function setSessionToken(token: string): Promise<void> {
   memoryToken = token;
   tokenHydrated = true;
-  await SecureStore.setItemAsync(TOKEN_KEY, token);
+  await safeSetItem(TOKEN_KEY, token);
 }
 
 export async function clearSessionToken(): Promise<void> {
   memoryToken = null;
   tokenHydrated = true;
   try {
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    await safeDeleteItem(TOKEN_KEY);
   } catch {
     /* ignore */
   }

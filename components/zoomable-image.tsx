@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View, type GestureResponderEvent, type StyleProp
 import { ImageZoomViewer } from '@/components/image-zoom-viewer';
 
 type Props = Omit<ImageProps, 'source'> & {
-  source: ImageSource | string | null | undefined;
+  source: any;
   style?: StyleProp<ViewStyle>;
   /** Légende affichée dans le viewer plein écran. */
   caption?: string | null;

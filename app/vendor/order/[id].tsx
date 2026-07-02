@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MapPin, Phone, Truck } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { VendorScreenHeader } from '@/components/vendor-screen-header';
@@ -36,7 +36,7 @@ export default function VendorOrderDetailScreen() {
   const { orders, refresh } = useVendor();
   const [acting, setActing] = useState(false);
   const colors = useAppColors();
-  const { showSuccess, showError, FeedbackOverlay } = useActionFeedback();
+  const { showSuccess, showError, showConfirm, FeedbackOverlay } = useActionFeedback();
   const styles = useThemedStyles(createVendorOrderDetailStyles);
   const { palette, labels } = useVendorTheme();
   const orderId = typeof id === 'string' ? id : '';
@@ -114,16 +114,15 @@ export default function VendorOrderDetailScreen() {
   };
 
   const refuseOrder = () => {
-    Alert.alert('Refuser la commande', 'Confirmer le refus ?', [
-      { text: 'Annuler', style: 'cancel' },
-      {
-        text: 'Refuser',
-        style: 'destructive',
-        onPress: () => {
-          void runStatus('refusee', 'Commande refusée.', 'Refusé par le commerce').then(() => router.back());
-        },
+    showConfirm({
+      title: 'Refuser la commande',
+      message: 'Confirmer le refus ?',
+      primaryLabel: 'Refuser',
+      secondaryLabel: 'Annuler',
+      onPrimary: () => {
+        void runStatus('refusee', 'Commande refusée.', 'Refusé par le commerce').then(() => router.back());
       },
-    ]);
+    });
   };
 
   return (

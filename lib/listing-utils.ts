@@ -1,28 +1,28 @@
 import type { ProductPublic } from '@/lib/catalog';
-import { resolveRemoteImageUrl } from '@/lib/images';
+import { resolveRemoteImageUrl, type ResizeOptions } from '@/lib/images';
 
 /** URLs d'images uniques et résolues pour un produit. */
-export function getProductGalleryUrls(product: ProductPublic): string[] {
+export function getProductGalleryUrls(product: ProductPublic, options?: ResizeOptions): string[] {
   const list: string[] = [];
   if (product.image_url) {
-    const resolved = resolveRemoteImageUrl(product.image_url);
+    const resolved = resolveRemoteImageUrl(product.image_url, options);
     if (resolved) list.push(resolved);
   }
   if (Array.isArray(product.images_urls)) {
     for (const u of product.images_urls) {
-      const resolved = resolveRemoteImageUrl(u);
+      const resolved = resolveRemoteImageUrl(u, options);
       if (resolved && !list.includes(resolved)) list.push(resolved);
     }
   }
   return list;
 }
 
-export function getProductPrimaryImage(product: ProductPublic): string | null {
-  return getProductGalleryUrls(product)[0] ?? null;
+export function getProductPrimaryImage(product: ProductPublic, options?: ResizeOptions): string | null {
+  return getProductGalleryUrls(product, options)[0] ?? null;
 }
 
-export function getProductPhotoCount(product: ProductPublic): number {
-  return getProductGalleryUrls(product).length;
+export function getProductPhotoCount(product: ProductPublic, options?: ResizeOptions): number {
+  return getProductGalleryUrls(product, options).length;
 }
 
 export function productKind(product: ProductPublic): 'plat' | 'article' {

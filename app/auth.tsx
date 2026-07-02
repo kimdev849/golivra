@@ -1,6 +1,7 @@
 import { Link, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Keyboard,
   Platform,
@@ -142,6 +143,8 @@ export default function AuthScreen() {
                   autoCorrect={false}
                   value={loginPhone}
                   onChangeText={(text) => setLoginPhone(formatCgPhone(text))}
+                  returnKeyType="next"
+                  onSubmitEditing={() => {}}
                 />
               </View>
             </ThemedView>
@@ -185,7 +188,10 @@ export default function AuthScreen() {
                 end={{ x: 1, y: 1 }}
                 style={StyleSheet.absoluteFill}
               />
-              <ThemedText style={styles.submitButtonText}>{isSubmitting ? 'Connexion...' : 'Se connecter'}</ThemedText>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                <ThemedText style={styles.submitButtonText}>{isSubmitting ? 'Connexion…' : 'Se connecter'}</ThemedText>
+                {isSubmitting ? <ActivityIndicator color={colors.onPrimary} style={{ marginLeft: 8 }} /> : null}
+              </View>
             </Pressable>
             <Link href="/forgot-password" asChild>
               <Pressable style={({ pressed }) => [styles.linkButton, pressed ? styles.buttonPressed : undefined]}>

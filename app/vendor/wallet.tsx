@@ -2,7 +2,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -73,11 +72,11 @@ export default function VendorWalletScreen() {
         methode: 'airtel_money',
         numero_compte: numero.trim(),
       });
-      Alert.alert('Demande envoyée', 'GoLivra validera votre retrait sous 1 à 3 jours.');
+      showSuccess('Demande envoyée', 'GoLivra validera votre retrait sous 1 à 3 jours.');
       setMontant('');
       await load();
     } catch (e) {
-      Alert.alert('Erreur', e instanceof Error ? e.message : 'Échec du retrait.');
+      showError('Erreur', e instanceof Error ? e.message : 'Échec du retrait.');
     } finally {
       setSubmitting(false);
     }

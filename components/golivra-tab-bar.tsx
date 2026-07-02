@@ -18,9 +18,7 @@ import { shouldShowTabBar } from '@/lib/tab-bar-visibility';
 const TAB_ORDER = ['index', 'explore', 'favorites', 'profile'] as const;
 
 function triggerTabHaptic() {
-  if (process.env.EXPO_OS === 'ios') {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }
+  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 }
 
 function SideTab({

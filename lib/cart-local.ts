@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import { safeGetItem, safeSetItem, safeDeleteItem } from '@/lib/safe-store';
 
 const STORAGE_KEY = 'golivra_cart_v1';
 
@@ -145,7 +145,7 @@ function parseStoredCart(raw: string): CartState | null {
 
 async function readCartFromStorage(): Promise<CartState | null> {
   try {
-    const raw = await SecureStore.getItemAsync(STORAGE_KEY);
+    const raw = await safeGetItem(STORAGE_KEY);
     if (!raw) return null;
     return parseStoredCart(raw);
   } catch {
@@ -179,11 +179,11 @@ function persistCartAsync(state: CartState | null): void {
   void (async () => {
     try {
       if (!state) {
-        await SecureStore.deleteItemAsync(STORAGE_KEY);
+        await safeDeleteItem(STORAGE_KEY);
         void pushCartToServer(null);
         return;
       }
-      await SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify(state));
+      await safeSetItem(STORAGE_KEY, JSON.stringify(state));
       void pushCartToServer(state);
     } catch {
       /* mémoire reste source de vérité */

@@ -19,6 +19,36 @@ import { loadExpoNotifications } from '@/lib/expo-notifications-module';
 import { registerPushToken } from '@/lib/push-token-api';
 import { hrefCourierMission } from '@/lib/courier-nav';
 import { VENDOR_HREF } from '@/lib/vendor-nav';
+import { safeGetItem, safeSetItem } from '@/lib/safe-store';
+
+/**
+ * Stocke l'identifiant de la dernière notification "initiale" déjà traitée.
+ *
+ * Sans cette garde, getLastNotificationResponseAsync() renvoie en boucle la
+ * dernière notification tapée (même il y a des jours), ce qui fait atterrir
+ * l'utilisateur sur /notifications à CHAQUE lancement de l'app — y compris
+ * au 1er lancement ou quand il est déjà connecté. On ne navigue donc que si
+ * l'ID de la notification courante diffère de celui déjà traité.
+ */
+const LAST_HANDLED_NOTIF_KEY = 'golivra_last_handled_notif_id';
+
+export async function markNotificationHandled(id: string | null | undefined): Promise<void> {
+  if (!id) return;
+  try {
+    await safeSetItem(LAST_HANDLED_NOTIF_KEY, id);
+  } catch {
+    /* ignore */
+  }
+}
+
+async function isNotificationAlreadyHandled(id: string | null | undefined): Promise<boolean> {
+  if (!id) return false;
+  try {
+    return (await safeGetItem(LAST_HANDLED_NOTIF_KEY)) === id;
+  } catch {
+    return false;
+  }
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type NotificationPermissionStatus = 'granted' | 'denied' | 'undetermined';
@@ -239,13 +269,25 @@ export async function handleInitialNotification(): Promise<void> {
 
   try {
     const response = await Notifications.getLastNotificationResponseAsync();
-    if (response) {
-      console.log('[notifications] 🚀 App ouverte depuis une notification');
-      const data = response.notification.request.content.data;
-      setTimeout(() => {
-        handleNotificationNavigation(data as NotifData);
-      }, 500);
+    if (!response) return;
+
+    // Identifiant stable de la notification : l'identifiant de requête côté Expo.
+    const notifId = response.notification.request.identifier;
+
+    // ⚠️ getLastNotificationResponseAsync() renvoie la DERNIÈRE notification
+    // tapée, même si elle l'a été lors d'un lancement précédent (l'OS ne la
+    // nettoie pas). Sans cette garde, l'utilisateur serait renvoyé sur
+    // /notifications à chaque ouverture de l'app.
+    if (await isNotificationAlreadyHandled(notifId)) {
+      return;
     }
+
+    await markNotificationHandled(notifId);
+    console.log('[notifications] 🚀 App ouverte depuis une notification');
+    const data = response.notification.request.content.data;
+    setTimeout(() => {
+      handleNotificationNavigation(data as NotifData);
+    }, 500);
   } catch (err) {
     console.warn('[notifications] handleInitialNotification error:', err);
   }

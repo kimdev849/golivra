@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -18,6 +18,7 @@ import {
   UtensilsCrossed,
 } from 'lucide-react-native';
 import { Image } from 'expo-image';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { GalleryViewer } from '@/components/gallery-viewer';
 import { ProductPrice } from '@/components/product-price';
@@ -39,8 +40,8 @@ import {
 import { peekEnterpriseById, peekProductsForEnterprise } from '@/lib/client-data';
 import { addProductToCartPrompt } from '@/lib/cart-local';
 import { getEffectiveUnitPrice } from '@/lib/product-promo';
-import { resolveRemoteImageUrl } from '@/lib/images';
-import { productDetailHref } from '@/lib/listing-utils';
+import { resolveRemoteImageUrl, type ResizeOptions } from '@/lib/images';
+import { getProductGalleryUrls, productDetailHref } from '@/lib/listing-utils';
 import {
   effectiveStockCap,
   isProductOrderable,
@@ -50,6 +51,9 @@ import { toggleFavorite, isFavorite } from '@/lib/favorites-api';
 import { getSessionToken } from '@/lib/auth';
 import { trackInteraction } from '@/lib/tracking';
 
+const IMG_HERO: ResizeOptions = { width: 800, format: 'webp', quality: 85 };
+const IMG_THUMB: ResizeOptions = { width: 200, format: 'webp', quality: 80 };
+
 export default function EnterpriseDetailScreen() {
   const { enterpriseId } = useLocalSearchParams<{ enterpriseId: string }>();
   const insets = useSafeAreaInsets();
@@ -57,18 +61,34 @@ export default function EnterpriseDetailScreen() {
   const id = typeof enterpriseId === 'string' ? enterpriseId : '';
   const colors = useAppColors();
   const styles = useThemedStyles(createEnterpriseDetailStyles);
+  const queryClient = useQueryClient();
 
-  const [enterprise, setEnterprise] = useState<EnterprisePublic | null>(null);
-  const [products, setProducts] = useState<ProductPublic[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [galleryState, setGalleryState] = useState<{ images: string[]; index: number } | null>(null);
 
+  const { data: enterprise, isLoading: loadingEnt, error: entError } = useQuery<EnterprisePublic>({
+    queryKey: ['enterprise', id],
+    queryFn: () => fetchEnterpriseById(id),
+    staleTime: 1000 * 60 * 3,
+    placeholderData: () => peekEnterpriseById(id) ?? undefined,
+    enabled: !!id,
+  });
+
+  const { data: products = [], isLoading: loadingProds } = useQuery({
+    queryKey: ['products', id],
+    queryFn: () => fetchProductsForEnterprise(id),
+    staleTime: 1000 * 60 * 1.5,
+    placeholderData: () => peekProductsForEnterprise(id) ?? undefined,
+    enabled: !!id,
+  });
+
+  const loading = loadingEnt || loadingProds;
+  const error = entError ? (entError instanceof Error ? entError.message : 'Erreur de chargement.') : null;
+
+  // Tracking vue commerce
   useEffect(() => {
-    if (enterprise) {
+    if (enterprise && products.length > 0) {
       void trackInteraction({
         type: 'view_enterprise',
         targetId: enterprise.id,
@@ -76,65 +96,23 @@ export default function EnterpriseDetailScreen() {
         categoryId: enterprise.categorie_id ?? undefined,
       });
     }
-  }, [enterprise]);
+  }, [enterprise, products]);
 
-  const reload = useCallback(async (force = false) => {
-    if (!id) return;
-    setError(null);
-    
-    const cachedEnt = peekEnterpriseById(id);
-    const cachedProds = peekProductsForEnterprise(id);
-    
-    if (cachedEnt) setEnterprise(cachedEnt);
-    if (cachedProds) setProducts(cachedProds);
-    
-    // N'afficher le loader que si on n'a absolument rien en cache
-    const hasCache = Boolean(cachedEnt); 
-    if (!hasCache && !force) setLoading(true);
-    else {
-      setRefreshing(true);
-    }
-
-    try {
-      const [ent, prods] = await Promise.all([
-        fetchEnterpriseById(id, force),
-        fetchProductsForEnterprise(id, force),
-      ]);
-      setEnterprise(ent);
-      setProducts(prods);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erreur de chargement.');
-      if (!cachedEnt) setEnterprise(null);
-      if (!cachedProds) setProducts([]);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [id]);
-
-  // Vérifier le statut favori et le token
+  // Vérifier le statut favori
   useEffect(() => {
     let alive = true;
-    const checkFavorite = async () => {
+    const check = async () => {
       try {
         const t = await getSessionToken();
-        if (!alive || !t) return;
+        if (!alive || !t || !id) return;
         setToken(t);
-        if (id) {
-          const favorited = await isFavorite(t, id);
-          if (alive) setIsFavorited(favorited);
-        }
-      } catch {
-        /* ignore */
-      }
+        const fav = await isFavorite(t, id);
+        if (alive) setIsFavorited(fav);
+      } catch { /* ignore */ }
     };
-    void checkFavorite();
+    void check();
     return () => { alive = false; };
   }, [id]);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
 
   const handleToggleFavorite = useCallback(async () => {
     if (!token || !enterprise) return;
@@ -142,11 +120,11 @@ export default function EnterpriseDetailScreen() {
       const newStatus = await toggleFavorite(token, enterprise.id, enterprise.nom ?? 'Commerce', enterprise.type);
       setIsFavorited(newStatus);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erreur lors de la mise à jour des favoris.');
+      // silent
     }
   }, [token, enterprise]);
 
-  const hero = resolveRemoteImageUrl(enterprise?.image_url);
+  const hero = resolveRemoteImageUrl(enterprise?.image_url, IMG_HERO);
   const isRestaurant = enterprise?.type === 'restaurant';
   const prepMin = enterprise?.delai_preparation_min ?? 25;
   const shipMin = enterprise?.delai_livraison_min ?? 48;
@@ -173,10 +151,7 @@ export default function EnterpriseDetailScreen() {
     if (!enterprise || products.length === 0) return;
     if (viewTrackedFor.current === enterprise.id) return;
     viewTrackedFor.current = enterprise.id;
-    trackEnterpriseView(
-      enterprise.id,
-      products.map((p) => p.id),
-    );
+    trackEnterpriseView(enterprise.id, products.map((p) => p.id));
   }, [enterprise, products]);
 
   if (!id) {
@@ -195,14 +170,17 @@ export default function EnterpriseDetailScreen() {
     );
   }
 
-  if (!loading && !refreshing && (error || !enterprise)) {
+  if (!loading && (error || !enterprise)) {
     return (
       <ThemedView style={styles.center}>
         <Building2 size={44} color={colors.placeholder} strokeWidth={LUCIDE_STROKE} />
         <ScreenEmptyState
           title="Commerce indisponible"
-          body={error ?? 'Ce commerce est fermé ou n’existe plus.'}
-          onRetry={() => void reload(true)}
+          body={error ?? 'Ce commerce est fermé ou n\'existe plus.'}
+          onRetry={() => {
+            queryClient.invalidateQueries({ queryKey: ['enterprise', id] });
+            queryClient.invalidateQueries({ queryKey: ['products', id] });
+          }}
         />
       </ThemedView>
     );
@@ -307,18 +285,14 @@ export default function EnterpriseDetailScreen() {
           </View>
         ) : (
           products.map((p) => {
-            const img = resolveRemoteImageUrl(p.image_url);
-            const allImages = (() => {
-              const list = Array.isArray(p.images_urls) ? p.images_urls.filter((u) => u && u.length > 0) : [];
-              if (img && !list.includes(img)) list.unshift(img);
-              return list.map((u) => resolveRemoteImageUrl(u) ?? u).filter((u): u is string => Boolean(u));
-            })();
+            const allImages = getProductGalleryUrls(p, IMG_THUMB);
+            const img = allImages[0] ?? null;
             const disabled = !isProductOrderable(p, { enterpriseType: enterprise.type });
             const stockLabel = stockDisplayLabel(p, { enterpriseType: enterprise.type });
             const openGallery = () => {
               if (!allImages.length) return;
               void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setGalleryState({ images: allImages, index: 0 });
+              setGalleryState({ images: getProductGalleryUrls(p, IMG_HERO), index: 0 });
             };
             return (
               <Pressable
@@ -386,7 +360,6 @@ export default function EnterpriseDetailScreen() {
         images={galleryState?.images ?? []}
         initialIndex={galleryState?.index ?? 0}
         onClose={() => setGalleryState(null)}
-        colors={colors}
       />
     </ThemedView>
   );
