@@ -137,11 +137,16 @@ export function formatPhone(value: string, indicatif?: string): string {
   const info = getPhoneInfo(activeIndicatif);
 
   if (!info) {
-    // Fallback: pas d'infos disponibles, formatage basique
-    const digits = value.replace(/\D/g, '');
-    if (!digits) return `${activeIndicatif} `;
+    // Fallback: pas d'infos disponibles (cache pas encore chargé)
+    // Extraire les chiffres nationaux (sans le préfixe) avant de formater
+    const prefixDigits = activeIndicatif.replace(/\D/g, '');
+    const allDigits = value.replace(/\D/g, '');
+    const nationalDigits = allDigits.startsWith(prefixDigits)
+      ? allDigits.slice(prefixDigits.length)
+      : allDigits;
+    if (!nationalDigits) return `${activeIndicatif} `;
     // Grouper par 2
-    const formatted = digits.replace(/(\d{2})(?=\d)/g, '$1 ');
+    const formatted = nationalDigits.replace(/(\d{2})(?=\d)/g, '$1 ');
     return `${activeIndicatif} ${formatted}`;
   }
 
