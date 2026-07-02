@@ -74,6 +74,8 @@ export async function registerAccount(payload: {
   otpCode: string;
   role: 'client' | 'restaurateur' | 'commercant';
   imageUrl?: string | null;
+  pays_id?: string | null;
+  ville_id?: string | null;
 }): Promise<AuthSession> {
   return apiFetch<AuthSession>('/api/auth/register', {
     method: 'POST',
@@ -88,6 +90,8 @@ export type RegisterVendorPayload = {
   otpCode: string;
   role: 'restaurateur' | 'commercant';
   imageUrl?: string | null;
+  pays_id?: string | null;
+  ville_id?: string | null;
   enterprise: {
     type: 'restaurant' | 'boutique';
     nom: string;

@@ -19,6 +19,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { CategoryPicker } from '@/components/category-picker';
 import { FormErrorBanner } from '@/components/form-error-banner';
 import { InlineFormError } from '@/components/inline-form-error';
+import { LocationPicker, type LocationValue } from '@/components/location-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { brandGradient3 } from '@/constants/app-palette';
@@ -76,6 +77,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
   const [profileImageDataUrl, setProfileImageDataUrl] = useState<string | null>(null);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
+  const [location, setLocation] = useState<LocationValue>({ pays: null, ville: null });
   const [businessName, setBusinessName] = useState('');
   const [businessAddress, setBusinessAddress] = useState('');
   const [businessDescription, setBusinessDescription] = useState('');
@@ -217,6 +219,8 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
           otpCode: otp.trim(),
           role: commerceKind === 'restaurant' ? 'restaurateur' : 'commercant',
           imageUrl: finalProfileImageUrl || null,
+          pays_id: location.pays?.id || null,
+          ville_id: location.ville?.id || null,
           enterprise: {
             type: commerceKind,
             nom: businessName.trim(),
@@ -249,6 +253,8 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
       const session = await registerAccount({
         nom: userNom, telephone: phoneE164!, motDePasse: password, otpCode: otp.trim(), imageUrl: finalProfileImageUrl || null,
         role: 'client',
+        pays_id: location.pays?.id || null,
+        ville_id: location.ville?.id || null,
       });
       if (!session?.token) {
         throw new Error('Compte créé mais session invalide. Connectez-vous avec votre numéro et mot de passe.');
@@ -338,6 +344,16 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
               </View>
 
               <ThemedText style={[styles.formHint, { color: colors.textMuted }]}>Un code de vérification sera envoyé par SMS.</ThemedText>
+
+              {/* Localisation (Pays / Ville) pour tous les profils */}
+              <ThemedText style={[styles.sectionTitle, { color: colors.primary, marginTop: 8 }]}>Localisation</ThemedText>
+              <LocationPicker
+                value={location}
+                onChange={setLocation}
+                autoDetect
+                disabled={otpSent}
+                compact
+              />
 
               {profile === 'vendeur' && forcedProfile !== 'client' && commerceKind ? (() => {
                 const c = commerceCopy(commerceKind);

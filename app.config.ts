@@ -2,7 +2,7 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
 
 import appJson from './app.json';
 
-const DEFAULT_API = 'https://golivraback.onrender.com';
+const DEFAULT_API = 'https://golivra-api.onrender.com';
 
 function normalizeApiOrigin(raw: string | undefined): string {
   let origin = (raw || DEFAULT_API).trim().replace(/\/+$/, '');

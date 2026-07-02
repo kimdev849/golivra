@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 
-const DEFAULT_API_ORIGIN = 'https://golivraback.onrender.com';
+const DEFAULT_API_ORIGIN = 'https://golivra-api.onrender.com';
 
 function normalizeOrigin(raw: string | undefined | null): string {
   let origin = (raw || DEFAULT_API_ORIGIN).trim().replace(/\/+$/, '');

@@ -2,7 +2,7 @@
 
 ## URL API en production
 
-L’app appelle **`https://golivraback.onrender.com`** (sans `/api` à la fin). Cette URL est :
+L’app appelle **`https://golivra-api.onrender.com`** (sans `/api` à la fin). Cette URL est :
 
 - codée en secours dans `lib/config.ts` ;
 - injectée au build via `EXPO_PUBLIC_API_BASE_URL` dans `eas.json` (profils preview & production).
