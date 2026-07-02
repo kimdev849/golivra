@@ -82,8 +82,10 @@ export function detectCountryCode(value: string): string {
   }
 
   // Si ça commence par + mais match aucun connu
+  // • Les codes pays ITU font max 3 chiffres.
+  // • Évite de capturer le début du numéro national (ex. +2420 → +242, pas +2420)
   if (/^\+\d/.test(cleaned)) {
-    const match = cleaned.match(/^(\+\d{1,4})/);
+    const match = cleaned.match(/^(\+\d{1,3})/);
     if (match) return match[1];
   }
 
