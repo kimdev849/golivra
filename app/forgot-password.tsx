@@ -16,12 +16,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { FormErrorBanner } from '@/components/form-error-banner';
+import { CountryCodeSelector } from '@/components/country-code-selector';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { resetPassword } from '@/lib/auth';
 import { requestOtp } from '@/lib/otp';
-import { formatCgPhone, toCgE164 } from '@/lib/phone';
-import { validateOtp, validatePassword, validatePasswordConfirmation, validatePhoneCg } from '@/lib/form-validation';
+import { formatPhone, toE164, DEFAULT_INDICATIF } from '@/lib/phone';
+import { validateOtp, validatePassword, validatePasswordConfirmation, validatePhone } from '@/lib/form-validation';
 
 type Step = 'phone' | 'otp' | 'done';
 
@@ -34,7 +35,8 @@ export default function ForgotPasswordScreen() {
   const formWidth = Math.min(width - 40, 460);
 
   const [step, setStep] = useState<Step>('phone');
-  const [phone, setPhone] = useState('+242 ');
+  const [countryCode, setCountryCode] = useState(DEFAULT_INDICATIF);
+  const [phone, setPhone] = useState(`${DEFAULT_INDICATIF} `);
   const [otpCode, setOtpCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -42,11 +44,11 @@ export default function ForgotPasswordScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const phoneE164 = toCgE164(phone);
+  const phoneE164 = toE164(phone);
 
   const handleRequestOtp = async () => {
     setError(null);
-    const e = validatePhoneCg(phone);
+    const e = validatePhone(phone, countryCode);
     if (!e.ok) {
       setError(e.message);
       return;
@@ -136,14 +138,23 @@ export default function ForgotPasswordScreen() {
             {step === 'phone' ? (
               <>
                 <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Téléphone</ThemedText>
-                <TextInput
-                  style={[styles.input, { borderColor: colors.inputBorder, color: colors.text }]}
-                  value={phone}
-                  onChangeText={(t) => setPhone(formatCgPhone(t))}
-                  keyboardType="phone-pad"
-                  placeholder="+242 06 XXX XX XX"
-                  placeholderTextColor={colors.placeholder}
-                />
+                <View style={[styles.phoneRow, { gap: 10 }]}>
+                  <CountryCodeSelector
+                    value={countryCode}
+                    onChange={(code) => {
+                      setCountryCode(code);
+                      setPhone(`${code} `);
+                    }}
+                  />
+                  <TextInput
+                    style={[styles.input, { flex: 1, borderColor: colors.inputBorder, color: colors.text }]}
+                    value={phone}
+                    onChangeText={(t) => setPhone(formatPhone(t, countryCode))}
+                    keyboardType="phone-pad"
+                    placeholder="06 XXX XX XX"
+                    placeholderTextColor={colors.placeholder}
+                  />
+                </View>
                 <Pressable
                   style={[styles.btn, { backgroundColor: colors.primary }, loading && styles.btnDisabled]}
                   disabled={loading || !phoneE164}
@@ -223,6 +234,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   inputLabel: { fontSize: 12, fontWeight: '800' },
+  phoneRow: { flexDirection: 'row', alignItems: 'center' },
   input: {
     borderWidth: 1,
     borderRadius: 14,

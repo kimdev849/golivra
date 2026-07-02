@@ -29,11 +29,11 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { registerAccount, registerVendorAccount, persistAuthSession } from '@/lib/auth';
 import { fetchEnterpriseCategories, type EnterpriseCategory } from '@/lib/enterprise';
 import { requestOtp } from '@/lib/otp';
-import { formatCgPhone, toCgE164 } from '@/lib/phone';
+import { formatPhone, toE164 } from '@/lib/phone';
 import { uploadImageForSignup } from '@/lib/uploads';
 import { VENDOR_HREF } from '@/lib/vendor-nav';
 import { friendlyErrorMessage } from '@/lib/ux-copy';
-import { validateAddress, validateCommerceName, validateDescription, validateOtp, validatePassword, validatePersonName, validatePhoneCg } from '@/lib/form-validation';
+import { validateAddress, validateCommerceName, validateDescription, validateOtp, validatePassword, validatePersonName, validatePhone } from '@/lib/form-validation';
 
 type Profile = 'client' | 'vendeur';
 type CommerceKind = 'restaurant' | 'boutique';
@@ -78,6 +78,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
   const [location, setLocation] = useState<LocationValue>({ pays: null, ville: null });
+  const phoneIndicatif = location.pays?.indicatif || '+242';
   const [businessName, setBusinessName] = useState('');
   const [businessAddress, setBusinessAddress] = useState('');
   const [businessDescription, setBusinessDescription] = useState('');
@@ -97,7 +98,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
   const signupDoneRef = useRef(false);
   const formWidth = Math.min(width - 40, 460);
-  const phoneE164 = toCgE164(phone);
+  const phoneE164 = toE164(phone);
 
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
@@ -132,7 +133,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
     } else {
       next.fullName = null;
     }
-    const e2 = validatePhoneCg(phone);
+    const e2 = validatePhone(phone, phoneIndicatif);
     if (!e2.ok) { next.phone = e2.message; setFieldErrors(next); return e2.message; }
     if (!phoneE164) { next.phone = 'Numéro invalide.'; setFieldErrors(next); return 'Numéro invalide.'; }
     next.phone = null;
@@ -338,7 +339,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
                 </View>
                 <View style={styles.inputBody}>
                   <ThemedText style={[styles.inputLabel, { color: colors.textSecondary }]}>Numéro de téléphone</ThemedText>
-                  <TextInput style={[styles.inputField, { color: colors.text }]} placeholder="+242 06 XXX XX XX" keyboardType="phone-pad" placeholderTextColor={colors.placeholder} selectionColor={colors.primary} value={phone} editable={!otpSent} autoCapitalize="none" autoCorrect={false} onChangeText={(text) => setPhone(formatCgPhone(text))} />
+                  <TextInput style={[styles.inputField, { color: colors.text }]} placeholder="+242 06 XXX XX XX" keyboardType="phone-pad" placeholderTextColor={colors.placeholder} selectionColor={colors.primary} value={phone} editable={!otpSent} autoCapitalize="none" autoCorrect={false} onChangeText={(text) => setPhone(formatPhone(text, phoneIndicatif))} />
                   <InlineFormError message={fieldErrors.phone} colors={colors} />
                 </View>
               </View>

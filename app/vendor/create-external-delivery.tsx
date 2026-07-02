@@ -22,10 +22,10 @@ import { useAppColors } from '@/hooks/use-app-colors';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
 import { getSessionToken } from '@/lib/auth';
 import { deliveryAddressError, snapshotFromFields } from '@/lib/format-address';
-import { formatCgPhone } from '@/lib/phone';
+import { formatPhone } from '@/lib/phone';
 import { createVendorExternalDelivery } from '@/lib/vendor-api';
 import { VENDOR_HREF } from '@/lib/vendor-nav';
-import { validatePersonName, validatePhoneCg } from '@/lib/form-validation';
+import { validatePersonName, validatePhone } from '@/lib/form-validation';
 
 const emptyAddr = (): DeliveryAddressFormValue => ({
   quartier: '',
@@ -44,7 +44,7 @@ export default function VendorCreateDirectDeliveryScreen() {
   const { palette } = useVendorTheme();
   const { showSuccess, showError, FeedbackOverlay } = useActionFeedback();
   const [clientNom, setClientNom] = useState('');
-  const [clientPhone, setClientPhone] = useState(() => formatCgPhone(''));
+  const [clientPhone, setClientPhone] = useState(() => formatPhone(''));
   const [address, setAddress] = useState<DeliveryAddressFormValue>(emptyAddr);
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -55,15 +55,15 @@ export default function VendorCreateDirectDeliveryScreen() {
       return;
     }
     const nom = clientNom.trim();
-    const tel = formatCgPhone(clientPhone);
+    const tel = formatPhone(clientPhone);
     const e1 = validatePersonName(nom);
     if (!e1.ok) {
       showError('Nom du destinataire invalide', e1.message);
       return;
     }
-    const e2 = validatePhoneCg(clientPhone);
+    const e2 = validatePhone(clientPhone);
     if (!e2.ok || !tel) {
-      showError('Téléphone invalide', e2.ok ? 'Indiquez un numéro valide (+242 …).' : e2.message);
+      showError('Téléphone invalide', e2.ok ? 'Indiquez un numéro valide.' : e2.message);
       return;
     }
     const e3 = deliveryAddressError(address);
@@ -125,8 +125,8 @@ export default function VendorCreateDirectDeliveryScreen() {
           <TextInput
             style={[styles.input, { marginTop: 10, borderColor: colors.border, backgroundColor: colors.surface, color: colors.text }]}
             value={clientPhone}
-            onChangeText={(t) => setClientPhone(formatCgPhone(t))}
-            placeholder="Téléphone (+242 …)"
+            onChangeText={(t) => setClientPhone(formatPhone(t))}
+            placeholder="Téléphone +XXX …"
             placeholderTextColor={colors.placeholder}
             keyboardType="phone-pad"
           />

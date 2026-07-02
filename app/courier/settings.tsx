@@ -24,8 +24,8 @@ import { useCourier } from '@/contexts/courier-context';
 import { apiFetch } from '@/lib/api';
 import { getSessionToken } from '@/lib/auth';
 import { useCourierPalette } from '@/lib/courier-theme';
-import { formatCgPhone, toCgE164 } from '@/lib/phone';
-import { validatePassword, validatePasswordConfirmation, validatePersonName, validatePhoneCg } from '@/lib/form-validation';
+import { formatPhone, toE164 } from '@/lib/phone';
+import { validatePassword, validatePasswordConfirmation, validatePersonName, validatePhone } from '@/lib/form-validation';
 
 type Me = { nom: string | null; telephone: string };
 
@@ -37,12 +37,12 @@ export default function CourierSettingsScreen() {
   const { profile, refresh } = useCourier();
 
   const [nom, setNom] = useState('');
-  const [phoneDisplay, setPhoneDisplay] = useState(() => formatCgPhone(''));
+  const [phoneDisplay, setPhoneDisplay] = useState(() => formatPhone(''));
 
   useEffect(() => {
     if (profile?.utilisateur) {
       setNom(profile.utilisateur.nom ?? '');
-      setPhoneDisplay(formatCgPhone(profile.utilisateur.telephone ?? ''));
+      setPhoneDisplay(formatPhone(profile.utilisateur.telephone ?? ''));
     }
   }, [profile]);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -55,7 +55,7 @@ export default function CourierSettingsScreen() {
   const [savingPassword, setSavingPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const phoneE164 = toCgE164(phoneDisplay);
+  const phoneE164 = toE164(phoneDisplay);
 
   const saveProfile = async () => {
     setError(null);
@@ -64,7 +64,7 @@ export default function CourierSettingsScreen() {
       setError(e1.message);
       return;
     }
-    const e2 = validatePhoneCg(phoneDisplay);
+    const e2 = validatePhone(phoneDisplay);
     if (!e2.ok) {
       setError(e2.message);
       return;
@@ -167,7 +167,7 @@ export default function CourierSettingsScreen() {
               icon={<Smartphone size={18} color={palette.primary} />}
               label="Téléphone"
               value={phoneDisplay}
-              onChangeText={(t) => setPhoneDisplay(formatCgPhone(t))}
+              onChangeText={(t) => setPhoneDisplay(formatPhone(t))}
               keyboardType="phone-pad"
               palette={palette}
             />

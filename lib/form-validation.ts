@@ -26,7 +26,6 @@ const NAME_REGEX_PERSON = /^[\p{L}][\p{L}\p{M}\s'’\-.]{0,79}$/u;
 const NAME_REGEX_COMMERCE = /^[\p{L}0-9][\p{L}\p{M}\s'’\-.,&()]{0,79}$/u;
 const NAME_REGEX_PRODUCT = /^[\p{L}0-9][\p{L}\p{M}0-9\s'’\-.,()/&°]{0,99}$/u;
 const EMAIL_REGEX = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
-const CG_PHONE_REGEX = /^\+242\s?0?[0-9]\s?(?:[0-9]{2}\s?){3}$/;
 const STRICT_PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{6,}$/;
 const OTP_REGEX = /^[0-9]{6}$/;
 
@@ -104,14 +103,60 @@ export function validateProductName(value: string): ValidationResult {
 
 /* --------------------- VALIDATEURS CONTACT --------------------- */
 
-export function validatePhoneCg(value: string): ValidationResult {
+import { detectCountryCode, getCountryConfig, type CountryPhoneConfig } from '@/lib/phone';
+
+/**
+ * Valide un numéro de téléphone de façon dynamique selon le pays détecté.
+ * @param value     Numéro saisi (avec indicatif)
+ * @param indicatif Indicatif forcé si déjà connu (ex. depuis la sélection pays)
+ */
+export function validatePhone(value: string, indicatif?: string): ValidationResult {
   const v = sanitizeText(value);
   if (v.length === 0) return fail('Numéro de téléphone requis.');
   if (!HAS_DIGIT_REGEX.test(v)) return fail('Le numéro doit contenir des chiffres.');
-  if (!CG_PHONE_REGEX.test(v) && !/^\+242[0-9]{9}$/.test(v.replace(/\s/g, ''))) {
-    return fail('Format attendu : +242 06 XXX XX XX.');
+
+  const activeIndicatif = indicatif || detectCountryCode(v);
+  const config = getCountryConfig(activeIndicatif);
+  const prefixDigits = activeIndicatif.replace(/\D/g, '');
+  const allDigits = v.replace(/\D/g, '');
+  const nationalDigits = allDigits.startsWith(prefixDigits)
+    ? allDigits.slice(prefixDigits.length, prefixDigits.length + config.nationalDigits)
+    : allDigits.slice(0, config.nationalDigits);
+
+  if (nationalDigits.length !== config.nationalDigits) {
+    const example = generateExample(activeIndicatif, config);
+    return fail(`Format attendu : ${example}`);
   }
+  if (!/^\d+$/.test(nationalDigits)) {
+    return fail('Le numéro doit contenir uniquement des chiffres.');
+  }
+
   return ok(v);
+}
+
+/** Génère un exemple de format pour l'indicatif donné. */
+function generateExample(indicatif: string, config: CountryPhoneConfig): string {
+  // Pour Congo: +242 06 XXX XX XX
+  if (config.indicatif === '+242') return '+242 06 XXX XX XX';
+  if (config.indicatif === '+237') return '+237 6XX XX XX XX';
+  if (config.indicatif === '+221') return '+221 7X XXX XX XX';
+  if (config.indicatif === '+225') return '+225 0X XX XX XX XX';
+  if (config.indicatif === '+241') return '+241 X XX XX XX';
+  if (config.indicatif === '+243') return '+243 8X XXX XX XX';
+  if (config.indicatif === '+229') return '+229 XX XX XX XX';
+  if (config.indicatif === '+228') return '+228 XX XX XX XX';
+  if (config.indicatif === '+234') return '+234 8XX XXX XXXX';
+  if (config.indicatif === '+33') return '+33 X XX XX XX XX';
+  // Générique
+  const xs = 'X'.repeat(config.nationalDigits);
+  return `${indicatif} ${xs}`;
+}
+
+/**
+ * @deprecated Utilisez `validatePhone(value, indicatif)` à la place.
+ */
+export function validatePhoneCg(value: string): ValidationResult {
+  return validatePhone(value, '+242');
 }
 
 export function validateEmailOptional(value: string): ValidationResult {

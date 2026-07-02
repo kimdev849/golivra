@@ -30,7 +30,7 @@ import { patchEnterprise } from '@/lib/enterprise';
 import { deliveryAddressError, quartierForForm } from '@/lib/format-address';
 import { resolveRemoteImageUrl } from '@/lib/images';
 import { uploadImageBase64 } from '@/lib/uploads';
-import { validateCommerceName, validateDescription, validatePhoneCg } from '@/lib/form-validation';
+import { validateCommerceName, validateDescription, validatePhone } from '@/lib/form-validation';
 
 const emptyAddr = (): DeliveryAddressFormValue => ({
   quartier: '',
@@ -92,7 +92,7 @@ export default function VendorShopInfoScreen() {
       return;
     }
     setNom(e1.value);
-    const e2 = validatePhoneCg(telephone);
+    const e2 = validatePhone(telephone);
     if (!e2.ok) {
       next.telephone = e2.message;
       setFieldErrors(next);

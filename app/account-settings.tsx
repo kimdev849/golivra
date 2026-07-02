@@ -27,10 +27,10 @@ import { pickVendorImageAsset } from '@/components/vendor-form-shared';
 import { apiFetch } from '@/lib/api';
 import { getSessionToken } from '@/lib/auth';
 import { resolveRemoteImageUrl } from '@/lib/images';
-import { formatCgPhone, toCgE164 } from '@/lib/phone';
+import { formatPhone, toE164 } from '@/lib/phone';
 import { isMerchantRole } from '@/lib/roles';
 import { uploadImageBase64 } from '@/lib/uploads';
-import { validatePassword, validatePasswordConfirmation, validatePersonName, validatePhoneCg } from '@/lib/form-validation';
+import { validatePassword, validatePasswordConfirmation, validatePersonName, validatePhone } from '@/lib/form-validation';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -54,7 +54,7 @@ export default function AccountSettingsScreen() {
   const [role, setRole] = useState<string | null>(null);
   const isMerchant = isMerchantRole(role);
   const [nom, setNom] = useState('');
-  const [phoneDisplay, setPhoneDisplay] = useState(() => formatCgPhone(''));
+  const [phoneDisplay, setPhoneDisplay] = useState(() => formatPhone(''));
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -83,7 +83,7 @@ export default function AccountSettingsScreen() {
       const data = await apiFetch<Me>('/api/auth/me', { method: 'GET', token });
       setRole(data.role ?? null);
       setNom(data.nom?.trim() ?? '');
-      setPhoneDisplay(formatCgPhone(data.telephone ?? ''));
+      setPhoneDisplay(formatPhone(data.telephone ?? ''));
       setAvatarUri(resolveRemoteImageUrl(data.imageUrl ?? data.image_url));
       setAvatarDataUrl(null);
     } catch (e) {
@@ -99,7 +99,7 @@ export default function AccountSettingsScreen() {
     }, [load])
   );
 
-  const phoneE164 = toCgE164(phoneDisplay);
+  const phoneE164 = toE164(phoneDisplay);
 
   const pickPhoto = async () => {
     const asset = await pickVendorImageAsset();
@@ -140,7 +140,7 @@ export default function AccountSettingsScreen() {
     }
     const cleanedNom = e1.value;
     setNom(cleanedNom);
-    const e2 = validatePhoneCg(phoneDisplay);
+    const e2 = validatePhone(phoneDisplay);
     if (!e2.ok) {
       next.phone = e2.message;
       setFieldErrors(next);
@@ -336,7 +336,7 @@ export default function AccountSettingsScreen() {
                         <TextInput
                           style={[styles.cellInput, { color: colors.text }]}
                           value={phoneDisplay}
-                          onChangeText={(t) => setPhoneDisplay(formatCgPhone(t))}
+                          onChangeText={(t) => setPhoneDisplay(formatPhone(t))}
                           placeholder="+242 …"
                           placeholderTextColor={colors.placeholder}
                           keyboardType="phone-pad"

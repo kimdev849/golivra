@@ -19,28 +19,30 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { FormErrorBanner } from '@/components/form-error-banner';
+import { CountryCodeSelector } from '@/components/country-code-selector';
 import type { AppPalette } from '@/constants/app-palette';
 import { brandGradient3 } from '@/constants/app-palette';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { loginAccount, persistAuthSession } from '@/lib/auth';
 import { prefetchClientCatalog } from '@/lib/client-data';
-import { formatCgPhone, toCgE164 } from '@/lib/phone';
+import { formatPhone, toE164, DEFAULT_INDICATIF } from '@/lib/phone';
 import { homeHrefForRole } from '@/lib/roles';
 import { UX_ERRORS, friendlyErrorMessage } from '@/lib/ux-copy';
-import { validatePassword, validatePhoneCg } from '@/lib/form-validation';
+import { validatePassword, validatePhone } from '@/lib/form-validation';
 
 export default function AuthScreen() {
   const router = useRouter();
   const colors = useAppColors();
   const styles = useMemo(() => makeAuthStyles(colors), [colors]);
   const { width } = useWindowDimensions();
-  const [loginPhone, setLoginPhone] = useState('+242 ');
+  const [countryCode, setCountryCode] = useState(DEFAULT_INDICATIF);
+  const [loginPhone, setLoginPhone] = useState(`${DEFAULT_INDICATIF} `);
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const phoneE164 = toCgE164(loginPhone);
+  const phoneE164 = toE164(loginPhone);
   const canSubmit = Boolean(phoneE164) && Boolean(password) && password.length >= 6 && !isSubmitting;
 
   useEffect(() => {
@@ -53,9 +55,9 @@ export default function AuthScreen() {
     };
   }, []);
 
-  const handleLogin = async () => {
+  const handleLoginAction = async () => {
     setError(null);
-    const e1 = validatePhoneCg(loginPhone);
+    const e1 = validatePhone(loginPhone, countryCode);
     if (!e1.ok) {
       setError(e1.message);
       return;
@@ -128,21 +130,25 @@ export default function AuthScreen() {
             />
 
             <ThemedView style={styles.inputCard}>
-              <View style={styles.inputIcon}>
-                <MaterialIcons name="call" size={18} color={colors.primary} />
-              </View>
+              <CountryCodeSelector
+                value={countryCode}
+                onChange={(code) => {
+                  setCountryCode(code);
+                  setLoginPhone(`${code} `);
+                }}
+              />
               <View style={styles.inputBody}>
                 <ThemedText style={styles.inputLabel}>Numéro de téléphone</ThemedText>
                 <TextInput
                   style={styles.inputField}
-                  placeholder="+242 06 XXX XX XX"
+                  placeholder="06 XXX XX XX"
                   keyboardType="phone-pad"
                   placeholderTextColor={colors.placeholder}
                   selectionColor={colors.primary}
                   autoCapitalize="none"
                   autoCorrect={false}
                   value={loginPhone}
-                  onChangeText={(text) => setLoginPhone(formatCgPhone(text))}
+                  onChangeText={(text) => setLoginPhone(formatPhone(text, countryCode))}
                   returnKeyType="next"
                   onSubmitEditing={() => {}}
                 />
@@ -181,7 +187,7 @@ export default function AuthScreen() {
                 !canSubmit ? styles.buttonDisabled : undefined,
               ]}
               disabled={!canSubmit}
-              onPress={handleLogin}>
+              onPress={handleLoginAction}>
               <LinearGradient
                 colors={canSubmit ? brandGradient3(colors) : [colors.primaryMuted, colors.primaryMuted]}
                 start={{ x: 0, y: 0 }}

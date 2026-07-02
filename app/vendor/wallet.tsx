@@ -20,7 +20,7 @@ import { useVendorTheme } from '@/hooks/use-vendor-theme';
 import { getSessionToken } from '@/lib/auth';
 import { formatFcfa } from '@/lib/format';
 import { fetchMyWallet, requestWithdrawal, type WalletDashboard } from '@/lib/wallet-api';
-import { validatePhoneCg } from '@/lib/form-validation';
+import { validatePhone } from '@/lib/form-validation';
 
 export default function VendorWalletScreen() {
   const insets = useSafeAreaInsets();
@@ -60,7 +60,7 @@ export default function VendorWalletScreen() {
       showError('Montant invalide', 'Minimum 1 000 FCFA.');
       return;
     }
-    const eNum = validatePhoneCg(numero);
+    const eNum = validatePhone(numero);
     if (!eNum.ok) {
       showError('Numéro invalide', eNum.message);
       return;
