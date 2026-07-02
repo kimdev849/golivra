@@ -29,7 +29,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { registerAccount, registerVendorAccount, persistAuthSession } from '@/lib/auth';
 import { fetchEnterpriseCategories, type EnterpriseCategory } from '@/lib/enterprise';
 import { requestOtp } from '@/lib/otp';
-import { formatPhone, toE164 } from '@/lib/phone';
+import { formatPhone, initPhoneCountries, toE164 } from '@/lib/phone';
 import { uploadImageForSignup } from '@/lib/uploads';
 import { VENDOR_HREF } from '@/lib/vendor-nav';
 import { friendlyErrorMessage } from '@/lib/ux-copy';
@@ -101,6 +101,8 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
   const phoneE164 = toE164(phone);
 
   useEffect(() => {
+    initPhoneCountries().catch(() => {});
+
     const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
     const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
     return () => { showSub.remove(); hideSub.remove(); };
