@@ -2,19 +2,17 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useMemo, useState } from 'react';
 import {
-  Dimensions,
   Pressable,
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import Carousel from 'react-native-reanimated-carousel';
 
 import type { MarketingCampaign } from '@/lib/campaigns';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const H_PAD = 16;
-const CAROUSEL_WIDTH = SCREEN_WIDTH - H_PAD * 2;
 
 type Props = {
   campaigns: MarketingCampaign[];
@@ -31,14 +29,6 @@ type Props = {
   };
 };
 
-const TYPE_EMOJI: Record<string, string> = {
-  offre_jour: '🔥',
-  promo: '🏷️',
-  lancement: '🚀',
-  saisonniere: '📅',
-  standard: '📢',
-};
-
 const TYPE_LABEL: Record<string, string> = {
   offre_jour: "Offre du jour",
   promo: 'Promotion',
@@ -48,11 +38,14 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 export function HomeCampaignBanner({ campaigns, onPress, colors }: Props) {
+  const { width: screenWidth } = useWindowDimensions();
+  const carouselWidth = screenWidth - H_PAD * 2;
+
   const [index, setIndex] = useState(0);
   const heroHeight = useMemo(() => {
-    const h = Math.round(CAROUSEL_WIDTH * 0.5);
+    const h = Math.round(carouselWidth * 0.5);
     return Math.min(Math.max(h, 160), 240);
-  }, []);
+  }, [carouselWidth]);
 
   const typeStyle = useCallback((type: string) => {
     switch (type) {
@@ -69,7 +62,7 @@ export function HomeCampaignBanner({ campaigns, onPress, colors }: Props) {
   return (
     <View style={styles.wrap}>
       <Carousel
-        width={CAROUSEL_WIDTH}
+        width={carouselWidth}
         height={heroHeight}
         data={campaigns}
         loop={campaigns.length > 1}
@@ -78,6 +71,7 @@ export function HomeCampaignBanner({ campaigns, onPress, colors }: Props) {
         autoPlay={campaigns.length > 1}
         autoPlayInterval={5000}
         scrollAnimationDuration={350}
+        style={styles.carousel}
         onSnapToItem={setIndex}
         renderItem={({ item }) => {
           const style = typeStyle(item.type);
@@ -163,7 +157,8 @@ export function HomeCampaignBanner({ campaigns, onPress, colors }: Props) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginBottom: 4 },
+  wrap: { marginBottom: 4, overflow: 'hidden', borderRadius: 18 },
+  carousel: { borderRadius: 18 },
   card: {
     flex: 1,
     borderRadius: 18,
