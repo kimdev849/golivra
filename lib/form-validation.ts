@@ -103,7 +103,7 @@ export function validateProductName(value: string): ValidationResult {
 
 /* --------------------- VALIDATEURS CONTACT --------------------- */
 
-import { detectCountryCode, getCountryConfig, type CountryPhoneConfig } from '@/lib/phone';
+import { detectCountryCode, getCachedCountryByIndicatif, initPhoneCountries } from '@/lib/phone';
 
 /**
  * Valide un numéro de téléphone de façon dynamique selon le pays détecté.
@@ -116,15 +116,18 @@ export function validatePhone(value: string, indicatif?: string): ValidationResu
   if (!HAS_DIGIT_REGEX.test(v)) return fail('Le numéro doit contenir des chiffres.');
 
   const activeIndicatif = indicatif || detectCountryCode(v);
-  const config = getCountryConfig(activeIndicatif);
+
+  // Récupérer les infos téléphone du pays depuis le cache
+  const country = getCachedCountryByIndicatif(activeIndicatif);
+  const expectedDigits = country?.phone_digits ?? 9;
   const prefixDigits = activeIndicatif.replace(/\D/g, '');
   const allDigits = v.replace(/\D/g, '');
   const nationalDigits = allDigits.startsWith(prefixDigits)
-    ? allDigits.slice(prefixDigits.length, prefixDigits.length + config.nationalDigits)
-    : allDigits.slice(0, config.nationalDigits);
+    ? allDigits.slice(prefixDigits.length, prefixDigits.length + expectedDigits)
+    : allDigits.slice(0, expectedDigits);
 
-  if (nationalDigits.length !== config.nationalDigits) {
-    const example = generateExample(activeIndicatif, config);
+  if (nationalDigits.length !== expectedDigits) {
+    const example = generateExample(activeIndicatif, expectedDigits);
     return fail(`Format attendu : ${example}`);
   }
   if (!/^\d+$/.test(nationalDigits)) {
@@ -134,21 +137,9 @@ export function validatePhone(value: string, indicatif?: string): ValidationResu
   return ok(v);
 }
 
-/** Génère un exemple de format pour l'indicatif donné. */
-function generateExample(indicatif: string, config: CountryPhoneConfig): string {
-  // Pour Congo: +242 06 XXX XX XX
-  if (config.indicatif === '+242') return '+242 06 XXX XX XX';
-  if (config.indicatif === '+237') return '+237 6XX XX XX XX';
-  if (config.indicatif === '+221') return '+221 7X XXX XX XX';
-  if (config.indicatif === '+225') return '+225 0X XX XX XX XX';
-  if (config.indicatif === '+241') return '+241 X XX XX XX';
-  if (config.indicatif === '+243') return '+243 8X XXX XX XX';
-  if (config.indicatif === '+229') return '+229 XX XX XX XX';
-  if (config.indicatif === '+228') return '+228 XX XX XX XX';
-  if (config.indicatif === '+234') return '+234 8XX XXX XXXX';
-  if (config.indicatif === '+33') return '+33 X XX XX XX XX';
-  // Générique
-  const xs = 'X'.repeat(config.nationalDigits);
+/** Génère un exemple de format pour l'indicatif donné (basé sur phone_digits de l'API). */
+function generateExample(indicatif: string, digits: number): string {
+  const xs = 'X'.repeat(Math.min(digits, 12));
   return `${indicatif} ${xs}`;
 }
 

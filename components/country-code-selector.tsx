@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
-import { COUNTRY_CONFIGS_LIST, type CountryPhoneConfig } from '@/lib/phone';
+import { usePaysList } from '@/lib/phone';
 
 type Props = {
   value: string; // indicatif actuel (ex. '+242')
@@ -24,8 +24,14 @@ export function CountryCodeSelector({ value, onChange, disabled = false }: Props
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
+  const paysList = usePaysList();
 
-  const selected = COUNTRY_CONFIGS_LIST.find((c) => c.indicatif === value) ?? COUNTRY_CONFIGS_LIST[0];
+  // Filtrer les pays valides (avec indicatif et phone_digits)
+  const validCountries = paysList.filter((p) => p.indicatif && p.phone_digits);
+
+  const selected = validCountries.find((p) => p.indicatif === value)
+    ?? validCountries[0]
+    ?? { indicatif: '+242', nom: 'Congo' };
 
   return (
     <>
@@ -48,26 +54,33 @@ export function CountryCodeSelector({ value, onChange, disabled = false }: Props
               Indicatif du pays
             </ThemedText>
             <ScrollView>
-              {COUNTRY_CONFIGS_LIST.map((cfg) => (
+              {validCountries.map((p) => (
                 <Pressable
-                  key={cfg.indicatif}
+                  key={p.id}
                   style={[
                     styles.option,
                     { borderBottomColor: colors.border },
-                    value === cfg.indicatif && { backgroundColor: colors.successSoft },
+                    value === p.indicatif && { backgroundColor: colors.successSoft },
                   ]}
                   onPress={() => {
-                    onChange(cfg.indicatif);
+                    if (p.indicatif) {
+                      onChange(p.indicatif);
+                    }
                     setOpen(false);
                   }}>
                   <ThemedText style={[styles.optionText, { color: colors.text }]}>
-                    {cfg.indicatif}
+                    {p.indicatif}
                   </ThemedText>
                   <ThemedText style={[styles.optionName, { color: colors.textMuted }]}>
-                    {cfg.country}
+                    {p.nom}
                   </ThemedText>
                 </Pressable>
               ))}
+              {validCountries.length === 0 && (
+                <ThemedText style={[styles.emptyText, { color: colors.textMuted }]}>
+                  Chargement des pays…
+                </ThemedText>
+              )}
             </ScrollView>
           </View>
         </Pressable>
@@ -106,4 +119,5 @@ const styles = StyleSheet.create({
   },
   optionText: { fontSize: 16, fontWeight: '700' },
   optionName: { fontSize: 14 },
+  emptyText: { textAlign: 'center', marginVertical: 20, fontSize: 14 },
 });

@@ -1,55 +1,64 @@
 /**
- * Formatage téléphone dynamique multi-pays.
+ * Formatage téléphone multi-pays.
  *
- * Chaque pays a son propre indicatif, nombre de chiffres, et motif de formatage.
- * Les fonctions détectent automatiquement le pays à partir du préfixe saisi.
+ * Aucune donnée codée en dur — tout vient de l'API (`Pays` depuis la table `pays`).
+ * Les pays sont mis en cache après le premier appel à `initPhoneCountries()`.
  */
 
+import { useState, useEffect } from 'react';
+import { fetchPays, type Pays } from '@/lib/location';
+
 /* -------------------------------------------------------------------------- */
-/*  Configuration pays                                                       */
+/*  Cache pays                                                                */
 /* -------------------------------------------------------------------------- */
 
-export type CountryPhoneConfig = {
-  indicatif: string;
-  name: string;
-  /** Nombre de chiffres après l'indicatif (sans le 0 éventuel). */
-  nationalDigits: number;
-  /**
-   * Tableau de tailles de groupes pour le formatage, ex [2,3,2,2] → "XX XXX XX XX".
-   * Les groupes sont appliqués dans l'ordre sans séparateur fixe,
-   * chaque élément définit le nombre de caractères à prendre pour ce groupe.
-   */
-  groups: number[];
-  /** Nom utilisé pour les messages d'erreur. */
-  country: string;
-};
+let _countries: Pays[] | null = null;
+let _countriesPromise: Promise<Pays[]> | null = null;
 
-const COUNTRY_CONFIGS: CountryPhoneConfig[] = [
-  { indicatif: '+242', name: '+242', nationalDigits: 9, groups: [2, 3, 2, 2], country: 'Congo' },
-  { indicatif: '+237', name: '+237', nationalDigits: 9, groups: [3, 2, 2, 2], country: 'Cameroun' },
-  { indicatif: '+221', name: '+221', nationalDigits: 9, groups: [2, 3, 2, 2], country: 'Sénégal' },
-  { indicatif: '+225', name: '+225', nationalDigits: 10, groups: [2, 2, 2, 2, 2], country: 'Côte d\'Ivoire' },
-  { indicatif: '+241', name: '+241', nationalDigits: 8, groups: [1, 2, 2, 3], country: 'Gabon' },
-  { indicatif: '+243', name: '+243', nationalDigits: 9, groups: [2, 3, 2, 2], country: 'RDC' },
-  { indicatif: '+229', name: '+229', nationalDigits: 8, groups: [2, 2, 2, 2], country: 'Bénin' },
-  { indicatif: '+228', name: '+228', nationalDigits: 8, groups: [2, 2, 2, 2], country: 'Togo' },
-  { indicatif: '+224', name: '+224', nationalDigits: 9, groups: [2, 3, 2, 2], country: 'Guinée' },
-  { indicatif: '+223', name: '+223', nationalDigits: 8, groups: [2, 2, 2, 2], country: 'Mali' },
-  { indicatif: '+226', name: '+226', nationalDigits: 8, groups: [2, 2, 2, 2], country: 'Burkina Faso' },
-  { indicatif: '+227', name: '+227', nationalDigits: 8, groups: [2, 2, 2, 2], country: 'Niger' },
-  { indicatif: '+234', name: '+234', nationalDigits: 10, groups: [3, 3, 4], country: 'Nigeria' },
-  { indicatif: '+33', name: '+33', nationalDigits: 9, groups: [1, 2, 2, 2, 2], country: 'France' },
-];
-
-/** Index par indicatif pour lookup rapide. */
-const CONFIG_BY_INDICATIF: Record<string, CountryPhoneConfig> = {};
-for (const cfg of COUNTRY_CONFIGS) {
-  CONFIG_BY_INDICATIF[cfg.indicatif] = cfg;
+/**
+ * Initialise/récupère la liste des pays depuis l'API.
+ * Le résultat est mis en cache après le premier appel réussi.
+ */
+export async function initPhoneCountries(): Promise<Pays[]> {
+  if (_countries) return _countries;
+  if (_countriesPromise) return _countriesPromise;
+  _countriesPromise = fetchPays().then((list) => {
+    // Filtrer uniquement les pays qui ont un indicatif
+    const valid = list.filter((p) => p.indicatif && p.phone_digits);
+    _countries = valid;
+    _countriesPromise = null;
+    return valid;
+  }).catch((err) => {
+    _countriesPromise = null;
+    throw err;
+  });
+  return _countriesPromise;
 }
 
-export const DEFAULT_INDICATIF = '+242';
-export const COUNTRY_CONFIGS_LIST = COUNTRY_CONFIGS;
-export const DEFAULT_COUNTRY_CONFIG = CONFIG_BY_INDICATIF[DEFAULT_INDICATIF]!;
+/**
+ * Vide le cache (utile pour tests ou rafraîchissement).
+ */
+export function resetPhoneCountries(): void {
+  _countries = null;
+  _countriesPromise = null;
+}
+
+/**
+ * Récupère la liste des pays depuis le cache.
+ * Retourne un tableau vide si `initPhoneCountries()` n'a pas été appelé.
+ */
+export function getCachedCountries(): Pays[] {
+  return _countries ?? [];
+}
+
+/**
+ * Récupère un pays par son indicatif depuis le cache.
+ */
+export function getCachedCountryByIndicatif(indicatif: string): Pays | undefined {
+  return (_countries ?? []).find(
+    (p) => p.indicatif?.replace(/\s/g, '') === indicatif.replace(/\s/g, ''),
+  );
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Détection du pays à partir d'une chaîne                                   */
@@ -57,25 +66,61 @@ export const DEFAULT_COUNTRY_CONFIG = CONFIG_BY_INDICATIF[DEFAULT_INDICATIF]!;
 
 /**
  * Détecte l'indicatif du pays à partir d'un numéro partiellement saisi.
- * Vérifie d'abord les préfixes longs (+242, +237, +225…) puis les plus courts (+33).
+ * Utilise le cache — doit être initialisé avec `initPhoneCountries()`.
  */
 export function detectCountryCode(value: string): string {
+  const countries = _countries ?? [];
   const cleaned = value.replace(/\s/g, '');
-  // Trier par longueur d'indicatif décroissante pour matcher +242 avant +24
-  const sorted = [...COUNTRY_CONFIGS].sort((a, b) => b.indicatif.length - a.indicatif.length);
-  for (const cfg of sorted) {
-    if (cleaned.startsWith(cfg.indicatif)) return cfg.indicatif;
+
+  // Trier par longueur d'indicatif décroissante (+242 avant +24)
+  const sorted = [...countries]
+    .filter((p) => p.indicatif)
+    .sort((a, b) => (b.indicatif?.length ?? 0) - (a.indicatif?.length ?? 0));
+
+  for (const p of sorted) {
+    if (p.indicatif && cleaned.startsWith(p.indicatif)) return p.indicatif;
   }
-  // Si ça commence par + mais match aucun connu, on garde le préfixe tapé
+
+  // Si ça commence par + mais match aucun connu
   if (/^\+\d/.test(cleaned)) {
     const match = cleaned.match(/^(\+\d{1,4})/);
     if (match) return match[1];
   }
-  return DEFAULT_INDICATIF;
+
+  return '+242'; // fallback Congo
 }
 
-export function getCountryConfig(indicatif: string): CountryPhoneConfig {
-  return CONFIG_BY_INDICATIF[indicatif] ?? DEFAULT_COUNTRY_CONFIG;
+/**
+ * Récupère les infos téléphone d'un pays depuis le cache.
+ */
+function getPhoneInfo(indicatif: string): { digits: number; groups: number[] } | null {
+  const countries = _countries ?? [];
+  const p = countries.find(
+    (c) => c.indicatif?.replace(/\s/g, '') === indicatif.replace(/\s/g, ''),
+  );
+  if (!p || !p.phone_digits) return null;
+
+  const groups = p.phone_format
+    ? p.phone_format.split(',').map(Number).filter((n) => n > 0)
+    : defaultGroups(p.phone_digits);
+
+  return { digits: p.phone_digits, groups };
+}
+
+/**
+ * Génère des groupes par défaut si aucun format n'est défini.
+ */
+function defaultGroups(digits: number): number[] {
+  if (digits <= 2) return [digits];
+  if (digits <= 4) return [2, digits - 2];
+  // Pour la plupart des numéros: groupes de 2, le dernier prend le reste
+  const groups: number[] = [];
+  let remaining = digits;
+  while (remaining > 0) {
+    groups.push(Math.min(2, remaining));
+    remaining -= 2;
+  }
+  return groups;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -84,30 +129,36 @@ export function getCountryConfig(indicatif: string): CountryPhoneConfig {
 
 /**
  * Formate un numéro selon les règles du pays détecté.
- * @param value  La valeur brute tapée par l'utilisateur
- * @param indicatif  Indicatif forcé (si déjà connu, ex. depuis la sélection pays)
+ * @param value     La valeur brute tapée par l'utilisateur
+ * @param indicatif Indicatif forcé (si déjà connu)
  */
 export function formatPhone(value: string, indicatif?: string): string {
   const activeIndicatif = indicatif || detectCountryCode(value);
-  const config = getCountryConfig(activeIndicatif);
-  const prefixDigits = activeIndicatif.replace(/\D/g, '');
+  const info = getPhoneInfo(activeIndicatif);
 
-  // Extraire les chiffres nationaux
+  if (!info) {
+    // Fallback: pas d'infos disponibles, formatage basique
+    const digits = value.replace(/\D/g, '');
+    if (!digits) return `${activeIndicatif} `;
+    // Grouper par 2
+    const formatted = digits.replace(/(\d{2})(?=\d)/g, '$1 ');
+    return `${activeIndicatif} ${formatted}`;
+  }
+
+  const prefixDigits = activeIndicatif.replace(/\D/g, '');
   const allDigits = value.replace(/\D/g, '');
   const nationalDigits = allDigits.startsWith(prefixDigits)
-    ? allDigits.slice(prefixDigits.length, prefixDigits.length + config.nationalDigits)
-    : allDigits.slice(0, config.nationalDigits);
+    ? allDigits.slice(prefixDigits.length, prefixDigits.length + info.digits)
+    : allDigits.slice(0, info.digits);
 
   if (!nationalDigits) return `${activeIndicatif} `;
 
-  // Appliquer les groupes de formatage
-  const formatted = formatGroups(nationalDigits, config.groups);
+  const formatted = formatGroups(nationalDigits, info.groups);
   return `${activeIndicatif} ${formatted}`;
 }
 
 /**
  * Applique un motif de groupes à une chaîne de chiffres.
- * Ex: "060001234" avec [2,3,2,2] → "06 000 12 34"
  */
 function formatGroups(digits: string, groups: number[]): string {
   const parts: string[] = [];
@@ -130,21 +181,45 @@ function formatGroups(digits: string, groups: number[]): string {
  */
 export function toE164(value: string): string | null {
   const activeIndicatif = detectCountryCode(value);
-  const config = getCountryConfig(activeIndicatif);
+  const info = getPhoneInfo(activeIndicatif);
   const prefixDigits = activeIndicatif.replace(/\D/g, '');
 
   const allDigits = value.replace(/\D/g, '');
+  const expectedDigits = info?.digits ?? 9;
   const nationalDigits = allDigits.startsWith(prefixDigits)
-    ? allDigits.slice(prefixDigits.length, prefixDigits.length + config.nationalDigits)
-    : allDigits.slice(0, config.nationalDigits);
+    ? allDigits.slice(prefixDigits.length, prefixDigits.length + expectedDigits)
+    : allDigits.slice(0, expectedDigits);
 
-  if (nationalDigits.length !== config.nationalDigits) return null;
+  if (nationalDigits.length !== expectedDigits) return null;
   return `${activeIndicatif}${nationalDigits}`;
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Rétrocompatibilité (Congo uniquement)                                     */
+/*  Utilitaires                                                               */
 /* -------------------------------------------------------------------------- */
+
+export const DEFAULT_INDICATIF = '+242';
+
+/**
+ * Hook React pour récupérer la liste des pays depuis le cache.
+ * Déclenche l'initialisation au premier appel et met à jour le state
+ * quand les données arrivent de l'API.
+ */
+export function usePaysList(): Pays[] {
+  const [countries, setCountries] = useState<Pays[]>(() => getCachedCountries());
+
+  useEffect(() => {
+    if (getCachedCountries().length > 0) {
+      setCountries(getCachedCountries());
+      return;
+    }
+    initPhoneCountries()
+      .then((list) => setCountries(list))
+      .catch(() => {});
+  }, []);
+
+  return countries;
+}
 
 /**
  * @deprecated Utilisez `formatPhone(value)` à la place.
@@ -157,12 +232,5 @@ export function formatCgPhone(value: string): string {
  * @deprecated Utilisez `toE164(value)` à la place.
  */
 export function toCgE164(value: string): string | null {
-  // Rediriger vers la version générique mais en forçant +242
-  const config = getCountryConfig('+242');
-  const digits = value.replace(/\D/g, '');
-  const nationalDigits = digits.startsWith('242') ? digits.slice(3, 12) : digits.slice(0, 9);
-  if (nationalDigits.length !== config.nationalDigits) return null;
-  return `+242${nationalDigits}`;
+  return toE164(value);
 }
-
-export { COUNTRY_CONFIGS as COUNTRY_PHONE_CONFIGS };

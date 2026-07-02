@@ -10,6 +10,8 @@ export type Pays = {
   code_iso2: string;
   code_iso3: string;
   indicatif: string | null;
+  phone_digits: number | null;
+  phone_format: string | null;
 };
 
 export type Ville = {
