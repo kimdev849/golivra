@@ -19,13 +19,12 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { FormErrorBanner } from '@/components/form-error-banner';
-import { CountryCodeSelector } from '@/components/country-code-selector';
 import type { AppPalette } from '@/constants/app-palette';
 import { brandGradient3 } from '@/constants/app-palette';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { loginAccount, persistAuthSession } from '@/lib/auth';
 import { prefetchClientCatalog } from '@/lib/client-data';
-import { formatPhone, toE164, DEFAULT_INDICATIF } from '@/lib/phone';
+import { formatPhone, toE164 } from '@/lib/phone';
 import { homeHrefForRole } from '@/lib/roles';
 import { UX_ERRORS, friendlyErrorMessage } from '@/lib/ux-copy';
 import { validatePassword, validatePhone } from '@/lib/form-validation';
@@ -35,8 +34,7 @@ export default function AuthScreen() {
   const colors = useAppColors();
   const styles = useMemo(() => makeAuthStyles(colors), [colors]);
   const { width } = useWindowDimensions();
-  const [countryCode, setCountryCode] = useState(DEFAULT_INDICATIF);
-  const [loginPhone, setLoginPhone] = useState(`${DEFAULT_INDICATIF} `);
+  const [loginPhone, setLoginPhone] = useState('+242 ');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
@@ -55,9 +53,9 @@ export default function AuthScreen() {
     };
   }, []);
 
-  const handleLoginAction = async () => {
+  const handleLogin = async () => {
     setError(null);
-    const e1 = validatePhone(loginPhone, countryCode);
+    const e1 = validatePhone(loginPhone);
     if (!e1.ok) {
       setError(e1.message);
       return;
@@ -130,25 +128,21 @@ export default function AuthScreen() {
             />
 
             <ThemedView style={styles.inputCard}>
-              <CountryCodeSelector
-                value={countryCode}
-                onChange={(code) => {
-                  setCountryCode(code);
-                  setLoginPhone(`${code} `);
-                }}
-              />
+              <View style={styles.inputIcon}>
+                <MaterialIcons name="call" size={18} color={colors.primary} />
+              </View>
               <View style={styles.inputBody}>
                 <ThemedText style={styles.inputLabel}>Numéro de téléphone</ThemedText>
                 <TextInput
                   style={styles.inputField}
-                  placeholder="06 XXX XX XX"
+                  placeholder="+242 06 XXX XX XX"
                   keyboardType="phone-pad"
                   placeholderTextColor={colors.placeholder}
                   selectionColor={colors.primary}
                   autoCapitalize="none"
                   autoCorrect={false}
                   value={loginPhone}
-                  onChangeText={(text) => setLoginPhone(formatPhone(text, countryCode))}
+                  onChangeText={(text) => setLoginPhone(formatPhone(text))}
                   returnKeyType="next"
                   onSubmitEditing={() => {}}
                 />
@@ -187,7 +181,7 @@ export default function AuthScreen() {
                 !canSubmit ? styles.buttonDisabled : undefined,
               ]}
               disabled={!canSubmit}
-              onPress={handleLoginAction}>
+              onPress={handleLogin}>
               <LinearGradient
                 colors={canSubmit ? brandGradient3(colors) : [colors.primaryMuted, colors.primaryMuted]}
                 start={{ x: 0, y: 0 }}
