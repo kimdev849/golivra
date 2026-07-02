@@ -24,7 +24,7 @@ import { brandGradient3 } from '@/constants/app-palette';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { loginAccount, persistAuthSession } from '@/lib/auth';
 import { prefetchClientCatalog } from '@/lib/client-data';
-import { formatPhone, toE164 } from '@/lib/phone';
+import { formatPhone, initPhoneCountries, toE164 } from '@/lib/phone';
 import { homeHrefForRole } from '@/lib/roles';
 import { UX_ERRORS, friendlyErrorMessage } from '@/lib/ux-copy';
 import { validatePassword, validatePhone } from '@/lib/form-validation';
@@ -44,6 +44,8 @@ export default function AuthScreen() {
   const canSubmit = Boolean(phoneE164) && Boolean(password) && password.length >= 6 && !isSubmitting;
 
   useEffect(() => {
+    initPhoneCountries().catch(() => {});
+
     const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
     const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
 

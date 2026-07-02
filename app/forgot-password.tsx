@@ -1,5 +1,5 @@
 import { Link, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -20,7 +20,7 @@ import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { resetPassword } from '@/lib/auth';
 import { requestOtp } from '@/lib/otp';
-import { formatPhone, toE164 } from '@/lib/phone';
+import { formatPhone, initPhoneCountries, toE164 } from '@/lib/phone';
 import { validateOtp, validatePassword, validatePasswordConfirmation, validatePhone } from '@/lib/form-validation';
 
 type Step = 'phone' | 'otp' | 'done';
@@ -43,6 +43,10 @@ export default function ForgotPasswordScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const phoneE164 = toE164(phone);
+
+  useEffect(() => {
+    initPhoneCountries().catch(() => {});
+  }, []);
 
   const handleRequestOtp = async () => {
     setError(null);
