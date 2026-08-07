@@ -276,7 +276,7 @@ export default function ProductDetailScreen() {
         styles.vendorRow,
         { backgroundColor: colors.surface, borderColor: colors.border },
       ]}
-      onPress={() => router.push(`/(tabs)/marketplace/${product.entreprise_id}`)}
+      onPress={() => router.push(`/marketplace/${product.entreprise_id}`)}
       android_ripple={{ color: colors.primaryMuted }}>
       <View style={[styles.vendorIcon, { backgroundColor: colors.primarySoft }]}>
         {product.enterprise_image_url ? (

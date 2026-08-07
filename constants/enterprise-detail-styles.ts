@@ -95,6 +95,7 @@ export function createEnterpriseDetailStyles(c: AppPalette) {
     desc: { fontSize: 15, lineHeight: 22, color: c.textSecondary },
     infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
     infoText: { flex: 1, fontSize: 14, color: c.textMuted, lineHeight: 20 },
+    deliveryHint: { fontSize: 12, color: c.textMuted, lineHeight: 17, paddingLeft: 30 },
     hoursBanner: {
       flexDirection: 'row',
       alignItems: 'center',

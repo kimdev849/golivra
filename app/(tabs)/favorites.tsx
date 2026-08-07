@@ -238,7 +238,7 @@ export default function FavoritesScreen() {
             return (
               <Pressable
                 style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}
-                onPress={() => router.push(`/(tabs)/marketplace/${item.id}`)}
+                onPress={() => router.push(`/marketplace/${item.id}`)}
                 android_ripple={{ color: colors.primaryMuted }}>
                 <View style={[styles.thumbWrap, { backgroundColor: colors.primarySoft }]}>
                   {img ? (

@@ -46,6 +46,7 @@ import { resolveRemoteImageUrl } from '@/lib/images';
 import {
   DEFAULT_PUBLIC_PRICING,
   deliveryFeeForQuartier,
+  deliveryMinutesForQuartier,
   displayDeliveryFeeFcfa,
   fetchPublicPricing,
   zoneLabelForQuartier,
@@ -235,7 +236,12 @@ export default function CartScreen() {
     if (!address.quartier.trim() || !p.zones?.zones?.length) return null;
     const label = zoneLabelForQuartier(address.quartier, p);
     const fee = deliveryFeeForQuartier(address.quartier, p);
-    return label ? `${label} · ${formatFcfa(fee)} / livraison` : `${formatFcfa(fee)} / livraison`;
+    // ⚡ Temps de livraison dynamique (GoLivra) selon la zone du quartier choisi.
+    const minutes = deliveryMinutesForQuartier(address.quartier, p);
+    const timePart = minutes ? ` · ~${minutes} min` : '';
+    return label
+      ? `${label} · ${formatFcfa(fee)} / livraison${timePart}`
+      : `${formatFcfa(fee)} / livraison${timePart}`;
   }, [address.quartier, pricing]);
 
   const deliveryFeeTotal = useMemo(() => {
@@ -472,7 +478,7 @@ export default function CartScreen() {
               </ThemedText>
               <Pressable
                 style={[styles.cta, { backgroundColor: colors.primary }]}
-                onPress={() => router.navigate('/(tabs)/marketplace')}
+                onPress={() => router.navigate('/(tabs)')}
                 android_ripple={{ color: 'rgba(255,255,255,0.2)' }}>
                 <ThemedText style={[styles.ctaText, { color: colors.onPrimary }]}>Voir les commerces</ThemedText>
               </Pressable>

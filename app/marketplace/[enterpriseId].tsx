@@ -32,6 +32,7 @@ import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { useCurrentTime } from '@/hooks/use-current-time';
+import { useDeliveryEstimate } from '@/hooks/use-delivery-estimate';
 import { computeLiveStatus } from '@/lib/horaires-status';
 import type { EnterprisePublic, ProductPublic } from '@/lib/catalog';
 import {
@@ -132,7 +133,11 @@ export default function EnterpriseDetailScreen() {
   const hero = resolveRemoteImageUrl(enterprise?.image_url, IMG_HERO);
   const isRestaurant = enterprise?.type === 'restaurant';
   const prepMin = enterprise?.delai_preparation_min ?? 25;
-  const shipMin = enterprise?.delai_livraison_min ?? 48;
+  // ⚡ Temps de livraison DYNAMIQUE : géré par GoLivra selon la ZONE du client
+  // (proche ~30 min · moyenne ~45 min · éloignée ~60 min). Repli sur le délai
+  // du commerce si la zone n'est pas déterminable.
+  const { minutes: deliveryMin } = useDeliveryEstimate();
+  const shipMin = deliveryMin ?? enterprise?.delai_livraison_min ?? 48;
   // ⚡ Statut ouvert/fermé RECALCULÉ EN DIRECT côté client.
   // Le serveur calcule est_ouvert_maintenant / peut_commander_maintenant à
   // l'instant de la requête, puis le cache client le fige (jusqu'à plusieurs
@@ -356,6 +361,11 @@ export default function EnterpriseDetailScreen() {
               Préparation ~{prepMin} min · Livraison ~{shipMin} min
             </ThemedText>
           </View>
+          {deliveryMin != null ? (
+            <ThemedText style={styles.deliveryHint}>
+              Livraison estimée selon votre zone — le temps de préparation est fixé par {commerceRef}.
+            </ThemedText>
+          ) : null}
         </View>
 
         {/* Statut d'ouverture (horaires) */}

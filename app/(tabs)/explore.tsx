@@ -498,7 +498,7 @@ export default function OrdersScreen() {
             <ThemedText style={[styles.emptyBody, { color: colors.textMuted }]}>
               Passez une commande depuis le panier pour la voir apparaître ici.
             </ThemedText>
-            <Pressable style={[styles.retrySolid, { backgroundColor: colors.primary }]} onPress={() => router.navigate('/(tabs)/marketplace')}>
+            <Pressable style={[styles.retrySolid, { backgroundColor: colors.primary }]} onPress={() => router.navigate('/(tabs)')}>
               <ThemedText style={[styles.retrySolidText, { color: colors.onPrimary }]}>Ouvrir le marketplace</ThemedText>
             </Pressable>
           </View>

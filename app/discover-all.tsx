@@ -28,6 +28,7 @@ import { LUCIDE_STROKE } from '@/constants/icons';
 import type { AppPalette } from '@/constants/app-palette';
 import { createScreenStyles } from '@/constants/ui-styles';
 import { useAppColors } from '@/hooks/use-app-colors';
+import { useDeliveryEstimate } from '@/hooks/use-delivery-estimate';
 import { useEnterprises } from '@/hooks/useMarketplace';
 import {
   sortEnterprisesByPopularity,
@@ -52,6 +53,8 @@ export default function DiscoverAllScreen() {
   const styles = useMemo(() => makeLocalStyles(colors), [colors]);
 
   const { data: enterprises, isLoading } = useEnterprises('all');
+  // ⚡ Temps de livraison dynamique (GoLivra) selon la zone de l'adresse principale.
+  const { minutes: deliveryMinutes } = useDeliveryEstimate();
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortKey>('popular');
 
@@ -148,7 +151,7 @@ export default function DiscoverAllScreen() {
                   styles.entRow,
                   { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.93 : 1 },
                 ]}
-                onPress={() => router.push(`/(tabs)/marketplace/${ent.id}` as never)}
+                onPress={() => router.push(`/marketplace/${ent.id}` as never)}
                 android_ripple={{ color: colors.primaryMuted }}>
                 <View style={[styles.entRowImg, { backgroundColor: colors.primarySoft }]}>
                   {img ? (
@@ -172,7 +175,9 @@ export default function DiscoverAllScreen() {
                     {[
                       ent.type === 'restaurant' ? 'Restaurant' : 'Boutique',
                       ent.categorie_nom,
-                      ent.delai_livraison_min ? `${ent.delai_livraison_min} min` : null,
+                      (deliveryMinutes ?? ent.delai_livraison_min)
+                        ? `${deliveryMinutes ?? ent.delai_livraison_min} min`
+                        : null,
                     ]
                       .filter(Boolean)
                       .join(' · ')}

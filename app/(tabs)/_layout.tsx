@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { Tabs, useRouter } from 'expo-router';
-import { ClipboardList, Heart, Home, ShoppingBag, Store, UserRound } from 'lucide-react-native';
+import { ClipboardList, Heart, Home, ShoppingBag, UserRound } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 
 import { GolivraTabBar } from '@/components/golivra-tab-bar';
@@ -152,16 +152,6 @@ export default function TabLayout() {
             title: 'Compte',
             tabBarIcon: ({ color, focused }) => (
               <UserRound size={21} color={color} strokeWidth={focused ? 2.4 : LUCIDE_STROKE} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="marketplace"
-          options={{
-            href: null,
-            title: 'Marketplace',
-            tabBarIcon: ({ color, focused }) => (
-              <Store size={21} color={color} strokeWidth={focused ? 2.4 : LUCIDE_STROKE} />
             ),
           }}
         />

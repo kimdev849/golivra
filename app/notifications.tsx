@@ -130,7 +130,7 @@ export default function NotificationsScreen() {
               </View>
               <ThemedText style={[styles.cardTitle, { color: colors.primaryDeep }]}>Aucune notification</ThemedText>
               <ThemedText style={[styles.cardBody, { color: colors.textMuted }]}>Vous serez informé ici des événements importants sur vos commandes.</ThemedText>
-              <Pressable style={[styles.retry, { backgroundColor: colors.primary }]} onPress={() => router.navigate('/(tabs)/marketplace')}>
+              <Pressable style={[styles.retry, { backgroundColor: colors.primary }]} onPress={() => router.navigate('/(tabs)')}>
                 <ThemedText style={styles.retryText}>Parcourir le marketplace</ThemedText>
               </Pressable>
             </View>

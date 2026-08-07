@@ -31,7 +31,10 @@ export function productKind(product: ProductPublic): 'plat' | 'article' {
 
 export function productDetailHref(product: ProductPublic): string {
   const kind = productKind(product);
-  return `/(tabs)/product/${product.id}?kind=${kind}`;
+  // Fiche produit dans le Stack racine (plein écran) : le retour revient à
+  // l'accueil / la fiche commerce d'où l'on vient (plus d'historique perdu
+  // dans un onglet caché).
+  return `/product/${product.id}?kind=${kind}`;
 }
 
 /** Filtre local par nom, description, vendeur ou tags. */

@@ -42,6 +42,7 @@ import { useAppColors } from '@/hooks/use-app-colors';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useUnreadNotifications } from '@/hooks/use-unread-notifications';
 import { useEnterprises } from '@/hooks/useMarketplace';
+import { useDeliveryEstimate } from '@/hooks/use-delivery-estimate';
 import {
   fetchProductFeed,
   searchCatalog,
@@ -224,10 +225,13 @@ function EnterpriseCard({
   enterprise,
   onPress,
   colors,
+  deliveryMinutes,
 }: {
   enterprise: EnterprisePublic;
   onPress: () => void;
   colors: ReturnType<typeof useAppColors>;
+  /** Temps de livraison GoLivra estimé par zone (30/45/60) — sinfon commerce. */
+  deliveryMinutes?: number | null;
 }) {
   const imgUrl = resolveRemoteImageUrl(enterprise.image_url, { width: 300, format: 'webp', quality: 80 });
 
@@ -270,9 +274,9 @@ function EnterpriseCard({
             </Text>
           ) : null}
         </View>
-      ) : enterprise.delai_livraison_min ? (
+      ) : deliveryMinutes ?? enterprise.delai_livraison_min ? (
         <Text style={[styles.enterpriseCardMeta, { color: colors.textMuted }]}>
-          {enterprise.delai_livraison_min} min
+          {deliveryMinutes ?? enterprise.delai_livraison_min} min
         </Text>
       ) : null}
     </Pressable>
@@ -288,6 +292,8 @@ export default function HomeScreen() {
   const colors = useAppColors();
   const { unreadCount } = useUnreadNotifications();
   const { heroOrder, isLoading: loadingOrders, refetch: refetchOrders } = useActiveOrders();
+  // ⚡ Temps de livraison dynamique (GoLivra) selon la zone de l'adresse principale.
+  const { minutes: deliveryMinutes } = useDeliveryEstimate();
 
   // ── Campagnes marketing actives (offre du jour) ────────
   // staleTime court : si une campagne est désactivée côté admin,
@@ -739,8 +745,9 @@ export default function HomeScreen() {
               <EnterpriseCard
                 key={ent.id}
                 enterprise={ent}
-                onPress={() => router.push(`/(tabs)/marketplace/${ent.id}` as never)}
+                onPress={() => router.push(`/marketplace/${ent.id}` as never)}
                 colors={colors}
+                deliveryMinutes={deliveryMinutes}
               />
             ))}
           </ScrollView>
@@ -773,7 +780,7 @@ export default function HomeScreen() {
                 styles.entRow,
                 { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.93 : 1 },
               ]}
-              onPress={() => router.push(`/(tabs)/marketplace/${ent.id}` as never)}>
+              onPress={() => router.push(`/marketplace/${ent.id}` as never)}>
               <View style={[styles.entRowImg, { backgroundColor: colors.primarySoft }]}>
                 {resolveRemoteImageUrl(ent.image_url, ENT_IMG) ? (
                   <Image
@@ -791,7 +798,7 @@ export default function HomeScreen() {
                   {ent.nom}
                 </Text>
                 <Text style={[styles.entRowMeta, { color: colors.textMuted }]} numberOfLines={1}>
-                  {[ent.categorie_nom, ent.delai_livraison_min ? `${ent.delai_livraison_min} min` : null]
+                  {[ent.categorie_nom, (deliveryMinutes ?? ent.delai_livraison_min) ? `${deliveryMinutes ?? ent.delai_livraison_min} min` : null]
                     .filter(Boolean)
                     .join(' · ')}
                 </Text>
@@ -821,7 +828,7 @@ export default function HomeScreen() {
                 styles.entRow,
                 { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.93 : 1 },
               ]}
-              onPress={() => router.push(`/(tabs)/marketplace/${ent.id}` as never)}>
+              onPress={() => router.push(`/marketplace/${ent.id}` as never)}>
               <View style={[styles.entRowImg, { backgroundColor: colors.primarySoft }]}>
                 {resolveRemoteImageUrl(ent.image_url, ENT_IMG) ? (
                   <Image

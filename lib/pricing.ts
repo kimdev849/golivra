@@ -166,3 +166,99 @@ export function displayDeliveryFeeFcfa(
   }
   return base;
 }
+
+// ─── Temps de livraison dynamique (GoLivra) ─────────────────────────────
+//
+// Le temps de livraison est géré par GoLivra (livreur) et dépend de la ZONE
+// de livraison du client, pas du commerce :
+//   - Zone proche  → ~30 min
+//   - Zone moyenne → ~45 min
+//   - Zone éloignée → ~60 min
+// Le temps de PRÉPARATION, lui, reste géré par le commerce (delai_preparation_min).
+
+export const DELIVERY_MINUTES_TIERS = [30, 45, 60] as const;
+
+export type DeliveryZoneTier = 'proche' | 'moyenne' | 'éloignée';
+
+export const DELIVERY_ZONE_TIER_LABEL: Record<DeliveryZoneTier, string> = {
+  proche: 'Zone proche',
+  moyenne: 'Zone moyenne',
+  éloignée: 'Zone éloignée',
+};
+
+/**
+ * Rang d'une zone (0 = la moins chère → proche, 1 = moyenne, 2+ = éloignée),
+ * classées par prix de livraison croissant (tiebreaker : `sort_order`).
+ * `null` si aucune zone configurée ou quartier inconnu.
+ *
+ * Note : en l'absence de champ « temps de livraison » par zone en base, le
+ * prix sert de proxy de distance — heuristique V1 assumée, remplaçable dès
+ * qu'une durée par zone sera ajoutée côté admin.
+ */
+function zoneTierForQuartier(
+  quartier: string | null | undefined,
+  pricing: PublicPricing = DEFAULT_PUBLIC_PRICING,
+): DeliveryZoneTier | null {
+  const q = String(quartier || '').trim();
+  const zones = pricing.zones;
+  if (!zones || !q || zones.zones.length === 0) return null;
+
+  const arr = zones.arrondissements.find((a) => a.name === q);
+  if (!arr) return null;
+
+  const sorted = [...zones.zones]
+    .filter((z) => z.is_active)
+    .sort(
+      (a, b) =>
+        a.price_base - b.price_base || (a.sort_order ?? 0) - (b.sort_order ?? 0),
+    );
+  const idx = sorted.findIndex((z) => z.id === arr.zone_id);
+  if (idx < 0) return null;
+  if (idx === 0) return 'proche';
+  if (idx === 1) return 'moyenne';
+  return 'éloignée';
+}
+
+const TIER_MINUTES: Record<DeliveryZoneTier, number> = {
+  proche: 30,
+  moyenne: 45,
+  éloignée: 60,
+};
+
+export type DeliveryEstimateForQuartier = {
+  /** Minutes estimées (30/45/60) ou null si la zone n'est pas déterminable. */
+  minutes: number | null;
+  /** 'proche' | 'moyenne' | 'éloignée' ou null. */
+  tier: DeliveryZoneTier | null;
+  /** « Zone proche » / « Zone moyenne » / « Zone éloignée » ou null. */
+  tierLabel: string | null;
+};
+
+/**
+ * Estimation complète du temps de livraison (GoLivra) pour le quartier du
+ * client : minutes + palier + libellé, en une seule passe.
+ */
+export function deliveryEstimateForQuartier(
+  quartier: string | null | undefined,
+  pricing: PublicPricing = DEFAULT_PUBLIC_PRICING,
+): DeliveryEstimateForQuartier {
+  const tier = zoneTierForQuartier(quartier, pricing);
+  if (!tier) return { minutes: null, tier: null, tierLabel: null };
+  return {
+    minutes: TIER_MINUTES[tier],
+    tier,
+    tierLabel: DELIVERY_ZONE_TIER_LABEL[tier],
+  };
+}
+
+/**
+ * Temps de livraison estimé (min) pour le quartier du client, selon la zone :
+ * proche 30 min · moyenne 45 min · éloignée 60 min.
+ * `null` si la zone n'est pas déterminable (pas de config zones / quartier inconnu).
+ */
+export function deliveryMinutesForQuartier(
+  quartier: string | null | undefined,
+  pricing: PublicPricing = DEFAULT_PUBLIC_PRICING,
+): number | null {
+  return deliveryEstimateForQuartier(quartier, pricing).minutes;
+}
