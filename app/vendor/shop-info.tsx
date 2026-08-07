@@ -268,7 +268,9 @@ export default function VendorShopInfoScreen() {
                 : horaires.openNow
                   ? `Ouvert aujourd'hui${horaires.todayHours ? ` · ${horaires.todayHours}` : ''}`
                   : horaires.nextLabel
-                    ? `Fermé aujourd'hui · réouverture ${horaires.nextLabel}`
+                    ? horaires.nextLabel.startsWith('aujourd')
+                      ? `Fermé pour le moment · ouvre ${horaires.nextLabel}`
+                      : `Fermé aujourd'hui · réouverture ${horaires.nextLabel}`
                     : "Fermé aujourd'hui"}
             </ThemedText>
             {horaires.hasHours ? (

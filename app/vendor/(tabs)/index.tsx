@@ -162,7 +162,9 @@ export default function VendorDashboardScreen() {
                 {horaires.openNow
                   ? `Ouvert aujourd'hui${horaires.todayHours ? ` · ${horaires.todayHours}` : ''}`
                   : horaires.nextLabel
-                    ? `Fermé aujourd'hui · réouverture ${horaires.nextLabel}`
+                    ? horaires.nextLabel.startsWith('aujourd')
+                      ? `Fermé pour le moment · ouvre ${horaires.nextLabel}`
+                      : `Fermé aujourd'hui · réouverture ${horaires.nextLabel}`
                     : "Fermé aujourd'hui"}
               </ThemedText>
               <ThemedText style={[styles.rowSub, { color: colors.textMuted }]} numberOfLines={1}>
