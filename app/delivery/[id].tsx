@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ArrowLeft, Bike, CheckCircle2, Clock, CreditCard, MapPin, PhoneCall, Star, Store, Wallet } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +13,7 @@ import { useAppColors } from '@/hooks/use-app-colors';
 import { apiFetch } from '@/lib/api';
 import { getSessionToken } from '@/lib/auth';
 import { formatDateTimeFr, type TimelineStep } from '@/lib/datetime';
+import { orderPollingIntervalMs } from '@/lib/order-status';
 
 type DeliveryStatus =
   | 'en_attente'
@@ -132,28 +133,50 @@ export default function DeliveryDetailScreen() {
   const [data, setData] = useState<DeliveryDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Marque si des données sont déjà affichées : un refresh en arrière-plan qui
+  // échoue ne doit pas remplacer l'écran par un bandeau d'erreur.
+  const hasDataRef = useRef(false);
 
   useEffect(() => {
     let alive = true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    // Nouvelle livraison affichée : on repart d'un premier chargement propre.
+    hasDataRef.current = false;
+
     const run = async () => {
       try {
         const token = await getSessionToken();
         if (!token) throw new Error('Non authentifié');
         const res = await apiFetch<DeliveryDetails>(`/api/delivery/${id}/details`, { method: 'GET', token });
-        if (alive) {
-          setData(res);
-          setLoading(false);
+        if (!alive) return;
+        hasDataRef.current = true;
+        setData(res);
+        setLoading(false);
+        // Suivi en temps réel : refresh silencieux selon l'avancement,
+        // arrêté dès que la livraison est terminée (livrée / annulée / échec).
+        if (timer) clearTimeout(timer);
+        const terminal = res.livraison.statut === 'echec';
+        const interval = terminal ? false : orderPollingIntervalMs(res.livraison.statut);
+        if (interval !== false) {
+          timer = setTimeout(() => void run(), interval);
         }
       } catch (e) {
         if (alive) {
-          setError(e instanceof Error ? e.message : 'Impossible de charger la livraison.');
+          if (!hasDataRef.current) {
+            setError(e instanceof Error ? e.message : 'Impossible de charger la livraison.');
+          }
           setLoading(false);
+          // Reprise après une erreur réseau transitoire (sinon l'écran gèle).
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => void run(), 15_000);
         }
       }
     };
+
     void run();
     return () => {
       alive = false;
+      if (timer) clearTimeout(timer);
     };
   }, [id]);
 

@@ -1,26 +1,67 @@
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ShoppingBag,
+  Store,
+  User,
+  UtensilsCrossed,
+  type LucideIcon,
+} from 'lucide-react-native';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
+import { AuthBackdrop } from '@/components/auth-backdrop';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAppColors } from '@/hooks/use-app-colors';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+
+/** Couleurs "image" des pastilles de rôle — fixes pour rester fidèles au design. */
+const ICON_BG_POPULAR = '#F59E0B';
+const ICON_BG_GREEN = '#065F46';
+const BADGE_BG = '#FBBF24';
+const BADGE_TEXT = '#1A1A1A';
 
 type Role = {
   href: '/signup/client' | '/signup/boutique' | '/signup/restaurant';
-  icon: 'person' | 'storefront' | 'restaurant';
+  icon: LucideIcon;
   title: string;
   subtitle: string;
-  iconBg: 'primary' | 'accent';
+  iconBg: string;
+  popular?: boolean;
 };
 
+// Animations d'entrée stables (cascade logo → cartes → bouton).
+const TOP_ENTER = FadeInDown.duration(380);
+const HEADER_ENTER = FadeInDown.duration(380).delay(60);
+const CHOICES_ENTER = FadeInUp.duration(420).delay(140);
+const FOOTER_ENTER = FadeInUp.duration(380).delay(260);
+
 const ROLES: Role[] = [
-  { href: '/signup/client', icon: 'person', title: 'Client', subtitle: 'Je commande, on me livre.', iconBg: 'primary' },
-  { href: '/signup/boutique', icon: 'storefront', title: 'Boutique', subtitle: 'Je vends mes produits en ligne.', iconBg: 'primary' },
-  { href: '/signup/restaurant', icon: 'restaurant', title: 'Restaurant', subtitle: 'Je sers mes plats et GoLivra les livre.', iconBg: 'primary' },
+  {
+    href: '/signup/client',
+    icon: User,
+    title: 'Client',
+    subtitle: 'Je commande, on me livre partout.',
+    iconBg: ICON_BG_POPULAR,
+    popular: true,
+  },
+  {
+    href: '/signup/boutique',
+    icon: Store,
+    title: 'Boutique',
+    subtitle: 'Je vends mes produits en ligne.',
+    iconBg: ICON_BG_GREEN,
+  },
+  {
+    href: '/signup/restaurant',
+    icon: UtensilsCrossed,
+    title: 'Restaurant',
+    subtitle: 'Je sers mes plats, GoLivra les livre.',
+    iconBg: ICON_BG_GREEN,
+  },
 ];
 
 export default function SignupChooseScreen() {
@@ -29,82 +70,109 @@ export default function SignupChooseScreen() {
   const { width } = useWindowDimensions();
   const cardWidth = Math.min(width - 40, 520);
   const colors = useAppColors();
-  const isDark = useColorScheme() === 'dark';
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.heroGlowTop, { backgroundColor: colors.heroGlow }]} />
-      <View style={[styles.heroGlowBottom, { backgroundColor: colors.heroGlow }]} />
-      <View style={[styles.page, { paddingBottom: Math.max(insets.bottom + 12, 18) }]}>
-        <View style={styles.topRow}>
-          <Pressable style={styles.backButton} onPress={() => router.replace('/auth')}>
-            <MaterialIcons name="arrow-back-ios-new" size={18} color={colors.primary} />
+      <AuthBackdrop colors={colors} />
+      <View
+        style={[
+          styles.page,
+          {
+            paddingTop: Math.max(insets.top + 14, 28),
+            paddingBottom: Math.max(insets.bottom + 12, 18),
+          },
+        ]}>
+      
+        <Animated.View entering={TOP_ENTER} style={styles.topRow}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.backButton,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+              pressed && styles.pressed,
+            ]}
+            onPress={() => router.replace('/auth')}
+            hitSlop={6}
+          >
+            <ChevronLeft size={22} color={colors.primary} strokeWidth={2.5} />
           </Pressable>
-        </View>
+          <View style={styles.topLogoWrap}>
+            <Image
+              source={require('@/assets/images/logo25292922882.png')}
+              style={styles.topLogo}
+              contentFit="contain"
+            />
+          </View>
+        </Animated.View>
 
         <View style={styles.centerBlock}>
-          <View style={styles.header}>
-            <Image source={require('@/assets/images/logo25292922882.png')} style={styles.logo} contentFit="contain" />
-            <ThemedText type="title">Créer un compte</ThemedText>
-            <ThemedText style={[styles.description, { color: colors.textSecondary }]}>Comment souhaitez-vous utiliser GoLivra ?</ThemedText>
-          </View>
+          <Animated.View entering={HEADER_ENTER} style={styles.header}>
+            <ThemedText type="title" style={styles.title}>
+              Créer un compte
+            </ThemedText>
+            <ThemedText style={[styles.description, { color: colors.textSecondary }]}>
+              Comment souhaitez-vous utiliser GoLivra ?
+            </ThemedText>
+          </Animated.View>
 
-          <View style={[styles.choices, { width: cardWidth }]}>
+          <Animated.View entering={CHOICES_ENTER} style={[styles.choices, { width: cardWidth }]}>
             {ROLES.map((r) => {
-              const isAccent = r.iconBg === 'accent';
+              const Icon = r.icon;
+              const isPopular = r.popular;
               return (
                 <Pressable
                   key={r.href}
                   style={({ pressed }) => [
                     styles.choiceCard,
                     {
-                      borderColor: colors.border,
                       backgroundColor: colors.surface,
+                      borderColor: isPopular ? BADGE_BG : colors.border,
                     },
                     pressed ? styles.pressed : undefined,
                   ]}
-                  onPress={() => router.push(r.href)}>
-                  <View
-                    style={[
-                      styles.choiceIconWrap,
-                      isAccent
-                        ? { backgroundColor: colors.accentSoft, borderColor: colors.accent }
-                        : { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong },
-                    ]}>
-                    <MaterialIcons
-                      name={r.icon}
-                      size={22}
-                      color={isAccent ? colors.accentDeep : colors.primary}
-                    />
+                  onPress={() => router.push(r.href)}
+                >
+                  {isPopular ? (
+                    <View style={styles.popularBadgeWrap}>
+                      <View style={styles.popularBadge}>
+                        <ShoppingBag size={11} color={BADGE_TEXT} strokeWidth={2.5} />
+                        <ThemedText style={styles.popularBadgeText}>Populaire</ThemedText>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  <View style={[styles.choiceIconWrap, { backgroundColor: r.iconBg }]}>
+                    <Icon size={24} color="#FFFFFF" strokeWidth={2.2} />
                   </View>
                   <View style={styles.choiceText}>
-                    <ThemedText
-                      style={[
-                        styles.choiceTitle,
-                        { color: isDark ? colors.primaryBright : colors.primaryDeep },
-                      ]}>
+                    <ThemedText style={[styles.choiceTitle, { color: colors.text }]}>
                       {r.title}
                     </ThemedText>
                     <ThemedText style={[styles.choiceSubtitle, { color: colors.textMuted }]}>
                       {r.subtitle}
                     </ThemedText>
                   </View>
-                  <MaterialIcons
-                    name="chevron-right"
-                    size={22}
-                    color={colors.textMuted}
-                  />
+                  <ChevronRight size={22} color={colors.text} strokeWidth={2.5} />
                 </Pressable>
               );
             })}
-          </View>
+          </Animated.View>
 
-          <ThemedView style={styles.footerInline} lightColor="transparent" darkColor="transparent">
-            <ThemedText style={[styles.footerText, { color: colors.textMuted }]}>Déjà un compte ? </ThemedText>
-            <Pressable onPress={() => router.replace('/auth')}>
-              <ThemedText style={[styles.footerLink, { color: colors.primary }]}>Se connecter</ThemedText>
+          <Animated.View entering={FOOTER_ENTER} style={styles.footerWrap}>
+            <ThemedText style={[styles.footerText, { color: colors.textMuted }]}>
+              Déjà un compte ?
+            </ThemedText>
+            <Pressable
+              style={({ pressed }) => [
+                styles.loginButton,
+                { borderColor: colors.primary, width: cardWidth },
+                pressed ? styles.pressed : undefined,
+              ]}
+              onPress={() => router.replace('/auth')}>
+              <ThemedText style={[styles.loginButtonText, { color: colors.primary }]}>
+                Se connecter
+              </ThemedText>
             </Pressable>
-          </ThemedView>
+          </Animated.View>
         </View>
       </View>
     </ThemedView>
@@ -113,90 +181,117 @@ export default function SignupChooseScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  heroGlowTop: {
-    position: 'absolute',
-    top: -180,
-    left: -120,
-    width: 420,
-    height: 420,
-    borderRadius: 260,
-    opacity: 0.95,
-  },
-  heroGlowBottom: {
-    position: 'absolute',
-    bottom: -220,
-    right: -160,
-    width: 520,
-    height: 520,
-    borderRadius: 320,
-    opacity: 0.5,
-  },
   page: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 14,
+  },
+  topRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topLogoWrap: {
+    flex: 1,
+    alignItems: 'center',
+    marginRight: 44,
+  },
+  topLogo: {
+    width: 92,
+    height: 52,
   },
   centerBlock: {
     flex: 1,
     justifyContent: 'center',
-  },
-  topRow: { width: '100%', flexDirection: 'row', justifyContent: 'flex-start' },
-  backButton: {
-    marginTop: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 999,
+    marginTop: 8,
   },
   header: {
     alignItems: 'center',
     gap: 8,
-    marginBottom: 14,
-    backgroundColor: 'transparent',
+    marginBottom: 24,
   },
-  logo: { width: 150, height: 84, marginTop: 6, marginBottom: 2 },
-  description: { opacity: 0.75, textAlign: 'center', maxWidth: 360 },
-  choices: { alignSelf: 'center', gap: 12, marginTop: 6, marginBottom: 0 },
+  title: {
+    fontSize: 26,
+    lineHeight: 32,
+    textAlign: 'center',
+  },
+  description: {
+    fontSize: 14.5,
+    textAlign: 'center',
+    maxWidth: 340,
+  },
+  choices: {
+    alignSelf: 'center',
+    gap: 14,
+  },
   choiceCard: {
     position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 16,
-    paddingHorizontal: 14,
-    gap: 12,
+    paddingHorizontal: 16,
+    gap: 14,
     borderWidth: 1.5,
-    borderRadius: 22,
-    boxShadow: '0px 14px 26px rgba(10,58,40,0.10)',
-    elevation: 10,
+    borderRadius: 18,
   },
-  popularBadgeWrap: { position: 'absolute', top: -10, right: 12 },
+  popularBadgeWrap: {
+    position: 'absolute',
+    top: -11,
+    right: 14,
+    zIndex: 2,
+  },
   popularBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 999,
+    backgroundColor: BADGE_BG,
   },
-  popularBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900', letterSpacing: 0.4 },
+  popularBadgeText: {
+    color: BADGE_TEXT,
+    fontSize: 10.5,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+  },
   choiceIconWrap: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 50,
+    height: 50,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
   },
-  choiceText: { flex: 1, gap: 2 },
-  choiceTitle: { fontSize: 16, fontWeight: '900' },
-  choiceSubtitle: { fontSize: 12, lineHeight: 16 },
-  pressed: { opacity: 0.9 },
-  footerInline: {
+  choiceText: { flex: 1, gap: 3 },
+  choiceTitle: { fontSize: 16.5, fontWeight: '900' },
+  choiceSubtitle: { fontSize: 12.5, lineHeight: 17 },
+  pressed: {
+    opacity: 0.88,
+    transform: [{ scale: 0.992 }],
+  },
+  footerWrap: {
     marginTop: 34,
-    paddingTop: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
   },
-  footerText: { fontWeight: '700' },
-  footerLink: { fontWeight: '900' },
+  footerText: { fontSize: 14.5, fontWeight: '700' },
+  loginButton: {
+    marginTop: 14,
+    alignSelf: 'center',
+    borderRadius: 999,
+    borderWidth: 1.5,
+    paddingVertical: 15,
+    minHeight: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loginButtonText: { fontSize: 16, fontWeight: '800' },
 });

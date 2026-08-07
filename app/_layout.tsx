@@ -1,3 +1,5 @@
+import '../global.css';
+
 import { DarkTheme, DefaultTheme, ThemeProvider as NavThemeProvider } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
@@ -13,6 +15,7 @@ import { BiometricAppGate } from '@/components/biometric-app-gate';
 import { OfflineBanner } from '@/components/offline-banner';
 import { CustomSplashScreen } from '@/components/splash-screen';
 import { AppThemeProvider, useAppTheme } from '@/contexts/app-theme-context';
+import { TextScaleProvider } from '@/contexts/text-scale-context';
 import { useIsOffline } from '@/hooks/use-network-status';
 import { warmAppCaches } from '@/lib/app-bootstrap';
 import { prefetchClientCatalog } from '@/lib/client-data';
@@ -82,10 +85,13 @@ function RootNavigation() {
         <Stack.Screen name="vendor" options={{ animation: 'fade', animationDuration: 200 }} />
         <Stack.Screen name="courier" options={{ animation: 'fade', animationDuration: 200 }} />
         <Stack.Screen name="notifications" />
+        <Stack.Screen name="profile-edit" />
         <Stack.Screen name="account-settings" />
         <Stack.Screen name="my-addresses" />
         <Stack.Screen name="payment-methods" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="discover-all" />
+        <Stack.Screen name="help-center" />
         <Stack.Screen name="how-multi-delivery" />
         <Stack.Screen name="order-deliveries-summary" />
         <Stack.Screen name="modal" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
@@ -159,6 +165,7 @@ function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <GestureHandlerRootView style={{ flex: 1 }}>
+        <TextScaleProvider>
         <AppThemeProvider>
           <BiometricAppGate>
             <View style={{ flex: 1 }}>
@@ -171,6 +178,7 @@ function RootLayout() {
             </View>
           </BiometricAppGate>
         </AppThemeProvider>
+        </TextScaleProvider>
       </GestureHandlerRootView>
     </QueryClientProvider>
   );

@@ -11,6 +11,9 @@ export const UX_ERRORS: Readonly<Record<string, string>> = {
   session: 'Reconnectez-vous pour continuer.',
   notFound: 'Élément introuvable.',
   forbidden: 'Action non autorisée.',
+  /** Réponse 404 « Cannot GET/PUT… » d'une API pas encore redéployée. */
+  serverOutdated:
+    "Cette fonction n'est pas encore disponible : le serveur n'est pas à jour. L'équipe doit redéployer l'API.",
 };
 
 export const UX_ONBOARDING = [
@@ -48,11 +51,27 @@ export function orderStatusLabel(statut: string | null | undefined): string {
     partiellement_livree: 'Une partie est déjà livrée',
     annulee: 'Annulée',
     remboursee: 'Remboursée',
+    expiree: 'Expirée',
     en_attente_vendeur: 'En attente du commerce',
     probleme: 'Un problème est survenu',
     refusee: 'Refusée',
   };
   return map[key] ?? 'En cours';
+}
+
+/**
+ * Message expliquant le remboursement sur une commande annulée / expirée.
+ * Renvoie null si la commande n'est pas concernée par un remboursement.
+ */
+export function orderRefundMessage(statut: string | null | undefined): string | null {
+  const key = normalizeStatutKey(statut);
+  if (key === 'remboursee' || key === 'expiree') {
+    return "Le restaurant n'a pas confirmé votre commande. Votre remboursement est en cours.";
+  }
+  if (key === 'refusee' || key === 'annulee') {
+    return 'Cette commande a été annulée. Vous serez remboursé si le paiement a été effectué.';
+  }
+  return null;
 }
 
 /** Statut commande côté vendeur. */
@@ -131,7 +150,10 @@ export function friendlyErrorMessage(raw: unknown, fallback: string = UX_ERRORS.
   if (/network request failed|failed to fetch|unable to resolve host|econnrefused|timeout|connexion impossible/i.test(lower)) {
     return UX_ERRORS.network;
   }
-  if (/route api|endpoint api|erreur http|réponse html|backend render|base api|cannot post/i.test(lower)) {
+  if (/cannot (get|put|post|patch|delete)\b/i.test(lower)) {
+    return UX_ERRORS.serverOutdated;
+  }
+  if (/route api|endpoint api|erreur http|réponse html|backend render|base api/i.test(lower)) {
     return UX_ERRORS.generic;
   }
   if (/session expirée|session révoquée|jeton|token|unauthorized|401/i.test(lower)) {

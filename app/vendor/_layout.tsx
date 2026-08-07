@@ -29,6 +29,7 @@ export default function VendorRootLayout() {
         <Stack.Screen name="categories" />
         <Stack.Screen name="notifications" />
         <Stack.Screen name="shop-info" />
+        <Stack.Screen name="horaires" />
         <Stack.Screen name="shop-addresses" />
         <Stack.Screen name="shop-payments" />
         <Stack.Screen name="shop-settings" />

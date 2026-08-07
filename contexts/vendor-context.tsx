@@ -15,6 +15,8 @@ type VendorStore = {
   products: VendorProduct[];
   pendingModeration: boolean;
   refresh: () => Promise<void>;
+  /** Rafraîchit uniquement les commandes, sans écran de chargement (actions de statut, realtime). */
+  refreshOrders: () => Promise<void>;
   setProducts: (updater: VendorProduct[] | ((prev: VendorProduct[]) => VendorProduct[])) => void;
   setOrders: (updater: VendorOrder[] | ((prev: VendorOrder[]) => VendorOrder[])) => void;
 };
@@ -40,14 +42,18 @@ function mapEnterpriseToShop(e: EnterpriseCreated): VendorShop {
   };
 }
 
-export const useVendor = create<VendorStore>((set) => ({
+export const useVendor = create<VendorStore>((set, get) => ({
   loading: true,
   shop: null,
   orders: [],
   products: [],
   pendingModeration: false,
   refresh: async () => {
-    set({ loading: true });
+    // Le chargement plein écran n'apparaît qu'au tout premier chargement :
+    // dès que des données existent, un refresh reste silencieux pour éviter
+    // les écrans blancs / squelettes à chaque action.
+    const hasData = get().shop !== null || get().orders.length > 0 || get().products.length > 0;
+    if (!hasData) set({ loading: true });
     const token = await getSessionToken();
     if (!token) {
       set({ shop: null, orders: [], products: [], pendingModeration: false, loading: false });
@@ -58,7 +64,11 @@ export const useVendor = create<VendorStore>((set) => ({
       const enterprises = await fetchMyEnterprises(token);
       const primary = enterprises[0] ?? null;
       if (!primary) {
-        set({ shop: null, orders: [], products: [], pendingModeration: false, loading: false });
+        // Comme pour une erreur réseau, on garde les données actuelles si l'on
+        // en a déjà (pas de flash vers un écran vide).
+        if (!hasData) {
+          set({ shop: null, orders: [], products: [], pendingModeration: false, loading: false });
+        }
         return;
       }
 
@@ -76,9 +86,19 @@ export const useVendor = create<VendorStore>((set) => ({
         pendingModeration: mapped.statut_moderation === 'en_attente',
       });
     } catch {
-      set({ shop: null, orders: [], products: [], pendingModeration: false });
+      if (!hasData) set({ shop: null, orders: [], products: [], pendingModeration: false });
     } finally {
-      set({ loading: false });
+      if (!hasData) set({ loading: false });
+    }
+  },
+  refreshOrders: async () => {
+    const token = await getSessionToken();
+    if (!token) return;
+    try {
+      const ordersData = await fetchVendorOrders(token);
+      set({ orders: ordersData });
+    } catch {
+      // Silencieux : on conserve les données actuelles en cas d'échec réseau.
     }
   },
   setProducts: (updater) => {

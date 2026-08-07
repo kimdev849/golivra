@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MapPin, Phone, Truck } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -25,7 +25,7 @@ import {
   livraisonStatutLabel,
   updateVendorOrderStatus,
 } from '@/lib/vendor-api';
-import type { VendorOrder, VendorOrderStatus } from '@/lib/vendor-types';
+import type { VendorOrder } from '@/lib/vendor-types';
 import { hrefVendorPreparation } from '@/lib/vendor-nav';
 import { vendorOrderStatusLabel as statusLabel } from '@/lib/ux-copy';
 
@@ -33,8 +33,8 @@ export default function VendorOrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { orders, refresh } = useVendor();
-  const [acting, setActing] = useState(false);
+  const { orders, refreshOrders, setOrders } = useVendor();
+  const [actingAction, setActingAction] = useState<string | null>(null);
   const colors = useAppColors();
   const { showSuccess, showError, showConfirm, FeedbackOverlay } = useActionFeedback();
   const styles = useThemedStyles(createVendorOrderDetailStyles);
@@ -45,7 +45,18 @@ export default function VendorOrderDetailScreen() {
   const [o, setO] = useState<VendorOrder | null>(cached ?? null);
   const [loading, setLoading] = useState(!cached);
   const [livraisonLabel, setLivraisonLabel] = useState<string | null>(null);
+  // Marque une action en cours pour éviter que le fetch initial (lancé au montage)
+  // n'écrase la mise à jour optimiste avec l'état serveur périmé.
+  const actingRef = useRef(false);
 
+  // Synchronise l'écran avec le store (silencieux, sans requête) : quand la
+  // liste des commandes évolue (mise à jour optimiste, refresh en arrière-plan),
+  // le détail affiche immédiatement l'état à jour, sans écran de chargement.
+  useEffect(() => {
+    if (cached) setO(cached);
+  }, [cached]);
+
+  // Fetch initial unique : détail de la commande + statut livraison.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -58,11 +69,13 @@ export default function VendorOrderDetailScreen() {
           fetchDeliveryStatus(token, orderId).catch(() => null),
         ]);
         if (cancelled) return;
-        setO(order);
+        // Si une action (accepter/refuser) est en cours, on laisse l'optimiste
+        // s'appliquer : le refresh en arrière-plan synchronisera l'état frais.
+        if (!actingRef.current) setO(order);
         const statut = delivery?.delivery?.statut ?? order.livraison_statut;
-        setLivraisonLabel(livraisonStatutLabel(statut));
+        if (!actingRef.current) setLivraisonLabel(livraisonStatutLabel(statut));
       } catch {
-        if (!cancelled && !cached) setO(null);
+        if (!cancelled) setO((cur) => cur ?? null);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -70,7 +83,7 @@ export default function VendorOrderDetailScreen() {
     return () => {
       cancelled = true;
     };
-  }, [orderId, cached]);
+  }, [orderId]);
 
   if (loading) {
     return (
@@ -96,20 +109,39 @@ export default function VendorOrderDetailScreen() {
   const showPrep = o.statut === 'a_preparer' || o.statut === 'en_preparation';
   const showDelivery = o.statut === 'prete' || o.statut === 'en_livraison';
 
-  const runStatus = async (statut: string, msg: string, raisonRefus?: string) => {
+  const runStatus = async (
+    statut: string,
+    msg: string,
+    actionKey: string,
+    raisonRefus?: string,
+  ) => {
+    if (!o || !o.sous_commande_id) return;
     const token = await getSessionToken();
-    if (!token || !o.sous_commande_id) return;
-    setActing(true);
+    if (!token) return;
+    const previous = o;
+    // Optimiste : l'UI change immédiatement (badge, boutons), sans écran blanc
+    // ni rechargement. Un petit spinner apparaît uniquement dans le bouton cliqué.
+    setO((cur) => (cur ? { ...cur, statut: statut as typeof cur.statut } : cur));
+    setOrders((prev) =>
+      prev.map((x) => (x.id === o.id ? { ...x, statut: statut as typeof x.statut } : x)),
+    );
+    setActingAction(actionKey);
+    actingRef.current = true;
     try {
       await updateVendorOrderStatus(token, o.id, statut, o.sous_commande_id, raisonRefus);
-      const updated = await fetchVendorOrder(token, o.id);
-      setO(updated);
       showSuccess('C’est enregistré', msg);
-      void refresh();
+      // Synchronisation en arrière-plan : commandes seules, sans loading.
+      void refreshOrders();
     } catch (e) {
+      // Rollback si le serveur a refusé.
+      setO(previous);
+      setOrders((prev) =>
+        prev.map((x) => (x.id === o.id ? { ...x, statut: previous.statut } : x)),
+      );
       showError('Mise à jour impossible', e instanceof Error ? e.message : undefined);
     } finally {
-      setActing(false);
+      setActingAction(null);
+      actingRef.current = false;
     }
   };
 
@@ -120,7 +152,9 @@ export default function VendorOrderDetailScreen() {
       primaryLabel: 'Refuser',
       secondaryLabel: 'Annuler',
       onPrimary: () => {
-        void runStatus('refusee', 'Commande refusée.', 'Refusé par le commerce').then(() => router.back());
+        void runStatus('refusee', 'Commande refusée.', 'refuse', 'Refusé par le commerce').then(
+          () => router.back(),
+        );
       },
     });
   };
@@ -227,15 +261,23 @@ export default function VendorOrderDetailScreen() {
           <View style={styles.actionRow}>
             <Pressable
               style={[styles.primaryBtn, { flex: 1, backgroundColor: palette.primary }]}
-              disabled={acting}
-              onPress={() => void runStatus('acceptee', 'Commande acceptée.')}>
-              <ThemedText style={styles.primaryTxt}>Accepter</ThemedText>
+              disabled={actingAction !== null}
+              onPress={() => void runStatus('acceptee', 'Commande acceptée.', 'accept')}>
+              {actingAction === 'accept' ? (
+                <ActivityIndicator color={colors.onPrimary} size="small" />
+              ) : (
+                <ThemedText style={styles.primaryTxt}>Accepter</ThemedText>
+              )}
             </Pressable>
             <Pressable
               style={[styles.outlineBtn, { flex: 1, borderColor: colors.error }]}
-              disabled={acting}
+              disabled={actingAction !== null}
               onPress={refuseOrder}>
-              <ThemedText style={[styles.outlineTxt, { color: colors.error }]}>Refuser</ThemedText>
+              {actingAction === 'refuse' ? (
+                <ActivityIndicator color={colors.error} size="small" />
+              ) : (
+                <ThemedText style={[styles.outlineTxt, { color: colors.error }]}>Refuser</ThemedText>
+              )}
             </Pressable>
           </View>
         ) : null}

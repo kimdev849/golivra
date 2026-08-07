@@ -7,7 +7,6 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, TextInput
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { VendorScreenHeader } from '@/components/vendor-screen-header';
-import { VendorTabHeader } from '@/components/vendor-tab-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { VENDOR_TAB_BAR_PADDING_BOTTOM } from '@/constants/vendor-layout';
@@ -98,7 +97,7 @@ export default function VendorCatalogScreen() {
   return (
     <ThemedView style={styles.screen}>
       <FeedbackOverlay />
-      <VendorTabHeader
+      <VendorScreenHeader
         title="Catalogue"
         right={
           <Pressable

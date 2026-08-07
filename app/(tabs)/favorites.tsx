@@ -217,7 +217,7 @@ export default function FavoritesScreen() {
                 title="Aucun commerce favori"
                 body="Touchez le cœur sur un commerce dans l'accueil pour le retrouver ici."
                 ctaLabel="Retour à l'accueil"
-                onCta={() => router.push('/(tabs)')}
+                onCta={() => router.navigate('/(tabs)')}
                 colors={colors}
               />
             ) : (
@@ -299,7 +299,7 @@ export default function FavoritesScreen() {
                 title="Aucun produit favori"
                 body="Touchez le cœur sur un produit dans l'accueil pour le retrouver ici."
                 ctaLabel="Retour à l'accueil"
-                onCta={() => router.push('/(tabs)')}
+                onCta={() => router.navigate('/(tabs)')}
                 colors={colors}
               />
             ) : (

@@ -25,9 +25,11 @@ export function stackTabRootOptions(): NativeStackNavigationOptions {
 
 export function stackAuthOptions(): NativeStackNavigationOptions {
   return {
-    animation: Platform.OS === 'ios' ? 'default' : 'slide_from_right',
-    animationDuration: 280,
-    gestureEnabled: false,
+    // Slide latéral fluide sur toutes les plateformes (type Facebook) avec
+    // geste de retour — navigation simple et naturelle entre connexion/inscription.
+    animation: 'slide_from_right',
+    animationDuration: 250,
+    gestureEnabled: true,
   };
 }
 

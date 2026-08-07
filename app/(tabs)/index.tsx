@@ -1,7 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -17,15 +16,19 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import {
+  BadgePercent,
   Bell,
   ChevronRight,
+  LayoutGrid,
   MapPin,
+  Package,
   Search,
-  SlidersHorizontal,
+  ShoppingBag,
   Star,
   Store,
   UtensilsCrossed,
   X,
+  type LucideIcon,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -42,6 +45,8 @@ import { useEnterprises } from '@/hooks/useMarketplace';
 import {
   fetchProductFeed,
   searchCatalog,
+  sortEnterprisesByPopularity,
+  sortEnterprisesByRecency,
   type CatalogSearchType,
   type EnterprisePublic,
   type ProductPublic,
@@ -63,17 +68,17 @@ const FEED_PAGE_SIZE = 24;
 // ─── Types ────────────────────────────────────────────────────────
 
 type FilterTab = 'all' | 'plat' | 'article' | 'restaurant' | 'boutique' | 'promo';
-type SortKey = 'recent' | 'price_low' | 'price_high';
+type SortKey = 'recent' | 'popular' | 'price_low' | 'price_high';
 
 // ─── Food category chips (visual) ─────────────────────────────────
 
-const FOOD_CATEGORIES: { key: FilterTab; label: string; emoji: string }[] = [
-  { key: 'all',        label: 'Tout',       emoji: '🍽️' },
-  { key: 'plat',       label: 'Plats',      emoji: '🍳' },
-  { key: 'restaurant', label: 'Restos',     emoji: '🏪' },
-  { key: 'boutique',   label: 'Boutiques',  emoji: '🛒' },
-  { key: 'article',    label: 'Produits',   emoji: '📦' },
-  { key: 'promo',      label: 'Promos',     emoji: '🏷️' },
+const FOOD_CATEGORIES: { key: FilterTab; label: string; Icon: LucideIcon }[] = [
+  { key: 'all',        label: 'Tout',       Icon: LayoutGrid },
+  { key: 'plat',       label: 'Plats',      Icon: UtensilsCrossed },
+  { key: 'restaurant', label: 'Restos',     Icon: Store },
+  { key: 'boutique',   label: 'Boutiques',  Icon: ShoppingBag },
+  { key: 'article',    label: 'Produits',   Icon: Package },
+  { key: 'promo',      label: 'Promos',     Icon: BadgePercent },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────
@@ -87,9 +92,13 @@ function categoryToSearchType(category: FilterTab): CatalogSearchType {
 }
 
 function isPromoProduct(p: ProductPublic): boolean {
+  // Sans prix promo (null), Number(null) vaudrait 0 : il faut tester la présence
+  // AVANT de convertir, sinon TOUT produit sans promo serait classé « en promo »
+  // et affiché à 0 FCFA sur l'accueil.
+  if (p.prix_promo == null) return false;
   const promo = Number(p.prix_promo);
   const base = Number(getEffectiveUnitPrice(p) ?? p.prix);
-  return Number.isFinite(promo) && promo < base;
+  return Number.isFinite(promo) && promo > 0 && promo < base;
 }
 
 function unitPrice(p: ProductPublic): number {
@@ -97,7 +106,7 @@ function unitPrice(p: ProductPublic): number {
 }
 
 function sortProducts(list: ProductPublic[], sort: SortKey): ProductPublic[] {
-  if (sort === 'recent') return list;
+  if (sort === 'recent' || sort === 'popular') return list;
   const copy = [...list];
   if (sort === 'price_low') copy.sort((a, b) => unitPrice(a) - unitPrice(b));
   if (sort === 'price_high') copy.sort((a, b) => unitPrice(b) - unitPrice(a));
@@ -244,7 +253,19 @@ function EnterpriseCard({
       <Text style={[styles.enterpriseCardName, { color: colors.text }]} numberOfLines={1}>
         {enterprise.nom}
       </Text>
-      {enterprise.delai_livraison_min ? (
+      {enterprise.note_moyenne && enterprise.note_moyenne > 0 ? (
+        <View style={styles.entRatingRow}>
+          <Star size={11} color="#F5A524" fill="#F5A524" strokeWidth={0} />
+          <Text style={[styles.enterpriseCardRating, { color: colors.text }]}>
+            {enterprise.note_moyenne.toFixed(1)}
+          </Text>
+          {enterprise.nb_avis ? (
+            <Text style={[styles.enterpriseCardRatingAvis, { color: colors.textMuted }]}>
+              ({enterprise.nb_avis})
+            </Text>
+          ) : null}
+        </View>
+      ) : enterprise.delai_livraison_min ? (
         <Text style={[styles.enterpriseCardMeta, { color: colors.textMuted }]}>
           {enterprise.delai_livraison_min} min
         </Text>
@@ -264,28 +285,41 @@ export default function HomeScreen() {
   const { heroOrder, isLoading: loadingOrders, refetch: refetchOrders } = useActiveOrders();
 
   // ── Campagnes marketing actives (offre du jour) ────────
+  // staleTime court : si une campagne est désactivée côté admin,
+  // la bannière disparaît dès le prochain affichage de l'accueil.
   const { data: activeCampaigns = [] } = useQuery({
     queryKey: ['active-campaigns'],
     queryFn: () => fetchActiveCampaigns(),
-    staleTime: 1000 * 60 * 5,
-    gcTime: 1000 * 60 * 15,
+    staleTime: 0,
+    gcTime: 1000 * 60 * 2,
+    refetchOnMount: 'always',
   });
 
   const flatListRef = useRef<FlatList>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<FilterTab>('all');
   const [sort, setSort] = useState<SortKey>('recent');
-  const [showSort, setShowSort] = useState(false);
   const [favProductKeys, setFavProductKeys] = useState<Set<string>>(new Set());
   const [showBackToTop, setShowBackToTop] = useState(false);
+
+  // ── En-tête fixe : la barre de recherche + filtres restent TOUJOURS
+  // visibles en haut. Pas de repli → scroll fluide, aucun vide blanc.
+  const [headerHeight, setHeaderHeight] = useState(0);
 
   const debouncedSearch = useDebouncedValue(search.trim(), 150);
   const searchActive = debouncedSearch.length >= 2;
 
   // ── Data hooks ────────────────────────────────────────────────
 
-  const { data: restaurants = [] } = useEnterprises('restaurant');
-  const { data: boutiques = [] } = useEnterprises('boutique');
+  const {
+    data: restaurants = [],
+    refetch: refetchRestaurants,
+  } = useEnterprises('restaurant');
+  const {
+    data: boutiques = [],
+    refetch: refetchBoutiques,
+  } = useEnterprises('boutique');
 
   const feedParams = useMemo(() => {
     if (category === 'promo') return { promo: true };
@@ -323,12 +357,6 @@ export default function HomeScreen() {
 
   const feedProducts = useMemo(() => feedPages?.pages.flat() ?? [], [feedPages]);
 
-  // Promo products from the feed
-  const promoProducts = useMemo(
-    () => feedProducts.filter(isPromoProduct).slice(0, 8),
-    [feedProducts],
-  );
-
   const {
     data: searchResult,
     isFetching: searching,
@@ -362,12 +390,39 @@ export default function HomeScreen() {
     return sortProducts(list, sort);
   }, [searchActive, searchResult, feedProducts, category, sort, debouncedSearch]);
 
+  const isEnterpriseView = !searchActive && (category === 'restaurant' || category === 'boutique');
+
+  /** Options de tri selon le contenu affiché : commerces ≠ produits. */
+  const sortOptions: { key: SortKey; label: string }[] = isEnterpriseView
+    ? [
+        { key: 'popular', label: 'Plus populaires' },
+        { key: 'recent', label: 'Plus récents' },
+      ]
+    : [
+        { key: 'price_low', label: 'Prix les plus bas' },
+        { key: 'price_high', label: 'Prix les plus chers' },
+      ];
+
   const displayEnterprises = useMemo(() => {
     if (searchActive) return searchResult?.enterprises ?? [];
-    if (category === 'restaurant') return restaurants;
-    if (category === 'boutique') return boutiques;
+    if (category === 'restaurant') {
+      if (sort === 'popular') return sortEnterprisesByPopularity(restaurants);
+      if (sort === 'recent') return sortEnterprisesByRecency(restaurants);
+      return restaurants;
+    }
+    if (category === 'boutique') {
+      if (sort === 'popular') return sortEnterprisesByPopularity(boutiques);
+      if (sort === 'recent') return sortEnterprisesByRecency(boutiques);
+      return boutiques;
+    }
     return [];
-  }, [searchActive, searchResult, category, restaurants, boutiques]);
+  }, [searchActive, searchResult, category, restaurants, boutiques, sort]);
+
+  /** « À découvrir » : restos + boutiques mélangés, mieux notés, max 3 + « Voir plus ». */
+  const discoverEnterprises = useMemo(
+    () => sortEnterprisesByPopularity([...restaurants, ...boutiques]).slice(0, 3),
+    [restaurants, boutiques],
+  );
 
   const showProductGrid =
     !searchActive ? category !== 'restaurant' && category !== 'boutique' : true;
@@ -384,10 +439,24 @@ export default function HomeScreen() {
     });
   }, [queryClient]);
 
+  // Le tri suit le type de contenu : commerces (populaire/récent) vs produits (prix).
+  useEffect(() => {
+    const enterprise = !searchActive && (category === 'restaurant' || category === 'boutique');
+    if (enterprise) {
+      setSort((s) => (s === 'popular' || s === 'recent' ? s : 'popular'));
+    } else {
+      setSort((s) => (s === 'price_low' || s === 'price_high' || s === 'recent' ? s : 'recent'));
+    }
+  }, [category, searchActive]);
+
   useFocusEffect(
     useCallback(() => {
+      // Commandes actives + commerces : la moyenne d'étoiles d'un commerce
+      // noté après livraison doit être visible dès le retour sur l'accueil.
       void refetchOrders();
-    }, [refetchOrders]),
+      void refetchRestaurants();
+      void refetchBoutiques();
+    }, [refetchOrders, refetchRestaurants, refetchBoutiques]),
   );
 
   useEffect(() => {
@@ -447,6 +516,14 @@ export default function HomeScreen() {
     void fetchNextPage();
   }, [feedEnabled, searchActive, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  /** Suit le scroll uniquement pour afficher le bouton « retour en haut ». */
+  const onScroll = useCallback(
+    (e: { nativeEvent: { contentOffset: { y: number } } }) => {
+      setShowBackToTop(e.nativeEvent.contentOffset.y > 500);
+    },
+    [],
+  );
+
   // ── Render helpers ────────────────────────────────────────────
 
   const renderProduct = useCallback(
@@ -468,12 +545,36 @@ export default function HomeScreen() {
     ? searching && !searchResult
     : loadingFeed && feedProducts.length === 0;
   const refreshing = searchActive ? refetchingSearch : refetchingFeed;
-  const hasActiveFilters = category !== 'all' || sort !== 'recent' || search.length > 0;
+  const defaultSort: SortKey = isEnterpriseView ? 'popular' : 'recent';
+  const hasActiveFilters = category !== 'all' || sort !== defaultSort || search.length > 0;
 
-  // ── List Header ───────────────────────────────────────────────
+  /** Rangée de tri affichée juste au-dessus du contenu qu'elle trie. */
+  const renderSortRow = (options: { key: SortKey; label: string }[]) => (
+    <View style={styles.sortRowWrap}>
+      {options.map((o) => {
+        const active = sort === o.key;
+        return (
+          <Pressable
+            key={o.key}
+            onPress={() => {
+              void Haptics.selectionAsync();
+              setSort(o.key);
+            }}
+            style={[
+              styles.sortChip,
+              { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border },
+            ]}>
+            <Text style={[styles.sortChipTxt, { color: active ? colors.onPrimary : colors.text }]}>{o.label}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
 
-  const listHeader = (
-    <View style={[styles.headerWrap, { paddingTop: Math.max(insets.top, 12) }]}>
+  // ── En-tête fixe repliable : top bar + recherche + filtres ─────
+
+  const fixedHeaderContent = (
+    <View style={styles.fixedHeaderInner}>
 
       {/* ── Top bar: location + bell ─────────────────────── */}
       <View style={styles.topBar}>
@@ -489,7 +590,7 @@ export default function HomeScreen() {
           {hasActiveFilters ? (
             <Pressable
               style={[styles.topBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              onPress={() => { setSearch(''); setCategory('all'); setSort('recent'); setShowSort(false); }}
+              onPress={() => { setSearch(''); setCategory('all'); setSort('recent'); }}
               hitSlop={8}>
               <X size={16} color={colors.error} strokeWidth={2.5} />
             </Pressable>
@@ -545,7 +646,11 @@ export default function HomeScreen() {
                   borderColor: active ? colors.primary : colors.border,
                 },
               ]}>
-              <Text style={styles.filterChipEmoji}>{c.emoji}</Text>
+              <c.Icon
+                size={14}
+                color={active ? colors.onPrimary : colors.textMuted}
+                strokeWidth={active ? 2.4 : 2}
+              />
               <Text style={[styles.filterChipTxt, { color: active ? colors.onPrimary : colors.text }]}>
                 {c.label}
               </Text>
@@ -553,38 +658,14 @@ export default function HomeScreen() {
           );
         })}
 
-        {/* Sort toggle */}
-        <Pressable
-          onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowSort(v => !v); }}
-          style={[
-            styles.filterChip,
-            { backgroundColor: showSort ? colors.primary : colors.surface, borderColor: showSort ? colors.primary : colors.border },
-          ]}>
-          <SlidersHorizontal size={13} color={showSort ? colors.onPrimary : colors.text} strokeWidth={2} />
-          <Text style={[styles.filterChipTxt, { color: showSort ? colors.onPrimary : colors.text }]}>Trier</Text>
-        </Pressable>
       </ScrollView>
+    </View>
+  );
 
-      {/* Sort chips */}
-      {showSort ? (
-        <View style={styles.sortRow}>
-          {(['recent', 'price_low', 'price_high'] as SortKey[]).map((s) => {
-            const labels: Record<SortKey, string> = { recent: 'Récents', price_low: 'Prix ↑', price_high: 'Prix ↓' };
-            const active = sort === s;
-            return (
-              <Pressable
-                key={s}
-                onPress={() => setSort(s)}
-                style={[
-                  styles.sortChip,
-                  { backgroundColor: active ? colors.primary : colors.surface, borderColor: active ? colors.primary : colors.border },
-                ]}>
-                <Text style={[styles.sortChipTxt, { color: active ? colors.onPrimary : colors.text }]}>{labels[s]}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : null}
+  // ── Liste : contenu défilant sous l'en-tête fixe ───────────────
+
+  const listHeader = (
+    <View style={styles.headerWrap}>
 
       {/* ── Active order widget ───────────────────────────── */}
       {!loadingOrders && heroOrder && !searchActive ? (
@@ -594,7 +675,8 @@ export default function HomeScreen() {
       {/* ─────────────────────────────────────────────────────
           BANNER — shown only on home (no search, no filter)
       ───────────────────────────────────────────────────── */}
-      {/* ── Campagnes marketing actives (offre du jour) ── */}
+      {/* ── Campagnes marketing actives (offre du jour) — visibles uniquement
+          si une campagne est réellement en cours. Sinon : rien du tout. ── */}
       {!searchActive && category === 'all' && activeCampaigns.length > 0 ? (
         <HomeCampaignBanner
           campaigns={activeCampaigns}
@@ -605,53 +687,25 @@ export default function HomeScreen() {
           }}
           colors={colors}
         />
-      ) : !searchActive && category === 'all' ? (
-        <View style={styles.bannerWrap}>
-          <LinearGradient
-            colors={['#0C4F36', '#155C3F']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.bannerGradient}>
-            {/* Text side */}
-            <View style={styles.bannerTextSide}>
-              <View style={styles.bannerPillWrap}>
-                <Text style={styles.bannerPillTxt}>Bienvenue sur GoLivra</Text>
-              </View>
-              <Text style={styles.bannerTitle}>Commandez près de{'\n'}chez vous en{'\n'}quelques clics.</Text>
-              <Pressable
-                style={styles.bannerBtn}
-                onPress={() => { handleCategoryPress('restaurant'); }}>
-                <Text style={styles.bannerBtnTxt}>Explorer</Text>
-              </Pressable>
-            </View>
-            {/* Food image side */}
-            <View style={styles.bannerImgSide}>
-              <Image
-                source={{ uri: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=400&fit=crop' }}
-                style={styles.bannerFood}
-                contentFit="cover"
-              />
-            </View>
-          </LinearGradient>
-        </View>
       ) : null}
 
       {/* ─────────────────────────────────────────────────────
-          RESTAURANTS POPULAIRES (horizontal scroll)
+          À DÉCOUVRIR (restos + boutiques mélangés, mieux notés, max 3)
       ───────────────────────────────────────────────────── */}
-      {!searchActive && category === 'all' && restaurants.length > 0 ? (
+      {!searchActive && category === 'all' && discoverEnterprises.length > 0 ? (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Restaurants populaires</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>À découvrir</Text>
             <Pressable
               style={styles.sectionSeeAll}
-              onPress={() => handleCategoryPress('restaurant')}>
-              <Text style={[styles.sectionSeeAllTxt, { color: colors.primary }]}>Voir tout</Text>
+              onPress={() => router.push('/discover-all')}
+              hitSlop={8}>
+              <Text style={[styles.sectionSeeAllTxt, { color: colors.primary }]}>Voir plus</Text>
               <ChevronRight size={14} color={colors.primary} strokeWidth={2.5} />
             </Pressable>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
-            {restaurants.slice(0, 8).map((ent) => (
+            {discoverEnterprises.map((ent) => (
               <EnterpriseCard
                 key={ent.id}
                 enterprise={ent}
@@ -669,11 +723,6 @@ export default function HomeScreen() {
       {!searchActive && category === 'all' && feedProducts.length > 0 ? (
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Recommandés pour vous</Text>
-          <View style={styles.sectionSeeAll}>
-            <Text style={[styles.sectionSeeAllTxt, { color: colors.textMuted }]}>
-              {feedProducts.length} articles
-            </Text>
-          </View>
         </View>
       ) : null}
 
@@ -685,6 +734,8 @@ export default function HomeScreen() {
           <Text style={[styles.sectionTitle, { color: colors.text }, { marginBottom: 10 }]}>
             {category === 'restaurant' ? 'Restaurants' : 'Boutiques'}
           </Text>
+          {/* Tri des commerces, juste au-dessus de la liste */}
+          {renderSortRow(sortOptions)}
           {displayEnterprises.map((ent) => (
             <Pressable
               key={ent.id}
@@ -763,12 +814,6 @@ export default function HomeScreen() {
         </View>
       ) : null}
 
-      {/* Search result count */}
-      {searchActive && !searching ? (
-        <Text style={[styles.resultCount, { color: colors.textMuted }]}>
-          {displayProducts.length + displayEnterprises.length} résultat{displayProducts.length + displayEnterprises.length !== 1 ? 's' : ''}
-        </Text>
-      ) : null}
 
       {/* Loading / searching */}
       {(loading && showProductGrid) || (searchActive && searching && !searchResult) ? (
@@ -798,15 +843,17 @@ export default function HomeScreen() {
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
             {FOOD_CATEGORIES.find(c => c.key === category)?.label ?? 'Produits'}
           </Text>
-          <Text style={[styles.sectionSeeAllTxt, { color: colors.textMuted }]}>
-            {displayProducts.length} articles
-          </Text>
         </View>
       ) : null}
 
       {searchActive && displayProducts.length > 0 ? (
         <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 8 }]}>Produits</Text>
       ) : null}
+
+      {/* Tri des produits : juste au-dessus de la grille triée.
+          Masqué sur « Recommandés pour vous » (catégorie all) : redondant, le tri
+          reste disponible dans les catégories et la recherche. */}
+      {showProductGrid && (searchActive || category !== 'all') ? renderSortRow(sortOptions) : null}
     </View>
   );
 
@@ -844,15 +891,21 @@ export default function HomeScreen() {
             )
           }
           contentContainerStyle={{
+            paddingTop: headerHeight,
             paddingHorizontal: H_PAD,
             paddingBottom: TAB_BAR_CONTENT_PADDING_BOTTOM + insets.bottom,
           }}
           onEndReached={onEndReached}
           onEndReachedThreshold={0.4}
-          onScroll={(e) => setShowBackToTop(e.nativeEvent.contentOffset.y > 500)}
+          onScroll={onScroll}
           scrollEventThrottle={16}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              progressViewOffset={headerHeight}
+            />
           }
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -864,23 +917,66 @@ export default function HomeScreen() {
         />
       ) : (
         <ScrollView
+          ref={scrollViewRef}
           contentContainerStyle={{
+            paddingTop: headerHeight,
             paddingHorizontal: H_PAD,
             paddingBottom: TAB_BAR_CONTENT_PADDING_BOTTOM + insets.bottom,
           }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              progressViewOffset={headerHeight}
+            />
           }
+          onScroll={onScroll}
+          scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}>
           {listHeader}
         </ScrollView>
       )}
 
-      {/* Back to top */}
+      {/* ── En-tête fixe (recherche + filtres) : toujours visible ── */}
+      <View
+        pointerEvents="box-none"
+        style={[
+          styles.fixedHeader,
+          {
+            backgroundColor: colors.background,
+            borderBottomColor: colors.border,
+            paddingTop: Math.max(insets.top, 12),
+          },
+        ]}
+        onLayout={(e) => {
+          const h = e.nativeEvent.layout.height;
+          setHeaderHeight((prev) => (Math.abs(prev - h) > 1 ? h : prev));
+        }}>
+        {fixedHeaderContent}
+      </View>
+
+      {/* Back to top — positionné bien AU-DESSUS de la barre d'onglets pour
+          ne jamais être recouvert. La barre mesure ~73px hors insets
+          (paddingTop 7 + icône 42 + libellé ~14 + padding gestes 10) :
+          bottom = insets + 96 garantit ~23px de marge, même avec une taille
+          de texte agrandie. Un bottom plus bas (82) le faisait glisser sous
+          le menu sur certains appareils. */}
       {showBackToTop ? (
         <Pressable
-          style={[styles.backToTop, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          onPress={() => { flatListRef.current?.scrollToOffset({ offset: 0, animated: true }); void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+          style={[
+            styles.backToTop,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              bottom: Math.max(insets.bottom, 10) + 96,
+            },
+          ]}
+          onPress={() => {
+            flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+            scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }}
           hitSlop={12}>
           <Text style={{ color: colors.primary, fontSize: 18 }}>↑</Text>
         </Pressable>
@@ -896,6 +992,21 @@ const styles = StyleSheet.create({
 
   // Header
   headerWrap: { gap: 12, marginBottom: 8 },
+
+  // En-tête fixe (top bar + recherche + filtres) : toujours visible,
+  // fond plein + fine bordure basse pour une séparation propre (pas flottant).
+  fixedHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    elevation: 4,
+    paddingHorizontal: H_PAD,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  fixedHeaderInner: { gap: 12 },
 
   // Top bar
   topBar: {
@@ -962,92 +1073,23 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
   },
-  filterChipEmoji: { fontSize: 14 },
-  filterChipTxt: { fontSize: 13, fontWeight: '700' },
+  filterChipTxt: { fontSize: 13, fontWeight: '500', textTransform: 'lowercase' },
 
   // Sort
-  sortRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  sortRowWrap: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginTop: 2,
+    marginBottom: 10,
+  },
   sortChip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
   },
-  sortChipTxt: { fontSize: 12, fontWeight: '700' },
-
-  // Banner
-  bannerWrap: { gap: 8 },
-  bannerGradient: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    flexDirection: 'row',
-    minHeight: 160,
-  },
-  bannerTextSide: {
-    flex: 1,
-    padding: 20,
-    justifyContent: 'center',
-    gap: 10,
-  },
-  bannerPillWrap: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  bannerPillTxt: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  bannerTitle: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '800',
-    lineHeight: 23,
-    letterSpacing: -0.3,
-  },
-  bannerBtn: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 999,
-  },
-  bannerBtnTxt: {
-    color: '#0C4F36',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  bannerImgSide: {
-    width: 140,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  bannerFood: {
-    position: 'absolute',
-    top: -10,
-    right: -10,
-    width: 170,
-    height: 190,
-  },
-  bannerDots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 5,
-    marginTop: -2,
-  },
-  bannerDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  bannerDotActive: {
-    width: 18,
-    borderRadius: 3,
-  },
+  sortChipTxt: { fontSize: 12, fontWeight: '500' },
 
   // Sections
   section: { gap: 0 },
@@ -1113,6 +1155,15 @@ const styles = StyleSheet.create({
     marginTop: 2,
     paddingHorizontal: 8,
   },
+  entRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 5,
+    paddingHorizontal: 8,
+  },
+  enterpriseCardRating: { fontSize: 11, fontWeight: '700' },
+  enterpriseCardRatingAvis: { fontSize: 11, fontWeight: '500' },
 
   // Enterprise list row (vertical)
   entRow: {
@@ -1218,9 +1269,10 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
 
-  // Grid
+  // Grid — maxWidth : quand il reste un seul produit sur la dernière rangée,
+  // la carte garde la même taille que les autres (pas de carte pleine largeur).
   gridRow: { gap: 10, marginBottom: 10 },
-  gridCell: { flex: 1 },
+  gridCell: { flex: 1, maxWidth: '48.5%' },
 
   // Loader
   loaderRow: {
@@ -1260,14 +1312,11 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 15, fontWeight: '700' },
   emptyBody: { fontSize: 13, textAlign: 'center' },
 
-  // Result count
-  resultCount: { fontSize: 13, marginTop: -4, marginBottom: 4 },
 
   // Back to top
   backToTop: {
     position: 'absolute',
     right: 16,
-    bottom: 100,
     width: 44,
     height: 44,
     borderRadius: 22,

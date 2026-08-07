@@ -4,6 +4,7 @@ import {
   Bell,
   Building2,
   ChevronRight,
+  Clock,
   CreditCard,
   HelpCircle,
   MapPin,
@@ -25,7 +26,6 @@ import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { VENDOR_TAB_BAR_PADDING_BOTTOM } from '@/constants/vendor-layout';
 import { useAppColors } from '@/hooks/use-app-colors';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
 import { VENDOR_HREF } from '@/lib/vendor-nav';
 import { useVendor } from '@/contexts/vendor-context';
@@ -34,7 +34,6 @@ export default function VendorMoreTabScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
-  const colorScheme = useColorScheme();
   const { shop } = useVendor();
   const { palette, labels, commerceType } = useVendorTheme();
   const isOnline = shop?.enLigne === true;
@@ -167,6 +166,13 @@ export default function VendorMoreTabScreen() {
             'Modalités de paiement clients',
             () => router.push(VENDOR_HREF.shopPayments)
           )}
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          {row(
+            <Clock size={20} color={palette.primary} strokeWidth={LUCIDE_STROKE} />,
+            "Horaires d'ouverture",
+            'Jours et heures de commande',
+            () => router.push({ pathname: '/vendor/horaires', params: shop?.id ? { id: shop.id } : {} })
+          )}
         </View>
 
         <ThemedText style={[styles.sectionLabel, { color: colors.textMuted }]}>Compte de connexion</ThemedText>
@@ -180,9 +186,9 @@ export default function VendorMoreTabScreen() {
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           {row(
             <Settings size={20} color={palette.primary} strokeWidth={LUCIDE_STROKE} />,
-            'Apparence',
-            'Thème clair ou sombre',
-            () => router.push(VENDOR_HREF.shopSettings)
+            'Réglages',
+            'Thème, taille du texte, notifications',
+            () => router.push('/settings')
           )}
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           {row(

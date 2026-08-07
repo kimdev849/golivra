@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -14,6 +14,7 @@ import {
   Phone,
   ShoppingBasket,
   ShoppingCart,
+  Star,
   Store,
   UtensilsCrossed,
 } from 'lucide-react-native';
@@ -39,6 +40,7 @@ import {
 } from '@/lib/catalog';
 import { peekEnterpriseById, peekProductsForEnterprise } from '@/lib/client-data';
 import { addProductToCartPrompt } from '@/lib/cart-local';
+import { showToast } from '@/lib/app-toast';
 import { getEffectiveUnitPrice } from '@/lib/product-promo';
 import { resolveRemoteImageUrl, type ResizeOptions } from '@/lib/images';
 import { getProductGalleryUrls, productDetailHref } from '@/lib/listing-utils';
@@ -119,7 +121,7 @@ export default function EnterpriseDetailScreen() {
     try {
       const newStatus = await toggleFavorite(token, enterprise.id, enterprise.nom ?? 'Commerce', enterprise.type);
       setIsFavorited(newStatus);
-    } catch (e) {
+    } catch {
       // silent
     }
   }, [token, enterprise]);
@@ -128,6 +130,37 @@ export default function EnterpriseDetailScreen() {
   const isRestaurant = enterprise?.type === 'restaurant';
   const prepMin = enterprise?.delai_preparation_min ?? 25;
   const shipMin = enterprise?.delai_livraison_min ?? 48;
+  // Horaires d'ouverture : fermé maintenant, fermé manuellement, ou horaires non
+  // définis (commandes bloquées) → on désactive l'ajout au panier.
+  const estFerme =
+    enterprise?.est_ouvert_maintenant === false ||
+    enterprise?.ouvert === false ||
+    enterprise?.accepte_commandes === false;
+  // Ouvert mais TROP TARD pour commander : le temps de préparation ne peut pas
+  // finir avant la fermeture (ex. fermeture 23h, préparation 25 min → plus de
+  // commande après 22h35). Le serveur calcule cette limite.
+  const tropTard = !estFerme && enterprise?.peut_commander_maintenant === false;
+  const commandesBloquees = estFerme || tropTard;
+  const derniereCommandeLabel = enterprise?.derniere_commande
+    ? `Dernière commande possible à ${enterprise.derniere_commande.replace(':', 'h')}.`
+    : null;
+  // Référence grammaticale du commerce (messages adaptés boutique / restaurant).
+  const commerceRef = isRestaurant ? 'ce restaurant' : 'cette boutique';
+  const fermetureFallback = isRestaurant
+    ? 'Ce restaurant est actuellement fermé.'
+    : 'Cette boutique est actuellement fermée.';
+  // Statut compact affiché près du nom (pastille colorée type Glovo / Uber Eats).
+  const statusInfo = (() => {
+    if (!enterprise) return { label: 'Ouvert', color: colors.success };
+    if (tropTard) return { label: 'Plus de commandes aujourd’hui', color: colors.warning };
+    if (enterprise.accepte_commandes === false) return { label: 'Fermé pour le moment', color: colors.warning };
+    if (enterprise.ouvert === false) return { label: 'Fermé pour le moment', color: colors.error };
+    if (enterprise.est_ouvert_maintenant === false) {
+      const reopen = enterprise.prochaine_ouverture ? ` · rouvre à ${enterprise.prochaine_ouverture}` : '';
+      return { label: `Fermé${reopen}`, color: colors.error };
+    }
+    return { label: 'Ouvert', color: colors.success };
+  })();
 
   const addProduct = (p: ProductPublic) => {
     if (!enterprise) return;
@@ -142,7 +175,15 @@ export default function EnterpriseDetailScreen() {
       nom: p.nom ?? 'Produit',
       prixUnitaire: prix,
       stockAvailable: effectiveStockCap(p, { enterpriseType: enterprise.type }),
-      onDone: () => {},
+      onDone: () => {
+        showToast({
+          message: 'Ajouté au panier',
+          action: {
+            label: 'Voir le panier',
+            onPress: () => router.navigate('/(tabs)/cart'),
+          },
+        });
+      },
     });
   };
 
@@ -242,12 +283,39 @@ export default function EnterpriseDetailScreen() {
           <View style={styles.heroBadge}>
             <ThemedText style={styles.heroBadgeText}>{enterprise.type === 'restaurant' ? 'Restaurant' : 'Boutique'}</ThemedText>
           </View>
+
+          {/* Note du commerce (badge sombre sur la photo) : toujours visible,
+              « · N avis » si déjà noté, sinon « Nouveau ». */}
+          <View style={styles.ratingBadge}>
+            <Star size={13} color="#FFC53D" fill="#FFC53D" strokeWidth={LUCIDE_STROKE} />
+            {enterprise.note_moyenne != null && enterprise.note_moyenne > 0 ? (
+              <>
+                <ThemedText style={styles.ratingBadgeValue}>
+                  {enterprise.note_moyenne.toFixed(1)}
+                </ThemedText>
+                {enterprise.nb_avis != null && enterprise.nb_avis > 0 ? (
+                  <ThemedText style={styles.ratingBadgeCount}>
+                    · {enterprise.nb_avis} avis
+                  </ThemedText>
+                ) : null}
+              </>
+            ) : (
+              <ThemedText style={styles.ratingBadgeValue}>Nouveau</ThemedText>
+            )}
+          </View>
         </View>
 
         <View style={styles.block}>
           <ThemedText type="title" style={styles.name}>
             {enterprise.nom ?? 'Commerce'}
           </ThemedText>
+          {/* Statut d'ouverture en un coup d'œil, près du nom */}
+          <View style={styles.statusRow}>
+            <View style={[styles.statusDot, { backgroundColor: statusInfo.color }]} />
+            <ThemedText style={[styles.statusText, { color: statusInfo.color }]}>
+              {statusInfo.label}
+            </ThemedText>
+          </View>
           {enterprise.description ? (
             <ThemedText style={styles.desc}>{enterprise.description}</ThemedText>
           ) : null}
@@ -271,9 +339,62 @@ export default function EnterpriseDetailScreen() {
           </View>
         </View>
 
+        {/* Statut d'ouverture (horaires) */}
+        {enterprise.horaires && enterprise.horaires.length > 0 ? (
+          tropTard ? (
+            <View
+              style={[
+                styles.hoursBanner,
+                { backgroundColor: colors.warningSoft, borderColor: colors.warning },
+              ]}>
+              <Clock size={16} color={colors.warning} strokeWidth={LUCIDE_STROKE} />
+              <ThemedText style={[styles.hoursBannerText, { color: colors.warning }]}>
+                {enterprise.message_commande ??
+                  `Il est trop tard pour commander aujourd'hui : ${commerceRef} ferme à ${
+                    enterprise.fermeture_plage?.replace(':', 'h') ?? ''
+                  } et la préparation prend ${prepMin} min.`}
+              </ThemedText>
+            </View>
+          ) : estFerme ? (
+            <View
+              style={[
+                styles.hoursBanner,
+                { backgroundColor: colors.errorSoft, borderColor: colors.error },
+              ]}>
+              <Clock size={16} color={colors.error} strokeWidth={LUCIDE_STROKE} />
+              <ThemedText style={[styles.hoursBannerText, { color: colors.error }]}>
+                {enterprise.message_fermeture ?? fermetureFallback}
+              </ThemedText>
+            </View>
+          ) : (
+            <View
+              style={[
+                styles.hoursBanner,
+                { backgroundColor: colors.successSoft, borderColor: colors.success },
+              ]}>
+              <Clock size={16} color={colors.success} strokeWidth={LUCIDE_STROKE} />
+              <ThemedText style={[styles.hoursBannerText, { color: colors.success }]}>
+                Ouvert actuellement — vous pouvez commander.
+                {derniereCommandeLabel ? ` ${derniereCommandeLabel}` : ''}
+              </ThemedText>
+            </View>
+          )
+        ) : enterprise.accepte_commandes === false ? (
+          <View
+            style={[
+              styles.hoursBanner,
+              { backgroundColor: colors.warningSoft, borderColor: colors.warning },
+            ]}>
+            <Clock size={16} color={colors.warning} strokeWidth={LUCIDE_STROKE} />
+            <ThemedText style={[styles.hoursBannerText, { color: colors.warning }]}>
+              {enterprise.message_fermeture ??
+                'Horaires non définis : les commandes sont momentanément indisponibles.'}
+            </ThemedText>
+          </View>
+        ) : null}
+
         <View style={styles.sectionHead}>
           <ThemedText style={styles.sectionTitle}>Articles</ThemedText>
-          <ThemedText style={styles.sectionHint}>{products.length} référence(s)</ThemedText>
         </View>
 
         {products.length === 0 ? (
@@ -287,7 +408,7 @@ export default function EnterpriseDetailScreen() {
           products.map((p) => {
             const allImages = getProductGalleryUrls(p, IMG_THUMB);
             const img = allImages[0] ?? null;
-            const disabled = !isProductOrderable(p, { enterpriseType: enterprise.type });
+            const disabled = commandesBloquees || !isProductOrderable(p, { enterpriseType: enterprise.type });
             const stockLabel = stockDisplayLabel(p, { enterpriseType: enterprise.type });
             const openGallery = () => {
               if (!allImages.length) return;
@@ -333,10 +454,16 @@ export default function EnterpriseDetailScreen() {
                     </ThemedText>
                   ) : null}
                   <ProductPrice product={p} showBadge />
-                  {stockLabel ? (
-                    <ThemedText style={[styles.stock, disabled && styles.stockOut]}>{stockLabel}</ThemedText>
-                  ) : disabled ? (
-                    <ThemedText style={[styles.stock, styles.stockOut]}>Indisponible</ThemedText>
+                  {disabled ? (
+                    <ThemedText style={[styles.stock, styles.stockDisabled]}>
+                      {commandesBloquees
+                        ? tropTard
+                          ? 'Plus de commandes aujourd’hui'
+                          : 'Commerce fermé'
+                        : (stockLabel ?? 'Indisponible')}
+                    </ThemedText>
+                  ) : stockLabel ? (
+                    <ThemedText style={styles.stock}>{stockLabel}</ThemedText>
                   ) : null}
                 </View>
                 <Pressable
@@ -347,7 +474,11 @@ export default function EnterpriseDetailScreen() {
                     addProduct(p);
                   }}
                   android_ripple={{ color: colors.primaryMuted }}>
-                  <ShoppingCart size={22} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
+                  <ShoppingCart
+                    size={22}
+                    color={disabled ? colors.textMuted : colors.onPrimary}
+                    strokeWidth={LUCIDE_STROKE}
+                  />
                 </Pressable>
               </Pressable>
             );

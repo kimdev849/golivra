@@ -1,5 +1,5 @@
 import { apiFetch } from '@/lib/api';
-import type { CartSegment, CartState } from '@/lib/cart-local';
+import { dedupeLines, type CartSegment, type CartState } from '@/lib/cart-local';
 
 export type RemoteCartResponse = {
   panier_id?: string;
@@ -26,7 +26,13 @@ export async function clearRemoteCart(token: string): Promise<RemoteCartResponse
 /** Fusionne le panier local avec le serveur (union des lignes par commerce). */
 export function mergeCartStates(local: CartState | null, remote: CartState | null): CartState | null {
   if (!local?.segments?.length && !remote?.segments?.length) return null;
-  if (!local?.segments?.length) return remote;
+  if (!local?.segments?.length) {
+    return {
+      segments: (remote?.segments ?? [])
+        .map((s) => ({ ...s, lines: dedupeLines(s.lines) }))
+        .filter((s) => s.lines.length > 0),
+    };
+  }
   if (!remote?.segments?.length) return local;
 
   const map = new Map<string, CartSegment>();
@@ -34,7 +40,7 @@ export function mergeCartStates(local: CartState | null, remote: CartState | nul
   for (const seg of remote.segments) {
     map.set(seg.enterpriseId, {
       ...seg,
-      lines: seg.lines.map((l) => ({ ...l })),
+      lines: dedupeLines(seg.lines),
     });
   }
 

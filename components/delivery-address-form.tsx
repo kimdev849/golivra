@@ -16,20 +16,28 @@ import type { DeliveryAddressFields } from '@/lib/format-address';
 
 export type DeliveryAddressFormValue = DeliveryAddressFields;
 
+/** Suggestions rapides pour le nom de l'adresse. */
+const ADDRESS_LABEL_CHIPS = ['Maison', 'Travail', 'Bureau'] as const;
+
 type Props = {
   value: DeliveryAddressFormValue;
   onChange: (next: DeliveryAddressFormValue) => void;
   accentColor?: string;
   compact?: boolean;
+  /** Si false : les champs (arrondissement + adresse détaillée) sont facultatifs (boutiques e-commerce). */
+  required?: boolean;
+  /** Masque le champ « Nom de l'adresse » (géré dans « Mes adresses »). */
+  hideLibelle?: boolean;
 };
 
-export function DeliveryAddressForm({ value, onChange, accentColor, compact = false }: Props) {
+export function DeliveryAddressForm({ value, onChange, accentColor, compact = false, required = true, hideLibelle = false }: Props) {
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const accent = accentColor ?? colors.primary;
   const accentDeep = accentColor ?? colors.primaryDeep;
   const [quartierOpen, setQuartierOpen] = useState(false);
   const [showOptional, setShowOptional] = useState(!compact);
+  const reqMark = required ? ' *' : '';
 
   const patch = useCallback(
     (part: Partial<DeliveryAddressFormValue>) => {
@@ -50,7 +58,40 @@ export function DeliveryAddressForm({ value, onChange, accentColor, compact = fa
 
   return (
     <View style={styles.wrap}>
-      {step(1, 'Arrondissement *')}
+      {/* ── Nom de l'adresse (optionnel, masqué quand hideLibelle) ── */}
+      {!hideLibelle ? (
+        <>
+          <ThemedText style={compact ? [styles.optionalLabel, { color: colors.textMuted }] : [styles.blockTitle, { color: accentDeep }]}>
+            Nom de l&apos;adresse
+          </ThemedText>
+          <View style={styles.chipsRow}>
+            {ADDRESS_LABEL_CHIPS.map((chip) => {
+              const on = (value.libelle ?? '').trim() === chip;
+              return (
+                <Pressable
+                  key={chip}
+                  onPress={() => patch({ libelle: on ? '' : chip })}
+                  style={[
+                    styles.chip,
+                    { borderColor: on ? accent : colors.border, backgroundColor: on ? accent : colors.surface },
+                  ]}>
+                  <ThemedText style={[styles.chipText, { color: on ? '#FFFFFF' : colors.textMuted }]}>{chip}</ThemedText>
+                </Pressable>
+              );
+            })}
+          </View>
+          <TextInput
+            style={[styles.input, { borderColor: colors.border, backgroundColor: colors.surface, color: colors.text }]}
+            value={value.libelle ?? ''}
+            onChangeText={(libelle) => patch({ libelle })}
+            placeholder="Ex. Chez maman, Résidence…"
+            placeholderTextColor={colors.placeholder}
+            maxLength={50}
+          />
+        </>
+      ) : null}
+
+      {step(1, `Arrondissement${reqMark}`)}
       {!compact ? (
         <ThemedText style={[styles.hint, { color: colors.textMuted }]}>
           {"Choisissez votre quartier (arrondissement), puis précisez l'adresse en texte libre."}
@@ -62,7 +103,7 @@ export function DeliveryAddressForm({ value, onChange, accentColor, compact = fa
         </ThemedText>
       </Pressable>
 
-      {step(2, 'Adresse détaillée *')}
+      {step(2, `Adresse détaillée${reqMark}`)}
       {!compact ? (
         <ThemedText style={[styles.hint, { color: colors.textMuted }]}>Rue, repère, couleur du portail, immeuble…</ThemedText>
       ) : null}
@@ -148,6 +189,14 @@ const styles = StyleSheet.create({
   stepNum: { fontWeight: '900' },
   optionalLabel: { fontSize: 12, fontWeight: '700', marginTop: 10, marginBottom: 6 },
   hint: { fontSize: 12, marginBottom: 6, lineHeight: 17 },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  chipText: { fontSize: 13, fontWeight: '700' },
   moreLink: { fontSize: 13, fontWeight: '700', marginTop: 8, marginBottom: 4 },
   select: {
     borderWidth: 1,

@@ -109,35 +109,50 @@ export default function TabLayout() {
           name="index"
           options={{
             title: 'Accueil',
-            tabBarIcon: ({ color }) => <Home size={24} color={color} strokeWidth={LUCIDE_STROKE} />,
+            tabBarIcon: ({ color, focused }) => (
+              <Home size={21} color={color} strokeWidth={focused ? 2.4 : LUCIDE_STROKE} />
+            ),
           }}
         />
         <Tabs.Screen
           name="explore"
           options={{
             title: 'Commandes',
-            tabBarIcon: ({ color }) => <ClipboardList size={24} color={color} strokeWidth={LUCIDE_STROKE} />,
+            tabBarIcon: ({ color, focused }) => (
+              <ClipboardList size={21} color={color} strokeWidth={focused ? 2.4 : LUCIDE_STROKE} />
+            ),
           }}
         />
         <Tabs.Screen
           name="cart"
           options={{
             title: 'Panier',
-            tabBarIcon: ({ color }) => <ShoppingBag size={24} color={color} strokeWidth={LUCIDE_STROKE} />,
+            tabBarIcon: ({ color, focused }) => (
+              <ShoppingBag size={21} color={color} strokeWidth={focused ? 2.4 : LUCIDE_STROKE} />
+            ),
           }}
         />
         <Tabs.Screen
           name="favorites"
           options={{
             title: 'Favoris',
-            tabBarIcon: ({ color }) => <Heart size={24} color={color} strokeWidth={LUCIDE_STROKE} />,
+            tabBarIcon: ({ color, focused }) => (
+              <Heart
+                size={21}
+                color={color}
+                fill={focused ? color : 'transparent'}
+                strokeWidth={focused ? 2.4 : LUCIDE_STROKE}
+              />
+            ),
           }}
         />
         <Tabs.Screen
           name="profile"
           options={{
             title: 'Compte',
-            tabBarIcon: ({ color }) => <UserRound size={24} color={color} strokeWidth={LUCIDE_STROKE} />,
+            tabBarIcon: ({ color, focused }) => (
+              <UserRound size={21} color={color} strokeWidth={focused ? 2.4 : LUCIDE_STROKE} />
+            ),
           }}
         />
         <Tabs.Screen
@@ -145,7 +160,9 @@ export default function TabLayout() {
           options={{
             href: null,
             title: 'Marketplace',
-            tabBarIcon: ({ color }) => <Store size={24} color={color} strokeWidth={LUCIDE_STROKE} />,
+            tabBarIcon: ({ color, focused }) => (
+              <Store size={21} color={color} strokeWidth={focused ? 2.4 : LUCIDE_STROKE} />
+            ),
           }}
         />
       </Tabs>

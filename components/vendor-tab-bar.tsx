@@ -1,140 +1,211 @@
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { PlatformPressable } from '@react-navigation/elements';
 import * as Haptics from 'expo-haptics';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  interpolateColor,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useVendorTheme } from '@/hooks/use-vendor-theme';
 
+/**
+ * Barre de navigation vendeur — pleine largeur, épurée et professionnelle,
+ * dans le même esprit que la barre client : onglet actif en bulle pleine
+ * couleur avec ressort (spring), micro-interactions à l'appui et fine
+ * bordure supérieure séparant la barre du contenu.
+ */
 const TAB_ORDER = ['index', 'orders', 'deliveries', 'products', 'more'] as const;
 
-function haptic() {
-  if (process.env.EXPO_OS === 'ios') {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }
+function triggerTabHaptic() {
+  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+}
+
+function TabItem({
+  route,
+  isFocused,
+  Icon,
+  title,
+  colors,
+  onPress,
+  onLongPress,
+}: {
+  route: { key: string; name: string };
+  isFocused: boolean;
+  Icon?: (props: {
+    focused: boolean;
+    color: string;
+    size: number;
+    strokeWidth?: number;
+  }) => React.ReactNode;
+  title: string;
+  colors: ReturnType<typeof useAppColors>;
+  onPress: () => void;
+  onLongPress: () => void;
+}) {
+  const active = useSharedValue(isFocused ? 1 : 0);
+  const pressed = useSharedValue(0);
+
+  React.useEffect(() => {
+    active.value = withSpring(isFocused ? 1 : 0, {
+      damping: 18,
+      stiffness: 220,
+      mass: 0.6,
+    });
+  }, [isFocused, active]);
+
+  const bubbleAnim = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      active.value,
+      [0, 1],
+      [colors.surfaceElevated, colors.primary],
+    ),
+    transform: [
+      {
+        scale: (0.86 + 0.14 * active.value) * (1 - 0.05 * pressed.value),
+      },
+    ],
+  }));
+
+  const contentColor = isFocused ? colors.onPrimary : colors.tabInactive;
+  const labelColor = isFocused ? colors.primary : colors.tabInactive;
+
+  return (
+    <PlatformPressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: isFocused }}
+      accessibilityLabel={title}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      onPressIn={() => {
+        pressed.value = 1;
+      }}
+      onPressOut={() => {
+        pressed.value = 0;
+      }}
+      style={styles.tab}
+      hitSlop={{ top: 6, bottom: 10, left: 4, right: 4 }}>
+      <Animated.View style={[styles.iconWrap, bubbleAnim]}>
+        {Icon ? (
+          <Icon
+            focused={isFocused}
+            color={contentColor}
+            size={21}
+            strokeWidth={isFocused ? 2.4 : LUCIDE_STROKE}
+          />
+        ) : null}
+      </Animated.View>
+      <Text
+        style={[
+          styles.label,
+          { color: labelColor, fontWeight: isFocused ? '700' : '500' },
+        ]}
+        numberOfLines={1}>
+        {title}
+      </Text>
+    </PlatformPressable>
+  );
 }
 
 export function VendorTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
-  const insets = useSafeAreaInsets();
-  const bottomPad = Math.max(insets.bottom, Platform.OS === 'ios' ? 10 : 8);
-  const { palette } = useVendorTheme();
   const colors = useAppColors();
-  const isDark = useColorScheme() === 'dark';
+  const insets = useSafeAreaInsets();
+  const bottomPad = Math.max(insets.bottom, 10);
 
   const orderedRoutes = TAB_ORDER.map((name) => state.routes.find((r) => r.name === name)).filter(
     (r): r is (typeof state.routes)[number] => r != null,
   );
 
-  const focusedName = state.routes[state.index]?.name;
-  const trackBg = isDark ? colors.surfaceElevated : colors.surface;
-  const trackBorder = isDark ? colors.border : 'rgba(13,82,55,0.08)';
+  const focusedRouteName = state.routes[state.index]?.name;
 
   return (
-    <View style={[styles.root, styles.boxPointer, { paddingBottom: bottomPad }]}>
-      <View style={[styles.barArea, styles.boxPointer]}>
-        <View
-          style={[
-            styles.track,
-            Platform.OS === 'ios' ? styles.trackShadowIos : styles.trackShadowAndroid,
-            {
-              backgroundColor: trackBg,
-              borderColor: trackBorder,
-              shadowColor: palette.primaryDeep,
-            },
-          ]}>
-          <View style={styles.row}>
-            {orderedRoutes.map((route) => {
-              const { options } = descriptors[route.key];
-              const isFocused = focusedName === route.name;
-              const title =
-                typeof options.title === 'string'
-                  ? options.title
-                  : typeof options.tabBarLabel === 'string'
-                    ? options.tabBarLabel
-                    : route.name;
-              const color = isFocused ? palette.primary : palette.tabBarInactive;
-              const Icon = options.tabBarIcon;
+    <View style={styles.root}>
+      <View
+        style={[
+          styles.bar,
+          {
+            backgroundColor: colors.surfaceElevated,
+            borderTopColor: colors.borderStrong,
+            paddingBottom: bottomPad,
+          },
+        ]}>
+        {orderedRoutes.map((route) => {
+          const { options } = descriptors[route.key];
+          const isFocused = focusedRouteName === route.name;
+          const title =
+            typeof options.title === 'string'
+              ? options.title
+              : typeof options.tabBarLabel === 'string'
+                ? options.tabBarLabel
+                : route.name;
+          const Icon = options.tabBarIcon;
 
-              return (
-                <PlatformPressable
-                  key={route.key}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isFocused }}
-                  accessibilityLabel={typeof title === 'string' ? title : route.name}
-                  onPress={() => {
-                    haptic();
-                    const e = navigation.emit({
-                      type: 'tabPress',
-                      target: route.key,
-                      canPreventDefault: true,
-                    });
-                    if (!isFocused && !e.defaultPrevented) {
-                      navigation.navigate(route.name as never);
-                    }
-                  }}
-                  style={styles.tab}
-                  hitSlop={{ top: 6, bottom: 8, left: 4, right: 4 }}>
-                  {Icon ? <Icon focused={isFocused} color={color} size={22} /> : null}
-                  <Text
-                    style={[styles.label, { color, fontWeight: isFocused ? '800' : '600' }]}
-                    numberOfLines={1}>
-                    {typeof title === 'string' ? title : route.name}
-                  </Text>
-                </PlatformPressable>
-              );
-            })}
-          </View>
-        </View>
+          const onPress = () => {
+            triggerTabHaptic();
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+            if (event.defaultPrevented) return;
+            if (!isFocused) navigation.navigate(route.name as never);
+          };
+
+          const onLongPress = () => {
+            navigation.emit({ type: 'tabLongPress', target: route.key });
+          };
+
+          return (
+            <TabItem
+              key={route.key}
+              route={route}
+              isFocused={isFocused}
+              Icon={Icon}
+              title={title}
+              colors={colors}
+              onPress={onPress}
+              onLongPress={onLongPress}
+            />
+          );
+        })}
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // Barre pleine largeur ancrée en bas — séparée du contenu par une fine bordure.
   root: {
-    paddingTop: 4,
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
   },
-  boxPointer: { pointerEvents: 'box-none' },
-  barArea: {
-    paddingHorizontal: 14,
-    alignItems: 'center',
-  },
-  track: {
-    width: '100%',
-    borderRadius: 28,
-    minHeight: 58,
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  trackShadowIos: {
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 14,
-  },
-  trackShadowAndroid: {
-    elevation: 6,
-  },
-  row: {
+  bar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    paddingHorizontal: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 7,
+    paddingHorizontal: 4,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 3,
-    paddingVertical: 4,
+    paddingTop: 4,
   },
-  label: {
-    fontSize: 10,
-    letterSpacing: -0.15,
+  iconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  label: { fontSize: 11, letterSpacing: -0.2 },
 });

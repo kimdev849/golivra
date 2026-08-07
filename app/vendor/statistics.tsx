@@ -1,8 +1,18 @@
-import { ChevronDown, Eye, MousePointerClick, Percent, ShoppingBag, TrendingUp, Info, Package, AlertTriangle } from 'lucide-react-native';
+import {
+  AlertTriangle,
+  Eye,
+  Info,
+  MousePointerClick,
+  Package,
+  Percent,
+  ShoppingBag,
+  TrendingUp,
+} from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import type { LucideIcon } from 'lucide-react-native';
 
 import { VendorScreenHeader } from '@/components/vendor-screen-header';
 import { ThemedText } from '@/components/themed-text';
@@ -16,12 +26,128 @@ import { fetchMyEnterpriseStats } from '@/lib/vendor-api';
 import { computeVendorStats, type VendorEngagementInput } from '@/lib/vendor-types';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { AppPalette } from '@/constants/app-palette';
+import type { VendorPalette } from '@/lib/vendor-theme';
 
 const PERIODS = [
-  { days: 7, label: '7 derniers jours' },
-  { days: 30, label: '30 derniers jours' },
-  { days: 90, label: '90 derniers jours' },
+  { days: 7, label: '7j' },
+  { days: 30, label: '30j' },
+  { days: 90, label: '90j' },
 ] as const;
+
+type DailyRevenue = { date: string; amount: number; label: string };
+
+/** Regroupe les revenus journaliers en ≤ maxBars barres (sinon illisible en 30j/90j). */
+function bucketRevenues(daily: DailyRevenue[], maxBars = 14): DailyRevenue[] {
+  if (daily.length <= maxBars) return daily;
+  const bucketSize = Math.ceil(daily.length / maxBars);
+  const out: DailyRevenue[] = [];
+  for (let i = 0; i < daily.length; i += bucketSize) {
+    const slice = daily.slice(i, i + bucketSize);
+    out.push({
+      date: slice[0].date,
+      amount: slice.reduce((s, d) => s + d.amount, 0),
+      // Dernier segment : garde le libellé du jour le plus récent ("Auj.").
+      label: slice[slice.length - 1].label,
+    });
+  }
+  return out;
+}
+
+function SectionTitle({ title, colors }: { title: string; colors: AppPalette }) {
+  return (
+    <View style={styles.sectionHeader}>
+      <ThemedText type="defaultSemiBold" style={[styles.sectionTitle, { color: colors.text }]}>
+        {title}
+      </ThemedText>
+    </View>
+  );
+}
+
+function KpiCard({
+  label,
+  value,
+  colors,
+  palette,
+  icon: Icon,
+}: {
+  label: string;
+  value: number | string;
+  colors: AppPalette;
+  palette: VendorPalette;
+  icon: LucideIcon;
+}) {
+  return (
+    <View style={[styles.kpiCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={[styles.kpiIcon, { backgroundColor: colors.primarySoft }]}>
+        <Icon size={18} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <ThemedText style={[styles.kpiValue, { color: colors.text }]} numberOfLines={1}>
+          {value}
+        </ThemedText>
+        <ThemedText style={[styles.kpiLabel, { color: colors.textMuted }]} numberOfLines={1}>
+          {label}
+        </ThemedText>
+      </View>
+    </View>
+  );
+}
+
+function InventoryItem({
+  label,
+  count,
+  color,
+  icon: Icon,
+}: {
+  label: string;
+  count: number;
+  color: string;
+  icon: LucideIcon;
+}) {
+  return (
+    <View style={styles.invItem}>
+      <View style={styles.invHeader}>
+        <Icon size={14} color={color} strokeWidth={LUCIDE_STROKE} />
+        <ThemedText style={[styles.invLabel, { color }]}>{label}</ThemedText>
+      </View>
+      <ThemedText style={[styles.invCount, { color }]}>{count}</ThemedText>
+    </View>
+  );
+}
+
+function EngagementCard({
+  icon: Icon,
+  label,
+  value,
+  suffix,
+  colors,
+  palette,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: number;
+  suffix?: string;
+  colors: AppPalette;
+  palette: VendorPalette;
+}) {
+  return (
+    <View style={[styles.engCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={[styles.engIcon, { backgroundColor: colors.primarySoft }]}>
+        <Icon size={20} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <ThemedText style={[styles.engValue, { color: colors.text }]} numberOfLines={1}>
+          {value.toLocaleString('fr-FR')}
+          {suffix ?? ''}
+        </ThemedText>
+        <ThemedText style={[styles.engLabel, { color: colors.textMuted }]} numberOfLines={1}>
+          {label}
+        </ThemedText>
+      </View>
+    </View>
+  );
+}
 
 export default function VendorStatisticsScreen() {
   const insets = useSafeAreaInsets();
@@ -29,7 +155,6 @@ export default function VendorStatisticsScreen() {
   const { palette } = useVendorTheme();
   const { orders, products, shop } = useVendor();
   const [periodDays, setPeriodDays] = useState(7);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [engagement, setEngagement] = useState<VendorEngagementInput | null>(null);
   const [engagementLoading, setEngagementLoading] = useState(false);
 
@@ -60,179 +185,210 @@ export default function VendorStatisticsScreen() {
     [orders, products, periodDays, engagement],
   );
 
+  const bars = useMemo(() => bucketRevenues(stats.dailyRevenues), [stats.dailyRevenues]);
+  const maxAmount = Math.max(...bars.map((b) => b.amount), 1);
+  const hasSales = bars.some((b) => b.amount > 0);
+  const periodLabel = periodDays === 7 ? '7 jours' : periodDays === 30 ? '30 jours' : '90 jours';
+
   return (
     <ThemedView style={styles.screen}>
-      <VendorScreenHeader
-        title="TABLEAU DE BORD"
-        right={
-          <Pressable style={[styles.dd, { backgroundColor: colors.surfaceMuted }]} hitSlop={8} onPress={() => setPickerOpen(true)}>
-            <ThemedText style={[styles.ddTxt, { color: colors.text }]}>{periodDays}j</ThemedText>
-            <ChevronDown size={14} color={colors.text} strokeWidth={3} />
-          </Pressable>
-        }
-      />
-      <ScrollView 
+      <VendorScreenHeader title="TABLEAU DE BORD" />
+
+      <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ padding: 18, paddingBottom: insets.bottom + 40 }}>
-        
+        {/* Sélecteur de période */}
+        <View style={[styles.segmented, { backgroundColor: colors.surfaceMuted }]}>
+          {PERIODS.map((p) => {
+            const active = periodDays === p.days;
+            return (
+              <Pressable
+                key={p.days}
+                style={[styles.segment, active && { backgroundColor: palette.primary }]}
+                onPress={() => setPeriodDays(p.days)}>
+                <ThemedText
+                  type="defaultSemiBold"
+                  style={[styles.segmentTxt, { color: active ? colors.onPrimary : colors.textSecondary }]}>
+                  {p.label}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* Carte revenus */}
         <LinearGradient
           colors={[...palette.gradient]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.bigCard, { shadowColor: palette.primary }]}>
-          <View style={styles.bigCardHeader}>
-            <View style={styles.revIconWrap}>
+          style={[styles.heroCard, { shadowColor: palette.primary }]}>
+          <View style={styles.heroHeader}>
+            <View style={styles.heroIcon}>
               <TrendingUp size={20} color="#FFFFFF" strokeWidth={LUCIDE_STROKE} />
             </View>
-            <ThemedText style={styles.revLab}>Chiffre d'affaires ({periodDays}j)</ThemedText>
+            <ThemedText style={styles.heroLabel}>{`Chiffre d'affaires (${periodLabel})`}</ThemedText>
           </View>
-          <ThemedText style={styles.revVal}>{formatFcfa(stats.revenus7j)}</ThemedText>
-          <View style={styles.trendRow}>
-            <View style={[styles.trendBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-              <ThemedText style={styles.trend}>Panier moyen: {formatFcfa(stats.averageOrderValue)}</ThemedText>
-            </View>
+          <ThemedText style={styles.heroValue}>{formatFcfa(stats.revenus7j)}</ThemedText>
+          <View style={styles.heroFooter}>
+            <ThemedText style={styles.heroTrend}>
+              {stats.commandes > 0
+                ? `${stats.commandes} commande${stats.commandes > 1 ? 's' : ''} • panier moyen ${formatFcfa(stats.averageOrderValue)}`
+                : 'Aucune commande sur cette période'}
+            </ThemedText>
           </View>
-          <View style={styles.bigCardGlow} />
+          <View style={styles.heroGlow} />
         </LinearGradient>
 
-        <View style={styles.row2}>
-          <StatMiniCard
+        {/* KPIs */}
+        <View style={styles.kpiRow}>
+          <KpiCard
             label="Commandes"
             value={stats.commandes}
             colors={colors}
-            icon={<ShoppingBag size={18} color={palette.primary} strokeWidth={LUCIDE_STROKE} />}
+            palette={palette}
+            icon={ShoppingBag}
           />
-          <StatMiniCard
+          <KpiCard
             label="Articles vendus"
             value={stats.produitsVendus}
             colors={colors}
-            icon={<Package size={18} color={palette.primary} strokeWidth={LUCIDE_STROKE} />}
+            palette={palette}
+            icon={Package}
           />
         </View>
 
-        {/* Chart Section */}
-        <View style={[styles.chartContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.sectionHeader}>
-            <ThemedText type="defaultSemiBold" style={{ color: colors.text }}>Performance quotidienne</ThemedText>
-          </View>
-          <View style={styles.barsContainer}>
-            {stats.dailyRevenues.map((day) => {
-              const max = Math.max(...stats.dailyRevenues.map(d => d.amount), 1);
-              const height = (day.amount / max) * 100;
-              return (
-                <View key={day.date} style={styles.barColumn}>
-                  <View style={styles.barTrack}>
-                    <LinearGradient
-                      colors={[palette.primary, palette.primarySoft]}
-                      style={[styles.bar, { height: `${Math.max(height, 5)}%` }]}
-                    />
+        {/* Graphique */}
+        <View style={[styles.chartCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <SectionTitle title="Performance quotidienne" colors={colors} />
+          {hasSales ? (
+            <View style={styles.barsRow}>
+              {bars.map((day) => {
+                const height = (day.amount / maxAmount) * 100;
+                return (
+                  <View key={day.date} style={styles.barColumn}>
+                    <View style={[styles.barTrack, { backgroundColor: colors.surfaceMuted }]}>
+                      <LinearGradient
+                        colors={[palette.primary, palette.primaryDeep]}
+                        style={[styles.bar, { height: `${Math.max(height, 6)}%` }]}
+                      />
+                    </View>
+                    <ThemedText style={[styles.barLabel, { color: colors.textMuted }]} numberOfLines={1}>
+                      {day.label}
+                    </ThemedText>
                   </View>
-                  <ThemedText style={[styles.barLabel, { color: colors.textSecondary }]}>{day.label}</ThemedText>
-                </View>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Inventory Section */}
-        <View style={[styles.inventoryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.sectionHeader}>
-            <ThemedText type="defaultSemiBold" style={{ color: colors.text }}>Gestion de Stock</ThemedText>
-            <Package size={16} color={colors.textMuted} />
-          </View>
-          <View style={styles.inventoryRow}>
-            <InventoryItem 
-              label="Rupture" 
-              count={stats.inventorySummary.outOfStock} 
-              color={colors.error} 
-              icon={<AlertTriangle size={14} color={colors.error} />}
-            />
-            <InventoryItem 
-              label="Stock faible" 
-              count={stats.inventorySummary.lowStock} 
-              color="#F59E0B" 
-              icon={<Info size={14} color="#F59E0B" />}
-            />
-            <InventoryItem 
-              label="Total articles" 
-              count={stats.inventorySummary.total} 
-              color={colors.primary} 
-              icon={<Package size={14} color={colors.primary} />}
-            />
-          </View>
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <ThemedText type="defaultSemiBold" style={[styles.h, { color: colors.text }]}>
-            Top Produits (Ventes)
-          </ThemedText>
-        </View>
-        
-        <View style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          {stats.topProduits.length === 0 ? (
-            <View style={styles.emptyState}>
-              <ThemedText style={[styles.empty, { color: colors.textMuted }]}>Aucune vente enregistrée.</ThemedText>
+                );
+              })}
             </View>
           ) : (
-            stats.topProduits.map((t, idx) => (
-              <View key={t.nom} style={[styles.topRow, { borderBottomColor: idx === stats.topProduits.length - 1 ? 'transparent' : colors.border }]}>
-                <View style={[styles.rankBadge, { backgroundColor: idx === 0 ? colors.primary : colors.surfaceMuted }]}>
-                  <ThemedText style={[styles.rankText, { color: idx === 0 ? '#FFF' : colors.text }]}>{idx + 1}</ThemedText>
-                </View>
-                <ThemedText style={{ flex: 1, fontWeight: '700', color: colors.text }} numberOfLines={1}>{t.nom}</ThemedText>
-                <View style={styles.ventesWrap}>
-                  <ThemedText style={[styles.ventes, { color: colors.primary }]}>{t.ventes}</ThemedText>
-                  <ThemedText style={[styles.ventesUnit, { color: colors.textMuted }]}> unités</ThemedText>
-                </View>
-              </View>
-            ))
+            <View style={styles.emptyBox}>
+              <ThemedText style={[styles.emptyText, { color: colors.textMuted }]}>
+                Aucune vente sur cette période.
+              </ThemedText>
+            </View>
           )}
         </View>
 
-        <View style={[styles.sectionHeader, { marginTop: 28 }]}>
-          <ThemedText type="defaultSemiBold" style={[styles.h, { color: colors.text }]}>
-            Engagement Client
-          </ThemedText>
+        {/* Stock */}
+        <View style={[styles.inventoryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <SectionTitle title="Gestion de stock" colors={colors} />
+          <View style={styles.inventoryRow}>
+            <InventoryItem
+              label="Rupture"
+              count={stats.inventorySummary.outOfStock}
+              color={colors.error}
+              icon={AlertTriangle}
+            />
+            <InventoryItem
+              label="Stock faible"
+              count={stats.inventorySummary.lowStock}
+              color={colors.warning}
+              icon={Info}
+            />
+            <InventoryItem
+              label="Total articles"
+              count={stats.inventorySummary.total}
+              color={palette.primary}
+              icon={Package}
+            />
+          </View>
         </View>
 
+        {/* Top produits */}
+        <View style={{ marginBottom: 24 }}>
+          <SectionTitle title="Top produits (ventes)" colors={colors} />
+          <View style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {stats.topProduits.length === 0 ? (
+              <View style={styles.emptyBox}>
+                <ThemedText style={[styles.emptyText, { color: colors.textMuted }]}>
+                  Aucune vente enregistrée.
+                </ThemedText>
+              </View>
+            ) : (
+              stats.topProduits.map((t, idx) => (
+                <View
+                  key={t.nom}
+                  style={[
+                    styles.topRow,
+                    { borderBottomColor: idx === stats.topProduits.length - 1 ? 'transparent' : colors.border },
+                  ]}>
+                  <View style={[styles.rankBadge, { backgroundColor: idx === 0 ? palette.primary : colors.surfaceMuted }]}>
+                    <ThemedText style={[styles.rankText, { color: idx === 0 ? '#FFF' : colors.text }]}>
+                      {idx + 1}
+                    </ThemedText>
+                  </View>
+                  <ThemedText style={[styles.topName, { color: colors.text }]} numberOfLines={1}>
+                    {t.nom}
+                  </ThemedText>
+                  <View style={styles.ventesWrap}>
+                    <ThemedText style={[styles.ventes, { color: palette.primary }]}>{t.ventes}</ThemedText>
+                    <ThemedText style={[styles.ventesUnit, { color: colors.textMuted }]}> unités</ThemedText>
+                  </View>
+                </View>
+              ))
+            )}
+          </View>
+        </View>
+
+        {/* Engagement */}
+        <SectionTitle title="Engagement client" colors={colors} />
         {engagementLoading ? (
           <View style={{ gap: 12 }}>
             <Skeleton width="100%" height={80} borderRadius={16} />
             <Skeleton width="100%" height={80} borderRadius={16} />
           </View>
         ) : !stats.engagement ? (
-          <View style={[styles.emptyState, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, borderRadius: 20, borderWidth: 1 }]}>
-            <ThemedText style={[styles.empty, { color: colors.textMuted }]}>
-              Données d'engagement non disponibles.
+          <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <ThemedText style={[styles.emptyText, { color: colors.textMuted }]}>
+              {'Données d\'engagement non disponibles.'}
             </ThemedText>
           </View>
         ) : (
           <>
-            <View style={styles.engagementColumn}>
+            <View style={styles.engGrid}>
               <EngagementCard
-                icon={<Eye size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />}
-                label="Vues Boutique"
+                icon={Eye}
+                label="Vues boutique"
                 value={stats.engagement?.totalVues ?? 0}
                 colors={colors}
                 palette={palette}
               />
               <EngagementCard
-                icon={<MousePointerClick size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />}
-                label="Clics Produits"
+                icon={MousePointerClick}
+                label="Clics produits"
                 value={stats.engagement?.totalClics ?? 0}
                 colors={colors}
                 palette={palette}
               />
               <EngagementCard
-                icon={<ShoppingBag size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />}
+                icon={ShoppingBag}
                 label="Conversions"
                 value={stats.engagement?.totalVentes ?? 0}
                 colors={colors}
                 palette={palette}
               />
               <EngagementCard
-                icon={<Percent size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />}
-                label="Taux d'Achat"
+                icon={Percent}
+                label="Taux d'achat"
                 value={stats.engagement?.tauxConversionPct ?? 0}
                 suffix="%"
                 colors={colors}
@@ -240,144 +396,75 @@ export default function VendorStatisticsScreen() {
               />
             </View>
 
-            <ThemedText style={[styles.subH, { color: colors.textSecondary }]}>
-              Plus consultés
-            </ThemedText>
-            <View style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              {stats.engagement?.topVus.length === 0 ? (
-                <ThemedText style={[styles.empty, { color: colors.textMuted, padding: 16 }]}>Aucune vue.</ThemedText>
-              ) : (
-                stats.engagement?.topVus.slice(0, 5).map((t, idx) => (
-                  <View key={`v-${t.id || idx}`} style={[styles.topRow, { borderBottomColor: idx === 4 ? 'transparent' : colors.border }]}>
-                    <ThemedText style={[styles.rank, { color: colors.textMuted }]}>{idx + 1}</ThemedText>
-                    <ThemedText style={{ flex: 1, fontWeight: '700', color: colors.text }} numberOfLines={1}>{t.nom}</ThemedText>
-                    <ThemedText style={[styles.ventes, { color: colors.textMuted }]}>{t.vues} vues</ThemedText>
-                  </View>
-                ))
-              )}
-            </View>
+            {(stats.engagement?.topVus.length ?? 0) > 0 ? (
+              <>
+                <ThemedText style={[styles.subHeader, { color: colors.textSecondary }]}>
+                  Plus consultés
+                </ThemedText>
+                <View style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  {stats.engagement?.topVus.slice(0, 5).map((t, idx) => (
+                    <View
+                      key={`v-${t.id || idx}`}
+                      style={[
+                        styles.topRow,
+                        { borderBottomColor: idx === 4 ? 'transparent' : colors.border },
+                      ]}>
+                      <ThemedText style={[styles.rank, { color: colors.textMuted }]}>{idx + 1}</ThemedText>
+                      <ThemedText style={[styles.topName, { color: colors.text }]} numberOfLines={1}>
+                        {t.nom}
+                      </ThemedText>
+                      <ThemedText style={[styles.ventes, { color: colors.textMuted }]}>{t.vues} vues</ThemedText>
+                    </View>
+                  ))}
+                </View>
+              </>
+            ) : null}
           </>
         )}
       </ScrollView>
-
-      <Modal visible={pickerOpen} transparent animationType="fade" onRequestClose={() => setPickerOpen(false)}>
-        <Pressable style={styles.modalBg} onPress={() => setPickerOpen(false)}>
-          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-              <ThemedText style={[styles.modalTitle, { color: colors.text }]}>Choisir une période</ThemedText>
-            </View>
-            {PERIODS.map((p) => (
-              <Pressable
-                key={p.days}
-                style={[styles.modalRow, { borderBottomColor: colors.border }]}
-                onPress={() => {
-                  setPeriodDays(p.days);
-                  setPickerOpen(false);
-                }}>
-                <ThemedText style={[styles.modalRowText, { color: periodDays === p.days ? colors.primary : colors.text }]}>
-                  {p.label}
-                </ThemedText>
-                {periodDays === p.days && <View style={[styles.checkDot, { backgroundColor: colors.primary }]} />}
-              </Pressable>
-            ))}
-          </View>
-        </Pressable>
-      </Modal>
     </ThemedView>
-  );
-}
-
-function StatMiniCard({ label, value, colors, icon }: any) {
-  return (
-    <View style={[styles.smallCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View style={[styles.miniIconWrap, { backgroundColor: colors.primarySoft }]}>
-        {icon}
-      </View>
-      <View>
-        <ThemedText style={[styles.sVal, { color: colors.text }]}>{value}</ThemedText>
-        <ThemedText style={[styles.sLab, { color: colors.textMuted }]}>{label}</ThemedText>
-      </View>
-    </View>
-  );
-}
-
-function InventoryItem({ label, count, color, icon }: any) {
-  return (
-    <View style={styles.invItem}>
-      <View style={styles.invHeader}>
-        {icon}
-        <ThemedText style={[styles.invLabel, { color }]}>{label}</ThemedText>
-      </View>
-      <ThemedText style={[styles.invCount, { color }]}>{count}</ThemedText>
-    </View>
-  );
-}
-
-function EngagementCard({
-  icon,
-  label,
-  value,
-  suffix,
-  colors,
-  palette,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  suffix?: string;
-  colors: ReturnType<typeof useAppColors>;
-  palette: any;
-}) {
-  return (
-    <View style={[styles.engCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View style={[styles.engIcon, { backgroundColor: colors.primarySoft }]}>{icon}</View>
-      <View style={{ flex: 1 }}>
-        <ThemedText style={[styles.engVal, { color: colors.text }]}>
-          {value.toLocaleString('fr-FR')}
-          {suffix ?? ''}
-        </ThemedText>
-        <ThemedText style={[styles.engLabel, { color: colors.textMuted }]} numberOfLines={1}>{label}</ThemedText>
-      </View>
-    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  dd: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 6, 
-    paddingHorizontal: 12, 
-    paddingVertical: 6, 
-    borderRadius: 10 
+
+  // Sélecteur de période
+  segmented: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    padding: 4,
+    gap: 4,
+    marginBottom: 16,
   },
-  ddTxt: { fontWeight: '900', fontSize: 13 },
-  bigCard: { 
-    borderRadius: 24, 
-    padding: 24, 
-    marginBottom: 20,
+  segment: { flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center' },
+  segmentTxt: { fontSize: 13 },
+
+  // Carte revenus
+  heroCard: {
+    borderRadius: 24,
+    padding: 22,
+    marginBottom: 16,
     overflow: 'hidden',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.2,
     shadowRadius: 20,
     elevation: 8,
   },
-  bigCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
-  revIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+  heroHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
+  heroIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  revLab: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.9)' },
-  revVal: { fontSize: 34, fontWeight: '900', color: '#FFFFFF', marginBottom: 12 },
-  trendRow: { flexDirection: 'row' },
-  trendBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  trend: { fontSize: 13, fontWeight: '800', color: '#FFFFFF' },
-  bigCardGlow: {
+  heroLabel: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.9)' },
+  heroValue: { fontSize: 34, fontWeight: '900', color: '#FFFFFF', marginBottom: 10 },
+  heroFooter: { flexDirection: 'row' },
+  heroTrend: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.85)' },
+  heroGlow: {
     position: 'absolute',
     right: -40,
     top: -40,
@@ -386,82 +473,107 @@ const styles = StyleSheet.create({
     borderRadius: 60,
     backgroundColor: 'rgba(255,255,255,0.1)',
   },
-  row2: { flexDirection: 'row', gap: 12, marginBottom: 24 },
-  smallCard: {
+
+  // KPIs
+  kpiRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  kpiCard: {
     flex: 1,
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 18,
+    padding: 14,
     borderWidth: 1,
-    flexDirection: 'row', 
-    alignItems: 'center', 
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
   },
-  miniIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+  kpiIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sLab: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  sVal: { fontSize: 22, fontWeight: '900', marginBottom: 2 },
-  chartContainer: { padding: 16, borderRadius: 20, borderWidth: 1, marginBottom: 20 },
-  barsContainer: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 120, marginTop: 16, paddingHorizontal: 8 },
-  barColumn: { alignItems: 'center', flex: 1 },
-  barTrack: { width: 12, height: '100%', backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 6, justifyContent: 'flex-end', overflow: 'hidden' },
+  kpiValue: { fontSize: 20, fontWeight: '900', marginBottom: 2 },
+  kpiLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
+
+  // Graphique
+  chartCard: { padding: 16, borderRadius: 20, borderWidth: 1, marginBottom: 16 },
+  barsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: 130,
+    marginTop: 12,
+    gap: 6,
+  },
+  barColumn: { flex: 1, alignItems: 'center', height: '100%', justifyContent: 'flex-end' },
+  barTrack: {
+    width: '70%',
+    maxWidth: 16,
+    height: '82%',
+    borderRadius: 6,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
   bar: { width: '100%', borderRadius: 6 },
-  barLabel: { fontSize: 10, marginTop: 6, fontWeight: '600' },
-  inventoryCard: { padding: 16, borderRadius: 20, borderWidth: 1, marginBottom: 20 },
-  inventoryRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 },
+  barLabel: { fontSize: 9, marginTop: 5, fontWeight: '600', maxWidth: '100%' },
+
+  // Stock
+  inventoryCard: { padding: 16, borderRadius: 20, borderWidth: 1, marginBottom: 24 },
+  inventoryRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 14 },
   invItem: { flex: 1, alignItems: 'center' },
   invHeader: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
   invLabel: { fontSize: 11, fontWeight: '700' },
   invCount: { fontSize: 18, fontWeight: '900' },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  h: { fontSize: 18, fontWeight: '900' },
-  listCard: { borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
-  emptyState: { padding: 32, alignItems: 'center' },
-  empty: { fontSize: 14, fontWeight: '600', textAlign: 'center' },
-  topRow: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 12, 
+
+  // Listes
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  sectionTitle: { fontSize: 16, fontWeight: '800' },
+  listCard: { borderRadius: 20, borderWidth: 1, overflow: 'hidden', marginTop: 4 },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     paddingHorizontal: 16,
-    paddingVertical: 14, 
-    borderBottomWidth: StyleSheet.hairlineWidth 
+    paddingVertical: 13,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   rankBadge: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   rankText: { fontSize: 14, fontWeight: '900' },
+  topName: { flex: 1, fontWeight: '700', fontSize: 15 },
   ventesWrap: { flexDirection: 'row', alignItems: 'baseline' },
   ventes: { fontSize: 16, fontWeight: '900' },
   ventesUnit: { fontSize: 12, fontWeight: '700' },
+  rank: { width: 22, textAlign: 'center', fontSize: 13, fontWeight: '800' },
+
+  // Engagement
+  engGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 20 },
   engCard: {
-    width: '100%',
+    width: '48%',
+    flexGrow: 1,
     borderRadius: 18,
-    padding: 16,
+    padding: 14,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
   },
-  engIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  engLabel: { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', flex: 1 },
-  engVal: { fontSize: 22, fontWeight: '900' },
-  engagementColumn: { gap: 12, marginBottom: 20 },
-  subH: { fontSize: 13, fontWeight: '800', marginTop: 10, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 },
-  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalCard: { borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingBottom: 40, elevation: 20, shadowColor: '#000', shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.1, shadowRadius: 20 },
-  modalHeader: { padding: 24, alignItems: 'center', borderBottomWidth: 1 },
-  modalTitle: { fontSize: 18, fontWeight: '900' },
-  modalRow: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between',
-    paddingVertical: 20, 
-    paddingHorizontal: 24, 
-    borderBottomWidth: StyleSheet.hairlineWidth 
+  engIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  engValue: { fontSize: 20, fontWeight: '900', marginBottom: 1 },
+  engLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
+  subHeader: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
-  modalRowText: { fontSize: 16, fontWeight: '800' },
-  checkDot: { width: 8, height: 8, borderRadius: 4 },
-  rank: { width: 22, textAlign: 'center', fontSize: 13, fontWeight: '800' },
+
+  // États vides
+  emptyBox: { paddingVertical: 24, alignItems: 'center' },
+  emptyCard: { borderRadius: 20, borderWidth: 1, padding: 28, alignItems: 'center' },
+  emptyText: { fontSize: 14, fontWeight: '600', textAlign: 'center' },
 });

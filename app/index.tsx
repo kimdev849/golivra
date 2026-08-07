@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useEffect, useState } from 'react';
 
 import { ThemedText } from '@/components/themed-text';
@@ -17,6 +18,10 @@ import { markOnboardingComplete, resolveBootstrapTarget } from '@/lib/app-bootst
 const SLOGAN = 'On vous apporte ce dont vous avez besoin ..';
 /** Orange marque GoLivra (utilisé dans le logo, le t-shirt et la casquette). */
 const GOLIVRA_ORANGE = '#F58A07';
+
+// Animations d'entrée du landing.
+const TOP_ENTER = FadeInDown.duration(500);
+const BOTTOM_ENTER = FadeInUp.duration(550).delay(120);
 
 export default function LandingScreen() {
   const router = useRouter();
@@ -95,7 +100,8 @@ export default function LandingScreen() {
       />
 
       {/* Petit logo en haut, transparent pour rester lisible */}
-      <View
+      <Animated.View
+        entering={TOP_ENTER}
         style={[
           styles.topBar,
           { paddingTop: Math.max(insets.top, 12) + 6 },
@@ -107,10 +113,11 @@ export default function LandingScreen() {
           contentFit="contain"
           tintColor="#FFFFFF"
         />
-      </View>
+      </Animated.View>
 
-      {/* Bloc bas : slogan + bouton + lien inscription */}
-      <View
+      {/* Bloc bas : slogan + boutons Connexion / Inscription */}
+      <Animated.View
+        entering={BOTTOM_ENTER}
         style={[
           styles.bottomBlock,
           {
@@ -135,15 +142,15 @@ export default function LandingScreen() {
             onPress={() => {
               void markOnboardingComplete();
             }}
-            style={styles.signupRow}
-            hitSlop={8}>
-            <ThemedText style={styles.signupText}>
-              Pas encore de compte ?{' '}
-              <ThemedText style={styles.signupLink}>{"S'inscrire"}</ThemedText>
-            </ThemedText>
+            android_ripple={{ color: 'rgba(255,255,255,0.25)', borderless: false }}
+            style={({ pressed }) => [
+              styles.signupBtn,
+              { width: buttonWidth, opacity: pressed ? 0.9 : 1 },
+            ]}>
+            <ThemedText style={styles.signupBtnText}>Créer un compte</ThemedText>
           </Pressable>
         </Link>
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -198,17 +205,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.3,
   },
-  signupRow: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+  // Bouton secondaire plein format : fond blanc opaque pour ressortir sur la photo,
+  // même gabarit que « Connexion » pour une vraie paire de boutons centrés.
+  signupBtn: {
+    minHeight: 56,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    boxShadow: '0px 8px 22px rgba(0,0,0,0.25)',
+    elevation: 4,
   },
-  signupText: {
-    color: 'rgba(255,255,255,0.88)',
-    fontSize: 14,
-  },
-  signupLink: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    textDecorationLine: 'underline',
+  signupBtnText: {
+    color: GOLIVRA_ORANGE,
+    fontSize: 19,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
 });

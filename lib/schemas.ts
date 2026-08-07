@@ -26,6 +26,8 @@ export const EnterprisePublicSchema = z
     banniere_url: z.string().nullable().optional(),
     note_moyenne: z.number().nullable().optional(),
     nb_avis: z.number().optional().default(0),
+    cree_le: z.string().nullable().optional(),
+    created_at: z.string().nullable().optional(),
     est_ouvert: z.boolean().optional().default(true),
     temps_preparation_min: z.number().nullable().optional(),
     adresse_ville: z.string().nullable().optional(),

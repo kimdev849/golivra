@@ -87,11 +87,37 @@ export async function advanceCourierMission(token: string, deliveryId: string): 
   });
 }
 
-export async function completeCourierMission(token: string, deliveryId: string): Promise<CourierMission> {
+/**
+ * Preuve de livraison envoyée à la complétion.
+ * La photo (caméra uniquement) est obligatoire ; le GPS et l'heure sont ajoutés
+ * automatiquement à la prise.
+ */
+export type CourierProofPayload = {
+  photoUrl: string;
+  /** Position GPS au moment de la prise (best-effort). */
+  gpsLat?: number;
+  gpsLng?: number;
+  /** Horodatage ISO de la prise. */
+  takenAt?: string;
+  /** Client présent (remise en main propre) ou absent (photo devant le lieu). */
+  clientPresent?: boolean;
+};
+
+export async function completeCourierMission(
+  token: string,
+  deliveryId: string,
+  proof: CourierProofPayload,
+): Promise<CourierMission> {
   return apiFetch<CourierMission>(`/api/delivery/courier/complete/${deliveryId}`, {
     method: 'POST',
     token,
-    jsonBody: {},
+    jsonBody: {
+      proofPhotoUrl: proof?.photoUrl,
+      proofLatitude: proof?.gpsLat,
+      proofLongitude: proof?.gpsLng,
+      proofTakenAt: proof?.takenAt,
+      proofClientPresent: proof?.clientPresent,
+    },
   });
 }
 

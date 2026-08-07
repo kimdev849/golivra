@@ -176,6 +176,46 @@ export async function initializeNotifications(): Promise<NotificationPermissionS
   return permission;
 }
 
+/** Anti-doublon : évite de relancer une inscription push en rafale. */
+let lastTokenRegistrationAt = 0;
+
+/**
+ * Ré-enregistre le token push de l'appareil après une connexion / inscription.
+ *
+ * Nécessaire car : l'initialisation complète n'a lieu qu'au démarrage de l'app,
+ * et le logout DÉSENREGISTRE le token. Sans cet appel, un utilisateur qui se
+ * connecte (ou se reconnecte) après le démarrage ne recevrait plus aucun push
+ * (clients comme vendeurs).
+ *
+ * Silencieux et non bloquant : ne redemande PAS la permission (elle a été
+ * demandée au premier lancement) et ne fait rien si elle est refusée.
+ * Anti-doublon : pas plus d'une inscription toutes les 15 s (les écrans
+ * vendeurs appellent cette fonction à chaque focus).
+ */
+export async function ensurePushTokenRegistered(): Promise<void> {
+  if (Platform.OS === 'web') return;
+
+  const now = Date.now();
+  if (now - lastTokenRegistrationAt < 15_000) return;
+  lastTokenRegistrationAt = now;
+
+  const Notifications = await loadExpoNotifications();
+  if (!Notifications) return;
+
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') return;
+
+    const token = await getExpoPushToken();
+    if (!token) return;
+
+    await registerPushToken(token, Platform.OS as 'ios' | 'android' | 'web');
+    console.log('[notifications] ✅ Token (ré)enregistré après connexion');
+  } catch (err) {
+    console.warn('[notifications] ensurePushTokenRegistered error:', err);
+  }
+}
+
 // ─── Navigation ───────────────────────────────────────────────────────────────
 
 type NotifData = Record<string, unknown> | null | undefined;
@@ -216,7 +256,7 @@ export function handleNotificationNavigation(data: NotifData): void {
   }
 
   if (action === 'open_orders') {
-    router.push('/(tabs)/explore');
+    router.navigate('/(tabs)/explore');
     return;
   }
 

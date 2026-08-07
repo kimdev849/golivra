@@ -28,10 +28,12 @@ function extractErrorMessage(parsed: unknown, text: string, status: number): str
     return friendlyErrorMessage(String((parsed as { message: unknown }).message));
   }
   const trimmed = text.trim();
-  if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')) {
-    return UX_ERRORS.generic;
+  // Express renvoie « Cannot GET/PUT/… » en HTML 404 quand une route n'existe
+  // pas encore (API pas redéployée). On montre un message clair au lieu du générique.
+  if (/cannot (get|put|post|patch|delete)\b/i.test(trimmed)) {
+    return UX_ERRORS.serverOutdated;
   }
-  if (trimmed.toLowerCase().includes('cannot post')) {
+  if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')) {
     return UX_ERRORS.generic;
   }
   if (status === 401) return UX_ERRORS.session;

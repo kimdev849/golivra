@@ -65,6 +65,13 @@ export async function clearSessionToken(): Promise<void> {
 export async function persistAuthSession(session: AuthSession): Promise<void> {
   await setSessionToken(session.token);
   await saveSessionSnapshot(session);
+  // Push notifications : le token est DÉSENREGISTRÉ au logout et l'init complète
+  // n'a lieu qu'au démarrage de l'app. On le (ré)enregistre donc après chaque
+  // connexion/inscription pour garantir la réception (fire-and-forget).
+  // Import dynamique pour éviter une dépendance circulaire (auth → notifications → auth).
+  void import('@/lib/notifications-service')
+    .then((m) => m.ensurePushTokenRegistered?.())
+    .catch(() => undefined);
 }
 
 export async function registerAccount(payload: {
@@ -177,9 +184,27 @@ export async function logoutLocal(): Promise<void> {
   }
   await clearSessionSnapshot();
   if (token) {
+    // Vide le panier SERVEUR de l'ancien compte (le token est capturé, donc
+    // l'appel reste valide même après clearSessionToken) : sinon le panier
+    // revenait à la reconnexion (persistance après déconnexion).
+    void (async () => {
+      try {
+        const { clearRemoteCart } = await import('@/lib/cart-api');
+        await clearRemoteCart(token);
+      } catch {
+        /* ignore */
+      }
+    })();
     void logoutRemote(token).catch(() => {
       /* réseau lent ou hors ligne : on déconnecte quand même localement */
     });
+  }
+  // Vide aussi le panier local (mémoire + stockage).
+  try {
+    const { clearCart } = await import('@/lib/cart-local');
+    await clearCart();
+  } catch {
+    /* ignore */
   }
   await clearSessionToken();
 }

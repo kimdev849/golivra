@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { Camera } from 'lucide-react-native';
+import { Camera, ChevronRight, Clock } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -24,6 +24,7 @@ import { LUCIDE_STROKE } from '@/constants/icons';
 import { useVendor } from '@/contexts/vendor-context';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
+import { useVendorHoraires } from '@/hooks/use-vendor-horaires';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
 import { getSessionToken } from '@/lib/auth';
 import { patchEnterprise } from '@/lib/enterprise';
@@ -48,6 +49,10 @@ export default function VendorShopInfoScreen() {
   const { showSuccess, showError, FeedbackOverlay } = useActionFeedback();
   const { shop, refresh } = useVendor();
   const { commerceType, palette } = useVendorTheme();
+  const horaires = useVendorHoraires(shop?.id);
+
+  const openHorairesEditor = () =>
+    router.push({ pathname: '/vendor/horaires', params: shop?.id ? { id: shop.id } : {} });
   const [nom, setNom] = useState('');
   const [description, setDescription] = useState('');
   const [telephone, setTelephone] = useState('');
@@ -106,9 +111,23 @@ export default function VendorShopInfoScreen() {
       return;
     }
     setDescription(e3.value);
-    const e4 = deliveryAddressError(address);
-    if (e4) {
-      next.address = e4;
+    // Adresse : obligatoire uniquement pour les restaurants (livraison sur place).
+    // Les boutiques (y compris e-commerce) peuvent enregistrer leur fiche sans adresse.
+    // Si une boutique saisit une adresse partielle, on la valide en léger (mêmes règles que l'API).
+    const isRestaurant = commerceType === 'restaurant';
+    if (isRestaurant) {
+      const e4 = deliveryAddressError(address);
+      if (e4) {
+        next.address = e4;
+        setFieldErrors(next);
+        return;
+      }
+    } else if (address.ligne1.trim() && address.ligne1.trim().length < 5) {
+      next.address = 'Adresse détaillée trop courte (5 caractères minimum).';
+      setFieldErrors(next);
+      return;
+    } else if (/^[0-9\s]+$/.test(address.ligne1.trim())) {
+      next.address = 'Adresse invalide (pas uniquement des chiffres).';
       setFieldErrors(next);
       return;
     }
@@ -188,17 +207,85 @@ export default function VendorShopInfoScreen() {
         <TextInput style={[styles.inp, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]} value={telephone} onChangeText={setTelephone} keyboardType="phone-pad" placeholderTextColor={colors.placeholder} />
         <InlineFormError message={fieldErrors.telephone} colors={colors} />
 
-        <ThemedText style={[styles.sectionHead, { color: colors.textSecondary }]}>Adresse du commerce</ThemedText>
-        <DeliveryAddressForm value={address} onChange={setAddress} accentColor={palette.primary} />
+        <ThemedText style={[styles.sectionHead, { color: colors.textSecondary }]}>
+          {commerceType === 'restaurant'
+            ? 'Adresse du commerce'
+            : 'Adresse du commerce (optionnelle)'}
+        </ThemedText>
+        {commerceType === 'boutique' ? (
+          <ThemedText style={[styles.addrHint, { color: colors.textMuted }]}>
+            Boutique en ligne ? Laissez vide si vous ne recevez pas de clients sur place.
+          </ThemedText>
+        ) : null}
+        <DeliveryAddressForm
+          value={address}
+          onChange={setAddress}
+          accentColor={palette.primary}
+          required={commerceType === 'restaurant'}
+          hideLibelle
+        />
         <InlineFormError message={fieldErrors.address} colors={colors} />
+
+        {/* ── Horaires d'ouverture (obligatoires pour recevoir des commandes) ── */}
+        <ThemedText style={[styles.sectionHead, { color: colors.textSecondary }]}>Horaires d&apos;ouverture</ThemedText>
+        <Pressable
+          style={[styles.hoursCard, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}
+          onPress={openHorairesEditor}>
+          <View
+            style={[
+              styles.hoursIcon,
+              {
+                backgroundColor: !horaires.hasHours
+                  ? colors.errorSoft
+                  : horaires.openNow
+                    ? colors.successSoft
+                    : colors.warningSoft,
+              },
+            ]}>
+            <Clock
+              size={20}
+              color={!horaires.hasHours ? colors.error : horaires.openNow ? colors.success : colors.warning}
+              strokeWidth={LUCIDE_STROKE}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText type="defaultSemiBold" style={[styles.hoursTitle, { color: colors.text }]}>
+              {horaires.hasHours ? 'Horaires définis' : 'Horaires non définis'}
+            </ThemedText>
+            <ThemedText
+              style={[
+                styles.hoursStatus,
+                {
+                  color: !horaires.hasHours
+                    ? colors.error
+                    : horaires.openNow
+                      ? colors.success
+                      : colors.warning,
+                },
+              ]}>
+              {!horaires.hasHours
+                ? "Requis — vous ne recevez aucune commande tant que ce n'est pas fait."
+                : horaires.openNow
+                  ? `Ouvert aujourd'hui${horaires.todayHours ? ` · ${horaires.todayHours}` : ''}`
+                  : horaires.nextLabel
+                    ? `Fermé aujourd'hui · réouverture ${horaires.nextLabel}`
+                    : "Fermé aujourd'hui"}
+            </ThemedText>
+            {horaires.hasHours ? (
+              <ThemedText style={[styles.hoursSummary, { color: colors.textMuted }]} numberOfLines={1}>
+                {horaires.summary}
+              </ThemedText>
+            ) : null}
+          </View>
+          <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+        </Pressable>
 
         <View style={[styles.deliveryCard, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}>
           <ThemedText type="defaultSemiBold" style={[styles.deliveryTitle, { color: colors.text }]}>
             Réseau GoLivra
           </ThemedText>
           <ThemedText style={[styles.deliverySub, { color: colors.textMuted }]}>
-            Quand un client commande, un livreur GoLivra est contacté (le client paie la livraison). Vous pouvez aussi
-            créer une livraison vous-même depuis l’app (vous payez les frais).
+            Un livreur livre vos commandes (le client paie). Créez aussi vos propres livraisons (vous payez).
           </ThemedText>
         </View>
 
@@ -240,6 +327,7 @@ const styles = StyleSheet.create({
   },
   chgPhotoTxt: { fontWeight: '700', fontSize: 13 },
   sectionHead: { fontSize: 14, fontWeight: '800', marginTop: 20, marginBottom: 4 },
+  addrHint: { fontSize: 12, lineHeight: 17, marginBottom: 8 },
   lab: { fontSize: 12, fontWeight: '800', marginBottom: 6, marginTop: 12 },
   inp: {
     borderWidth: 1,
@@ -249,6 +337,25 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   area: { minHeight: 88 },
+  hoursCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginTop: 4,
+  },
+  hoursIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hoursTitle: { fontSize: 15, fontWeight: '800', marginBottom: 2 },
+  hoursStatus: { fontSize: 12.5, fontWeight: '800', lineHeight: 17 },
+  hoursSummary: { fontSize: 12, fontWeight: '500', marginTop: 2, opacity: 0.85 },
   deliveryCard: {
     marginTop: 20,
     padding: 14,

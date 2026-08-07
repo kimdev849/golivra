@@ -131,7 +131,7 @@ CREATE TABLE produits (
     entreprise_id UUID REFERENCES entreprises(id) ON DELETE CASCADE,
     nom VARCHAR(150),
     description TEXT,
-    prix DECIMAL(10,2),
+    prix DECIMAL(12,2),
     stock INT,
     image_url TEXT
 );
@@ -144,7 +144,7 @@ CREATE TABLE menus (
     entreprise_id UUID REFERENCES entreprises(id) ON DELETE CASCADE,
     nom VARCHAR(150),
     description TEXT,
-    prix DECIMAL(10,2),
+    prix DECIMAL(12,2),
     temps_preparation INT,
     disponible BOOLEAN DEFAULT true
 );
@@ -173,7 +173,7 @@ CREATE TABLE commandes (
     utilisateur_id UUID REFERENCES utilisateurs(id) ON DELETE SET NULL,
     entreprise_id UUID REFERENCES entreprises(id) ON DELETE SET NULL,
     statut VARCHAR(30),
-    prix_total DECIMAL(10,2),
+    prix_total DECIMAL(12,2),
     adresse_livraison TEXT,
     latitude DECIMAL(10,8),
     longitude DECIMAL(11,8),
@@ -186,7 +186,7 @@ CREATE TABLE commande_articles (
     item_id UUID,
     type_item VARCHAR(20),
     quantite INT,
-    prix DECIMAL(10,2)
+    prix DECIMAL(12,2)
 );
 
 -- =========================
@@ -207,7 +207,7 @@ CREATE TABLE livraisons (
 CREATE TABLE paiements (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     commande_id UUID REFERENCES commandes(id) ON DELETE CASCADE,
-    montant DECIMAL(10,2),
+    montant DECIMAL(12,2),
     methode VARCHAR(50),
     statut VARCHAR(20),
     cree_le TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -219,7 +219,7 @@ CREATE TABLE paiements (
 CREATE TABLE remboursements (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     paiement_id UUID REFERENCES paiements(id) ON DELETE CASCADE,
-    montant DECIMAL(10,2),
+    montant DECIMAL(12,2),
     raison TEXT,
     statut VARCHAR(20),
     cree_le TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -231,13 +231,13 @@ CREATE TABLE remboursements (
 CREATE TABLE portefeuilles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     utilisateur_id UUID REFERENCES utilisateurs(id) ON DELETE CASCADE,
-    solde DECIMAL(10,2) DEFAULT 0
+    solde DECIMAL(12,2) DEFAULT 0
 );
 
 CREATE TABLE transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     portefeuille_id UUID REFERENCES portefeuilles(id) ON DELETE CASCADE,
-    montant DECIMAL(10,2),
+    montant DECIMAL(12,2),
     type VARCHAR(20), -- debit / credit
     description TEXT,
     cree_le TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP

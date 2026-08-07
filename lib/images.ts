@@ -18,6 +18,12 @@ export function resolveRemoteImageUrl(
 
   // Si c'est une image Supabase, on peut injecter les paramètres de redimensionnement
   if (u.includes('supabase.co/storage/v1/object/public/')) {
+    // Idempotence : l'URL contient déjà nos paramètres de redimensionnement
+    // (ex. déjà passée dans resolveRemoteImageUrl) → on la retourne telle quelle.
+    // Évite les doublons du type ?width=800&format=webp&...&width=800 qui
+    // font échouer le rendu chez Supabase (galerie sombre/vide).
+    if (/\?[^#]*\b(width|height|format|quality)=/.test(u)) return u;
+
     const { width, height, quality = 80, format = 'webp' } = options || {};
     
     // Si aucune option de redimensionnement, on retourne l'URL telle quelle
@@ -29,7 +35,6 @@ export function resolveRemoteImageUrl(
     if (quality) params.append('quality', quality.toString());
     if (format === 'webp') params.append('format', 'webp');
 
-    // On s'assure de ne pas doubler les paramètres si l'URL en a déjà
     const separator = u.includes('?') ? '&' : '?';
     return `${u}${separator}${params.toString()}`;
   }

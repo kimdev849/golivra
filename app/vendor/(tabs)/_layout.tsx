@@ -42,6 +42,12 @@ export default function VendorTabsLayout() {
         return;
       }
       setOk(true);
+      // Filet de sécurité : garantit que le token push de l'appareil est
+      // (ré)enregistré quand le vendeur ouvre son espace, même si la
+      // connexion a eu lieu après le démarrage de l'app.
+      void import('@/lib/notifications-service')
+        .then((m) => m.ensurePushTokenRegistered?.())
+        .catch(() => undefined);
     } catch {
       setOk(false);
       router.replace('/auth');

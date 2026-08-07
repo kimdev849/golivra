@@ -119,3 +119,36 @@ export async function patchEnterprise(
     jsonBody: body,
   });
 }
+
+export type EnterpriseHoraires = {
+  jour: number;
+  ouverture: string | null;
+  fermeture: string | null;
+};
+
+export type EnterpriseHorairesPayload = {
+  horaires: EnterpriseHoraires[];
+};
+
+export async function fetchEnterpriseHoraires(
+  token: string,
+  enterpriseId: string,
+): Promise<EnterpriseHoraires[]> {
+  const data = await apiFetch<{ horaires: EnterpriseHoraires[] }>(
+    `/api/enterprises/${enterpriseId}/horaires`,
+    { method: 'GET', token },
+  );
+  return Array.isArray(data?.horaires) ? data.horaires : [];
+}
+
+export async function saveEnterpriseHoraires(
+  token: string,
+  enterpriseId: string,
+  horaires: EnterpriseHoraires[],
+): Promise<EnterpriseHoraires[]> {
+  const data = await apiFetch<{ horaires: EnterpriseHoraires[] }>(
+    `/api/enterprises/${enterpriseId}/horaires`,
+    { method: 'PUT', token, jsonBody: { horaires } },
+  );
+  return Array.isArray(data?.horaires) ? data.horaires : [];
+}

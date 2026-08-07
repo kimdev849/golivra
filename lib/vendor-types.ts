@@ -60,6 +60,8 @@ export type VendorOrder = {
   lignes: VendorOrderLine[];
   livreur?: { nom: string; tel: string };
   livraison_statut?: string | null;
+  /** Délai d'acceptation (15 min après création). Présent si la commande est encore en attente. */
+  acceptation_limite_at?: string | null;
   created_at?: string;
   commande_timeline?: TimelineStep[];
   sous_commande_timeline?: TimelineStep[];

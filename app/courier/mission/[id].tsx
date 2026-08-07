@@ -5,13 +5,13 @@ import { ArrowLeft, CheckCircle2, MapPin, Phone, Store, User } from 'lucide-reac
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppContentWidth } from '@/components/app-content-width';
+import { DeliveryProofModal } from '@/components/courier/delivery-proof-modal';
 import { ThemedText } from '@/components/themed-text';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useCourier } from '@/contexts/courier-context';
 import {
   acceptCourierMission,
   advanceCourierMission,
-  completeCourierMission,
   missionStatutLabel,
   type CourierMission,
 } from '@/lib/courier-api';
@@ -24,10 +24,12 @@ export default function CourierMissionDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const palette = useCourierPalette();
-  const { missions, refresh } = useCourier();
+  const { missions, refreshMissions } = useCourier();
   const { showSuccess, showError, FeedbackOverlay } = useActionFeedback();
   const [mission, setMission] = useState<CourierMission | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [acting, setActing] = useState<string | null>(null);
+  const [proofOpen, setProofOpen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -48,19 +50,24 @@ export default function CourierMissionDetailScreen() {
   const accept = async () => {
     if (!id) return;
     const previous = mission;
+    // Optimiste : le bouton bascule immédiatement vers « course attribuée ».
     setMission((m) => (m ? { ...m, ouverte: false, statut: 'attribuee' as const } : m));
     showSuccess('Course acceptée !', 'Vous pouvez récupérer la commande chez le commerce.');
+    setActing('accept');
     try {
       const token = await getSessionToken();
       if (!token) throw new Error('Session expirée');
       const updated = await acceptCourierMission(token, id);
       setMission({ ...updated, ouverte: false });
-      void refresh();
+      // Synchronisation en arrière-plan : missions seules, sans loading.
+      void refreshMissions();
     } catch (e) {
       if (previous) setMission(previous);
       const msg = e instanceof Error ? e.message : 'Impossible d\'accepter la course.';
       setError(msg);
       showError('Acceptation impossible', msg);
+    } finally {
+      setActing(null);
     }
   };
 
@@ -69,37 +76,30 @@ export default function CourierMissionDetailScreen() {
     const previous = mission;
     setMission((m) => (m ? { ...m, statut: 'en_collecte' as const } : m));
     showSuccess('Collecte enregistrée', 'Récupération confirmée chez le commerce.');
+    setActing('advance');
     try {
       const token = await getSessionToken();
       if (!token) throw new Error('Session expirée');
       const updated = await advanceCourierMission(token, id);
       setMission(updated);
-      void refresh();
+      void refreshMissions();
     } catch (e) {
       if (previous) setMission(previous);
       const msg = e instanceof Error ? e.message : 'Impossible de mettre à jour la course.';
       setError(msg);
       showError('Mise à jour impossible', msg);
+    } finally {
+      setActing(null);
     }
   };
 
-  const complete = async () => {
-    if (!id) return;
-    const previous = mission;
-    setMission((m) => (m ? { ...m, statut: 'livree' as const } : m));
-    showSuccess('Livraison terminée !', 'Bonne course, merci.');
-    try {
-      const token = await getSessionToken();
-      if (!token) throw new Error('Session expirée');
-      const updated = await completeCourierMission(token, id);
-      setMission(updated);
-      void refresh();
-    } catch (e) {
-      if (previous) setMission(previous);
-      const msg = e instanceof Error ? e.message : 'Impossible de valider la livraison.';
-      setError(msg);
-      showError('Finalisation impossible', msg);
-    }
+  // La validation passe par la preuve photo obligatoire (modal dédié) :
+  // la livraison n'est marquée « livrée » qu'une fois la preuve envoyée.
+  const handleProofDone = (updated: CourierMission) => {
+    setProofOpen(false);
+    setMission(updated);
+    void refreshMissions();
+    showSuccess('Livraison terminée !', 'Preuve envoyée. Bonne course, merci.');
   };
 
   return (
@@ -191,23 +191,37 @@ export default function CourierMissionDetailScreen() {
           ) : null}
 
           {canAccept ? (
-            <Pressable style={[styles.primaryBtn, { backgroundColor: palette.primary }]} onPress={() => void accept()}>
-              <ThemedText style={styles.primaryBtnText}>Accepter cette course</ThemedText>
+            <Pressable
+              style={[styles.primaryBtn, { backgroundColor: palette.primary }, acting !== null && styles.disabled]}
+              disabled={acting !== null}
+              onPress={() => void accept()}>
+              {acting === 'accept' ? (
+                <ActivityIndicator color="#FFF" size="small" />
+              ) : (
+                <ThemedText style={styles.primaryBtnText}>Accepter cette course</ThemedText>
+              )}
             </Pressable>
           ) : null}
           {canAdvance ? (
             <Pressable
-              style={[styles.secondaryBtn, { borderColor: palette.primary }]}
+              style={[styles.secondaryBtn, { borderColor: palette.primary }, acting !== null && styles.disabled]}
+              disabled={acting !== null}
               onPress={() => void advance()}>
-              <ThemedText style={[styles.secondaryBtnText, { color: palette.primary }]}>
-                {advanceLabel}
-              </ThemedText>
+              {acting === 'advance' ? (
+                <ActivityIndicator color={palette.primary} size="small" />
+              ) : (
+                <ThemedText style={[styles.secondaryBtnText, { color: palette.primary }]}>
+                  {advanceLabel}
+                </ThemedText>
+              )}
             </Pressable>
           ) : null}
           {canComplete ? (
-            <Pressable style={[styles.primaryBtn, { backgroundColor: palette.primary }]} onPress={() => void complete()}>
+            <Pressable
+              style={[styles.primaryBtn, { backgroundColor: palette.primary }]}
+              onPress={() => setProofOpen(true)}>
               <CheckCircle2 size={20} color="#FFF" strokeWidth={LUCIDE_STROKE} />
-              <ThemedText style={styles.primaryBtnText}>Marquer comme livrée</ThemedText>
+              <ThemedText style={styles.primaryBtnText}>Confirmer la livraison</ThemedText>
             </Pressable>
           ) : isDone ? (
             <ThemedText style={[styles.hint, { color: palette.muted }]}>Course terminée.</ThemedText>
@@ -217,6 +231,15 @@ export default function CourierMissionDetailScreen() {
           </AppContentWidth>
         </ScrollView>
       )}
+
+      {proofOpen && mission ? (
+        <DeliveryProofModal
+          deliveryId={mission.id}
+          reference={mission.commande?.numero || mission.id.slice(0, 8).toUpperCase()}
+          onDone={handleProofDone}
+          onClose={() => setProofOpen(false)}
+        />
+      ) : null}
     </View>
   );
 }

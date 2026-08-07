@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 
 import { MapPin, Package, Phone, Plus, Truck } from 'lucide-react-native';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { AppState, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 
 
@@ -21,6 +22,8 @@ import { formatFcfa } from '@/lib/format';
 import {
 
   fetchVendorExternalDeliveries,
+
+  fetchVendorOrders,
 
   livraisonStatutLabel,
 
@@ -47,44 +50,11 @@ function isCommandeDeliveryActive(o: VendorOrder): boolean {
 export function VendorDeliveryPanel({ embedded }: { embedded?: boolean }) {
 
   const router = useRouter();
-  const { orders, refresh } = useVendor();
+  const isFocused = useIsFocused();
+  const { orders, setOrders } = useVendor();
   const { palette, labels } = useVendorTheme();
   const colors = useAppColors();
   const [externalDeliveries, setExternalDeliveries] = useState<VendorExternalDelivery[]>([]);
-
-
-
-  const loadExternal = useCallback(async () => {
-
-    const token = await getSessionToken();
-
-    if (!token) {
-
-      setExternalDeliveries([]);
-
-      return;
-
-    }
-
-    try {
-
-      setExternalDeliveries(await fetchVendorExternalDeliveries(token));
-
-    } catch {
-
-      setExternalDeliveries([]);
-
-    }
-
-  }, []);
-
-
-
-  useEffect(() => {
-
-    void loadExternal();
-
-  }, [loadExternal]);
 
 
 
@@ -100,11 +70,91 @@ export function VendorDeliveryPanel({ embedded }: { embedded?: boolean }) {
 
 
 
-  const refreshAll = async () => {
+  // Rafraîchissement automatique toutes les 5 s (statuts livraison en temps réel).
 
-    await Promise.all([refresh(), loadExternal()]);
+  // Léger : ne refetch que les commandes + livraisons externes (pas le profil ni les produits).
 
-  };
+  const refreshingRef = useRef(false);
+
+  const refreshLight = useCallback(async () => {
+
+    if (refreshingRef.current) return;
+
+    refreshingRef.current = true;
+
+    try {
+
+      const token = await getSessionToken();
+
+      if (token) {
+
+        const [freshOrders, freshExternal] = await Promise.all([
+
+          fetchVendorOrders(token),
+
+          fetchVendorExternalDeliveries(token),
+
+        ]);
+
+        setOrders(freshOrders);
+
+        setExternalDeliveries(freshExternal);
+
+      } else {
+
+        setExternalDeliveries([]);
+
+      }
+
+    } catch {
+
+      // On garde les données actuelles en cas d'échec réseau.
+
+    } finally {
+
+      refreshingRef.current = false;
+
+    }
+
+  }, [setOrders]);
+
+  // L'intervalle ne tourne que si l'écran est visible ET l'app au premier plan.
+
+  const appActive = useRef(true);
+
+  useEffect(() => {
+
+    const sub = AppState.addEventListener('change', (state) => {
+
+      const active = state === 'active';
+
+      appActive.current = active;
+
+      // Retour au premier plan : on rafraîchit immédiatement si l'écran est visible.
+
+      if (active && isFocused) void refreshLight();
+
+    });
+
+    return () => sub.remove();
+
+  }, [isFocused, refreshLight]);
+
+  useEffect(() => {
+
+    if (!isFocused) return;
+
+    void refreshLight();
+
+    const id = setInterval(() => {
+
+      if (appActive.current) void refreshLight();
+
+    }, 5000);
+
+    return () => clearInterval(id);
+
+  }, [isFocused, refreshLight]);
 
 
 
@@ -129,9 +179,7 @@ export function VendorDeliveryPanel({ embedded }: { embedded?: boolean }) {
       <View style={[styles.infoBanner, { backgroundColor: palette.primarySoft, borderColor: palette.onlinePillBorder }]}>
         <Truck size={20} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
         <ThemedText style={[styles.infoTxt, { color: palette.primaryDeep }]}>
-          <ThemedText type="defaultSemiBold">Gérez vos livraisons facilement.</ThemedText> Les commandes de vos
-          clients sont livrées automatiquement par nos livreurs. Vous pouvez aussi créer vos propres livraisons quand
-          vous en avez besoin. Les livreurs sont assignés automatiquement.
+          Vos commandes sont livrées automatiquement. Créez vos propres livraisons en un clic.
         </ThemedText>
       </View>
 
@@ -196,12 +244,6 @@ export function VendorDeliveryPanel({ embedded }: { embedded?: boolean }) {
       ) : null}
 
 
-
-      <Pressable style={styles.refreshBtn} onPress={() => void refreshAll()}>
-
-        <ThemedText style={[styles.refreshTxt, { color: palette.primary }]}>Actualiser</ThemedText>
-
-      </Pressable>
 
     </>
 
@@ -493,10 +535,6 @@ const styles = StyleSheet.create({
   linkBtn: { marginTop: 12, alignItems: 'center', paddingVertical: 8 },
 
   linkTxt: { fontWeight: '800', fontSize: 14 },
-
-  refreshBtn: { alignItems: 'center', paddingVertical: 14 },
-
-  refreshTxt: { fontWeight: '800', fontSize: 14 },
 
 });
 

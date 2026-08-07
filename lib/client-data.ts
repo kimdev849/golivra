@@ -1,6 +1,6 @@
 import { apiFetch } from '@/lib/api';
 import type { EnterprisePublic, ProductPublic } from '@/lib/catalog';
-import { fetchCached, invalidateCached, peekCached } from '@/lib/request-cache';
+import { fetchCached, invalidateCached, peekCached, setCached } from '@/lib/request-cache';
 import type { EnterpriseCategory } from '@/lib/enterprise';
 
 const TTL_ENTERPRISES = 120_000;
@@ -18,8 +18,8 @@ export type AuthMe = {
   roleId?: string | number;
   image_url?: string | null;
   imageUrl?: string | null;
-  cree_le?: string;
-  created_at?: string;
+  cree_le?: string | null;
+  created_at?: string | null;
 };
 
 export function prefetchClientCatalog(): void {
@@ -105,9 +105,13 @@ export function peekProductsForEnterprise(enterpriseId: string): ProductPublic[]
   return peekCached<ProductPublic[]>(`products:${enterpriseId}`, TTL_PRODUCTS);
 }
 
+function authMeCacheKey(token: string): string {
+  return `auth:me:${token.slice(0, 24)}`;
+}
+
 export async function fetchAuthMe(token: string, force = false): Promise<AuthMe> {
   return fetchCached(
-    `auth:me:${token.slice(0, 24)}`,
+    authMeCacheKey(token),
     () => apiFetch<AuthMe>('/api/auth/me', { method: 'GET', token }),
     TTL_ME,
     force
@@ -115,7 +119,18 @@ export async function fetchAuthMe(token: string, force = false): Promise<AuthMe>
 }
 
 export function peekAuthMe(token: string): AuthMe | null {
-  return peekCached<AuthMe>(`auth:me:${token.slice(0, 24)}`, TTL_ME);
+  return peekCached<AuthMe>(authMeCacheKey(token), TTL_ME);
+}
+
+/**
+ * Met à jour immédiatement le profil en cache (nom, téléphone, photo…) après
+ * une modification réussie — le profil s'affiche ainsi à jour sans attendre
+ * l'expiration du TTL.
+ */
+export function patchAuthMeCache(token: string, patch: Partial<AuthMe>): void {
+  const key = authMeCacheKey(token);
+  const current = peekCached<AuthMe>(key, Number.POSITIVE_INFINITY);
+  setCached(key, { ...(current ?? {}), ...patch });
 }
 
 export function clearClientDataCache(): void {

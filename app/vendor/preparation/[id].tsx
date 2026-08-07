@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Pressable, ScrollView, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { VendorScreenHeader } from '@/components/vendor-screen-header';
@@ -22,7 +23,8 @@ export default function VendorPreparationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { orders, refresh, setOrders } = useVendor();
+  const { orders, refreshOrders, setOrders } = useVendor();
+  const [acting, setActing] = useState(false);
   const colors = useAppColors();
   const { showSuccess, showError, FeedbackOverlay } = useActionFeedback();
   const styles = useThemedStyles(createVendorPreparationStyles);
@@ -41,26 +43,33 @@ export default function VendorPreparationScreen() {
   const runStatus = async (statut: string, successMsg: string, goDeliveries?: boolean) => {
     if (!o) return;
     const previousStatut = o.statut;
+    // Optimiste : le statut change immédiatement (badge, étapes), sans rechargement.
     setOrders((prev) =>
       prev.map((x) => (x.id === o.id ? { ...x, statut: statut as typeof x.statut } : x)),
     );
-    if (goDeliveries) {
-      router.replace(VENDOR_HREF.deliveriesTab);
-      showSuccess('Commande prête !', successMsg, { primaryLabel: 'OK' });
-    } else {
-      router.back();
-      showSuccess('C’est enregistré', successMsg, { primaryLabel: 'OK' });
-    }
+    setActing(true);
     try {
       const token = await getSessionToken();
       if (!token) throw new Error('Session expirée');
       await updateVendorOrderStatus(token, o.id, statut, o.sous_commande_id);
-      void refresh();
+      // Synchronisation en arrière-plan : commandes seules, sans écran de chargement.
+      void refreshOrders();
+      // On ne navigue qu'après le succès : en cas d'erreur, le rollback et le
+      // toast restent visibles sur cet écran.
+      if (goDeliveries) {
+        router.replace(VENDOR_HREF.deliveriesTab);
+        showSuccess('Commande prête !', successMsg, { primaryLabel: 'OK' });
+      } else {
+        router.back();
+        showSuccess('C’est enregistré', successMsg, { primaryLabel: 'OK' });
+      }
     } catch (e) {
       setOrders((prev) =>
         prev.map((x) => (x.id === o.id ? { ...x, statut: previousStatut } : x)),
       );
       showError('Mise à jour impossible', e instanceof Error ? e.message : 'Réessayez.');
+    } finally {
+      setActing(false);
     }
   };
 
@@ -141,7 +150,13 @@ export default function VendorPreparationScreen() {
           </View>
         ))}
 
-        {o.statut === 'en_attente' || o.statut === 'a_preparer' || o.statut === 'acceptee' ? (
+        {acting ? (
+          <Pressable
+            style={[styles.primary, { backgroundColor: palette.primary }]}
+            disabled>
+            <ActivityIndicator color={colors.onPrimary} size="small" />
+          </Pressable>
+        ) : o.statut === 'en_attente' || o.statut === 'a_preparer' || o.statut === 'acceptee' ? (
           <Pressable
             style={[styles.primary, { backgroundColor: palette.primary }]}
             onPress={() => {
@@ -155,9 +170,7 @@ export default function VendorPreparationScreen() {
             }}>
             <ThemedText style={styles.primaryTxt}>Accepter et commencer la préparation</ThemedText>
           </Pressable>
-        ) : null}
-
-        {o.statut === 'en_preparation' ? (
+        ) : o.statut === 'en_preparation' ? (
           <Pressable
             style={[styles.primary, { backgroundColor: palette.primaryDeep, marginTop: 10 }]}
             onPress={() =>

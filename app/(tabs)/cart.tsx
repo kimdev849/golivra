@@ -5,7 +5,6 @@ import { Image } from 'expo-image';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,10 +13,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Info, Minus, Plus, ShoppingBag, Smartphone, Trash2, Truck } from 'lucide-react-native';
+import { Check, ChevronRight, Home, Info, Minus, PackageOpen, Plus, Smartphone, Sparkles, Trash2, Truck } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 
-import { DeliveryAddressForm, type DeliveryAddressFormValue } from '@/components/delivery-address-form';
+
+import { DeliveryAddressForm } from '@/components/delivery-address-form';
 import { ProductPrice } from '@/components/product-price';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -38,8 +38,8 @@ import {
   type CartSegment,
   type CartState,
 } from '@/lib/cart-local';
-import { fetchUserAddresses } from '@/lib/addresses';
-import { deliveryAddressError, formatDeliveryAddressText, snapshotFromFields } from '@/lib/format-address';
+import { fetchUserAddresses, type UserAddress } from '@/lib/addresses';
+import { addressLabel, deliveryAddressError, formatDeliveryAddressText, snapshotFromFields, type DeliveryAddressFields } from '@/lib/format-address';
 import { formatFcfa } from '@/lib/format';
 import { CLIENT_PAYMENT_METHODS, type ClientPaymentMethodId } from '@/lib/payment-methods';
 import { resolveRemoteImageUrl } from '@/lib/images';
@@ -57,6 +57,28 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
 
+/** Valeur d'adresse vierge (aucune adresse sélectionnée). */
+const emptyAddressForm = (): DeliveryAddressFields => ({
+  libelle: '',
+  quartier: '',
+  ligne1: '',
+  instructions: '',
+  point_reperes: '',
+  ville: 'Brazzaville',
+  pays: 'Congo',
+});
+
+/** Convertit une adresse enregistrée en champs d'adresse. */
+const addressFromSaved = (a: UserAddress): DeliveryAddressFields => ({
+  libelle: a.libelle ?? '',
+  quartier: a.quartier || '',
+  ligne1: a.ligne1 || '',
+  instructions: a.instructions ?? '',
+  point_reperes: a.point_reperes ?? '',
+  ville: a.ville || 'Brazzaville',
+  pays: a.pays || 'Congo',
+});
+
 function segmentLabel(seg: CartSegment, ent: EnterprisePublic | null | undefined): string {
   const t = ent?.type ?? seg.enterpriseType;
   if (t === 'boutique') return 'Boutique';
@@ -70,15 +92,9 @@ export default function CartScreen() {
   const colors = useAppColors();
   const { showSuccess, showError, showConfirm, FeedbackOverlay } = useActionFeedback();
   const { cart, hydrated, hydrate, syncFromMemory } = useCart();
-  const [address, setAddress] = useState<DeliveryAddressFormValue>({
-    quartier: '',
-    ligne1: '',
-    instructions: '',
-    point_reperes: '',
-    ville: 'Brazzaville',
-    pays: 'Congo',
-  });
+  const [address, setAddress] = useState<DeliveryAddressFields>(emptyAddressForm);
   const [savedAddressId, setSavedAddressId] = useState<string | null>(null);
+  const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([]);
   const [stockByProduct, setStockByProduct] = useState<Record<string, number>>({});
   const [productById, setProductById] = useState<Record<string, ProductPublic>>({});
   const [enterpriseById, setEnterpriseById] = useState<Record<string, EnterprisePublic | null>>({});
@@ -90,6 +106,13 @@ export default function CartScreen() {
   const [promoError, setPromoError] = useState<string | null>(null);
   const [pricing, setPricing] = useState<PublicPricing | null>(null);
   const orderInFlight = useRef(false);
+
+  /** Référence de l'adresse courante, lisible depuis les callbacks stables. */
+  const addressRef = useRef(address);
+  addressRef.current = address;
+
+  /** Adresse enregistrée actuellement sélectionnée (si la saisie n'a pas été modifiée). */
+  const selectedAddress = savedAddresses.find((a) => a.id === savedAddressId) ?? null;
 
   const syncStockFromCart = useCallback(async (c: CartState) => {
     try {
@@ -122,26 +145,53 @@ export default function CartScreen() {
     }
   }, []);
 
-  const loadPrincipalAddress = useCallback(async () => {
+  const loadSavedAddresses = useCallback(async () => {
     try {
       const token = await getSessionToken();
       if (!token) return;
       const rows = await fetchUserAddresses(token);
+      setSavedAddresses(rows);
       const principal = rows.find((a) => a.est_principale) ?? rows[0];
       if (!principal) return;
-      setSavedAddressId(principal.id);
-      setAddress({
-        quartier: principal.quartier || '',
-        ligne1: principal.ligne1 || '',
-        instructions: principal.instructions ?? '',
-        point_reperes: principal.point_reperes ?? '',
-        ville: principal.ville || 'Brazzaville',
-        pays: principal.pays || 'Congo',
+      // Pré-remplit avec l'adresse principale uniquement si l'utilisateur
+      // n'a encore rien saisi ; une adresse manuelle reste intacte et
+      // aucune carte n'est surlignée à sa place (jamais imposé).
+      const current = addressRef.current;
+      const prefilled = !current.quartier.trim() && !current.ligne1.trim();
+      setSavedAddressId((prev) => {
+        if (prev && rows.some((r) => r.id === prev)) return prev;
+        return prefilled ? principal.id : null;
       });
+      if (prefilled) setAddress(addressFromSaved(principal));
     } catch {
       /* pas d'adresse enregistrée */
     }
   }, []);
+
+  /** Sélection d'une adresse enregistrée → pré-remplit le formulaire. */
+  const selectSavedAddress = useCallback((a: UserAddress) => {
+    setSavedAddressId(a.id);
+    setAddress(addressFromSaved(a));
+  }, []);
+
+  /** Édition manuelle des champs : tant que le cœur (arrondissement + adresse)
+      reste identique à l'adresse sélectionnée, le lien est conservé ;
+      dès qu'il change, on désélectionne pour que la commande reflète la saisie. */
+  const handleAddressChange = useCallback(
+    (next: DeliveryAddressFields) => {
+      setAddress(next);
+      if (!savedAddressId) return;
+      const selected = savedAddresses.find((a) => a.id === savedAddressId);
+      if (
+        selected &&
+        (next.quartier.trim() !== (selected.quartier || '').trim() ||
+          next.ligne1.trim() !== (selected.ligne1 || '').trim())
+      ) {
+        setSavedAddressId(null);
+      }
+    },
+    [savedAddressId, savedAddresses],
+  );
 
   const refreshMeta = useCallback(async (c: CartState | null) => {
     // Ne pas re-fetch le pricing à chaque focus — TTL 60s
@@ -150,13 +200,13 @@ export default function CartScreen() {
     }
     if (c && c.segments.length > 0) {
       void syncStockFromCart(c);
-      void loadPrincipalAddress();
+      void loadSavedAddresses();
     } else {
       setStockByProduct({});
       setProductById({});
       setEnterpriseById({});
     }
-  }, [syncStockFromCart, loadPrincipalAddress, pricing]);
+  }, [syncStockFromCart, loadSavedAddresses, pricing]);
 
   useFocusEffect(
     useCallback(() => {
@@ -273,14 +323,7 @@ export default function CartScreen() {
         setStockByProduct({});
         setProductById({});
         setEnterpriseById({});
-        setAddress({
-          quartier: '',
-          ligne1: '',
-          instructions: '',
-          point_reperes: '',
-          ville: 'Brazzaville',
-          pays: 'Congo',
-        });
+        setAddress(emptyAddressForm());
         setSavedAddressId(null);
         showSuccess('Panier vidé', 'Tous les articles ont été retirés.');
       },
@@ -344,14 +387,7 @@ export default function CartScreen() {
       }));
       await saveCart(null);
       clearPromo();
-      setAddress({
-        quartier: '',
-        ligne1: '',
-        instructions: '',
-        point_reperes: '',
-        ville: 'Brazzaville',
-        pays: 'Congo',
-      });
+      setAddress(emptyAddressForm());
       setSavedAddressId(null);
       await refreshMeta(null);
       const summaryHref = {
@@ -386,7 +422,7 @@ export default function CartScreen() {
       <FeedbackOverlay />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}>
         <ScrollView
           keyboardShouldPersistTaps="handled"
@@ -418,16 +454,25 @@ export default function CartScreen() {
             </View>
           ) : !hasItems ? (
             <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={[styles.emptyIcon, { backgroundColor: colors.primarySoft, borderColor: colors.border }]}>
-                <ShoppingBag size={28} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+              {/* Illustration : boîte ouverte + halos décoratifs */}
+              <View style={styles.emptyArt}>
+                <View style={[styles.emptyHalo, { backgroundColor: colors.primarySoft }]} />
+                <View style={[styles.emptyIconRing, { backgroundColor: colors.primarySoft, borderColor: colors.border }]}>
+                  <PackageOpen size={40} color={colors.primary} strokeWidth={1.6} />
+                </View>
+                <View style={[styles.emptySpark, styles.emptySparkA, { backgroundColor: colors.primary }]}>
+                  <Sparkles size={11} color={colors.onPrimary} strokeWidth={2.2} />
+                </View>
+                <View style={[styles.emptyDot, styles.emptyDotB, { backgroundColor: colors.primary }]} />
+                <View style={[styles.emptyDot, styles.emptyDotC, { backgroundColor: colors.primarySoft }]} />
               </View>
               <ThemedText style={[styles.emptyTitle, { color: colors.primaryDeep }]}>Votre panier est vide</ThemedText>
               <ThemedText style={[styles.emptyBody, { color: colors.textMuted }]}>
-                Ajoutez des articles depuis une fiche commerce du marketplace.
+                Découvrez les restaurants et boutiques pour commencer vos achats.
               </ThemedText>
               <Pressable
                 style={[styles.cta, { backgroundColor: colors.primary }]}
-                onPress={() => router.push('/(tabs)/marketplace')}
+                onPress={() => router.navigate('/(tabs)/marketplace')}
                 android_ripple={{ color: 'rgba(255,255,255,0.2)' }}>
                 <ThemedText style={[styles.ctaText, { color: colors.onPrimary }]}>Voir les commerces</ThemedText>
               </Pressable>
@@ -526,10 +571,86 @@ export default function CartScreen() {
               })}
 
               <View style={[styles.checkoutSection, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
-                <ThemedText type="defaultSemiBold" style={[styles.checkoutSectionTitle, { color: colors.primaryDeep }]}>
-                  Adresse de livraison
-                </ThemedText>
-                <DeliveryAddressForm value={address} onChange={setAddress} compact />
+                <View style={styles.checkoutSectionHead}>
+                  <ThemedText type="defaultSemiBold" style={[styles.checkoutSectionTitle, { color: colors.primaryDeep }]}>
+                    Adresse de livraison
+                  </ThemedText>
+                  <Pressable
+                    style={styles.manageLink}
+                    onPress={() => router.push('/my-addresses' as Href)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Gérer mes adresses">
+                    <ThemedText style={[styles.manageLinkText, { color: colors.primary }]}>Gérer</ThemedText>
+                    <ChevronRight size={15} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+                  </Pressable>
+                </View>
+
+                {savedAddresses.length > 0 ? (
+                  <View style={styles.addrList}>
+                    {savedAddresses.map((a) => {
+                      const on = savedAddressId === a.id;
+                      return (
+                        <Pressable
+                          key={a.id}
+                          onPress={() => selectSavedAddress(a)}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected: on }}
+                          accessibilityLabel={`Adresse ${addressLabel(a.libelle)}`}
+                          style={[
+                            styles.addrCard,
+                            {
+                              borderColor: on ? colors.primary : colors.border,
+                              backgroundColor: on ? colors.primarySoft : colors.surface,
+                            },
+                          ]}>
+                          <Home size={18} color={on ? colors.primary : colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+                          <View style={styles.addrCardBody}>
+                            <View style={styles.addrCardTitleRow}>
+                              <ThemedText type="defaultSemiBold" style={[styles.addrCardTitle, { color: colors.text }]} numberOfLines={1}>
+                                {addressLabel(a.libelle)}
+                              </ThemedText>
+                              {a.est_principale ? (
+                                <ThemedText style={[styles.addrPrincipal, { color: colors.primary }]}>Principale</ThemedText>
+                              ) : null}
+                            </View>
+                            <ThemedText style={[styles.addrCardText, { color: colors.textSecondary }]} numberOfLines={2}>
+                              {formatDeliveryAddressText({
+                                quartier: a.quartier || '',
+                                ligne1: a.ligne1,
+                                point_reperes: a.point_reperes,
+                                instructions: a.instructions,
+                                ville: a.ville,
+                                pays: a.pays,
+                              })}
+                            </ThemedText>
+                          </View>
+                          <View
+                            style={[
+                              styles.addrCheck,
+                              on ? { borderColor: colors.primary, backgroundColor: colors.primary } : null,
+                            ]}>
+                            {on ? <Check size={12} color={colors.onPrimary} strokeWidth={3} /> : null}
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  <ThemedText style={[styles.noAddrHint, { color: colors.textMuted }]}>
+                    Aucune adresse enregistrée — vous pouvez saisir votre adresse ci-dessous, ou l&apos;ajouter dans « Mes adresses » pour la réutiliser.
+                  </ThemedText>
+                )}
+
+                {selectedAddress ? (
+                  <View style={[styles.livrerRow, { backgroundColor: colors.accentSoft }]}>
+                    <Home size={15} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+                    <ThemedText style={[styles.livrerText, { color: colors.primaryDeep }]} numberOfLines={1}>
+                      Livrer à : {addressLabel(address.libelle)}
+                    </ThemedText>
+                  </View>
+                ) : null}
+                <DeliveryAddressForm value={address} onChange={handleAddressChange} compact hideLibelle />
                 {!addressOk ? (
                   <ThemedText style={[styles.checkoutWarn, { color: colors.warning }]}>Quartier + description requis pour commander.</ThemedText>
                 ) : zoneDeliveryHint ? (
@@ -717,14 +838,45 @@ const styles = StyleSheet.create({
     gap: 12,
     alignItems: 'center',
   },
-  emptyIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  emptyArt: {
+    width: 132,
+    height: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  emptyHalo: {
+    position: 'absolute',
+    width: 112,
+    height: 112,
+    borderRadius: 56,
+    opacity: 0.5,
+  },
+  emptyIconRing: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
+    shadowColor: '#0C3020',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
+  emptySpark: {
+    position: 'absolute',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptySparkA: { top: 4, right: 12 },
+  emptyDot: { position: 'absolute', width: 8, height: 8, borderRadius: 4 },
+  emptyDotB: { bottom: 12, left: 18 },
+  emptyDotC: { bottom: 2, right: 26 },
   emptyTitle: { fontSize: 18, fontWeight: '800' },
   emptyBody: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
   cta: {
@@ -743,7 +895,50 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
   },
-  checkoutSectionTitle: { fontSize: 16, marginBottom: 4 },
+  checkoutSectionTitle: { fontSize: 16 },
+  checkoutSectionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  manageLink: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingVertical: 4, paddingLeft: 10 },
+  manageLinkText: { fontSize: 13, fontWeight: '800' },
+  addrList: { gap: 8, marginBottom: 10 },
+  addrCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  addrCardBody: { flex: 1, gap: 3 },
+  addrCardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  addrCardTitle: { fontSize: 15, flexShrink: 1 },
+  addrPrincipal: { fontSize: 11, fontWeight: '800' },
+  addrCardText: { fontSize: 13, lineHeight: 18 },
+  addrCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noAddrHint: { fontSize: 12, lineHeight: 17, marginBottom: 4 },
+  livrerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+  },
+  livrerText: { fontSize: 13, fontWeight: '800', flexShrink: 1 },
   checkoutWarn: { fontSize: 12, marginTop: 10, fontWeight: '600' },
   payHint: { fontSize: 12, marginBottom: 12, lineHeight: 17 },
   payChoices: { flexDirection: 'row', gap: 10 },

@@ -7,9 +7,12 @@ export type UploadImageResult = {
   size: number;
 };
 
+/** Dossiers d'upload autorisés par l'API (voir upload.controller.js). */
+export type UploadFolder = 'profiles' | 'enterprises' | 'products' | 'campagnes' | 'deliveries';
+
 export async function uploadImageBase64(
   token: string,
-  params: { dataUrl: string; folder: 'profiles' | 'enterprises' | 'products' },
+  params: { dataUrl: string; folder: UploadFolder },
 ): Promise<UploadImageResult> {
   return apiFetch<UploadImageResult>('/api/uploads/image', {
     method: 'POST',
@@ -20,7 +23,7 @@ export async function uploadImageBase64(
 
 export async function uploadImageBase64Public(params: {
   dataUrl: string;
-  folder: 'profiles' | 'enterprises' | 'products';
+  folder: UploadFolder;
 }): Promise<UploadImageResult | null> {
   try {
     return await apiFetch<UploadImageResult>('/api/uploads/public-image', {
@@ -38,7 +41,7 @@ export async function uploadImageBase64Public(params: {
  */
 export async function uploadImageForSignup(
   token: string | null,
-  params: { dataUrl: string; folder: 'profiles' | 'enterprises' | 'products' },
+  params: { dataUrl: string; folder: UploadFolder },
 ): Promise<string> {
   if (token) {
     try {

@@ -11,9 +11,9 @@ import { LUCIDE_STROKE } from '@/constants/icons';
 import { VENDOR_TAB_BAR_PADDING_BOTTOM } from '@/constants/vendor-layout';
 import { useVendor } from '@/contexts/vendor-context';
 import { useAppColors } from '@/hooks/use-app-colors';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
 import { useRealtimeOrders } from '@/hooks/use-realtime-orders';
+import { useVendorHoraires } from '@/hooks/use-vendor-horaires';
 import { formatFcfa } from '@/lib/format';
 import { getSessionToken } from '@/lib/auth';
 import { livraisonStatutLabel } from '@/lib/vendor-api';
@@ -50,6 +50,15 @@ function statusStyle(s: VendorOrderStatus, colors: ReturnType<typeof useAppColor
   }
 }
 
+function formatHeureLimite(iso: string | null | undefined): string {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+}
+
 function matchesFilter(o: VendorOrder, f: FilterKey): boolean {
   if (f === 'all') return true;
   if (f === 'prep')
@@ -67,9 +76,9 @@ export default function VendorOrdersTabScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
-  const colorScheme = useColorScheme();
-  const { orders, refresh, shop, loading } = useVendor();
+  const { orders, refreshOrders, shop, loading } = useVendor();
   const { palette, labels } = useVendorTheme();
+  const horaires = useVendorHoraires(shop?.id);
   const [filter, setFilter] = useState<FilterKey>('all');
   const [token, setToken] = useState<string | null>(null);
   const bottom = Math.max(insets.bottom, 10) + VENDOR_TAB_BAR_PADDING_BOTTOM;
@@ -80,9 +89,11 @@ export default function VendorOrdersTabScreen() {
   }, []);
 
   // --- REALTIME: Écoute les nouvelles commandes ---
+  // Refresh silencieux (commandes seules, sans écran de chargement) :
+  // chaque changement reçu ne doit pas faire clignoter la liste.
   useRealtimeOrders({
     enterpriseId: shop?.id || null,
-    refreshOrders: refresh,
+    refreshOrders,
     token,
   });
 
@@ -113,6 +124,17 @@ export default function VendorOrdersTabScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scroll, { paddingBottom: bottom }]}>
+        {!horaires.loading && !horaires.hasHours ? (
+          <Pressable
+            style={[styles.hoursWarn, { backgroundColor: colors.errorSoft, borderColor: colors.error }]}
+            onPress={() => router.push({ pathname: '/vendor/horaires', params: shop?.id ? { id: shop.id } : {} })}>
+            <Clock size={16} color={colors.error} strokeWidth={LUCIDE_STROKE} />
+            <ThemedText style={[styles.hoursWarnTxt, { color: colors.error }]} numberOfLines={2}>
+              Horaires non définis : vous ne recevez aucune commande. Définissez-les.
+            </ThemedText>
+          </Pressable>
+        ) : null}
+
         <View style={styles.pillRow}>
           {pills.map((p) => {
             const on = filter === p.key;
@@ -167,6 +189,15 @@ export default function VendorOrdersTabScreen() {
                     </View>
                   </View>
 
+                  {o.statut === 'en_attente' && o.acceptation_limite_at ? (
+                    <View style={[styles.deliveryBadge, { backgroundColor: colors.warningSoft }]}>
+                      <ThemedText style={[styles.deliveryHint, { color: colors.warning }]} numberOfLines={2}>
+                        À accepter avant {formatHeureLimite(o.acceptation_limite_at)} — sinon la commande
+                        expire et le client est automatiquement remboursé.
+                      </ThemedText>
+                    </View>
+                  ) : null}
+
                   {(o.statut === 'prete' || o.statut === 'en_livraison') && o.livraison_statut ? (
                     <View style={[styles.deliveryBadge, { backgroundColor: colors.primarySoft }]}>
                       <ThemedText style={[styles.deliveryHint, { color: colors.primary }]} numberOfLines={1}>
@@ -199,6 +230,17 @@ export default function VendorOrdersTabScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   scroll: { paddingHorizontal: 18, paddingTop: 6 },
+  hoursWarn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginBottom: 14,
+  },
+  hoursWarnTxt: { flex: 1, fontSize: 13, fontWeight: '800', lineHeight: 18 },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
   pill: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999 },
   pillText: { fontSize: 13, fontWeight: '800' },

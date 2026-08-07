@@ -27,6 +27,8 @@ type CourierStore = {
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
+  /** Rafraîchit uniquement les missions, sans écran de chargement (actions de course). */
+  refreshMissions: () => Promise<void>;
   setDisponible: (value: boolean) => Promise<void>;
   setMissions: (updater: CourierMission[] | ((prev: CourierMission[]) => CourierMission[])) => void;
 };
@@ -74,13 +76,33 @@ function profileFromAuthMe(me: AuthMeLivreur): CourierProfile | null {
   };
 }
 
+/** Recalcule le résumé (missions en cours / aujourd'hui) à partir des missions. */
+function withResume(prof: CourierProfile, missions: CourierMission[]): CourierProfile {
+  const active = missions.filter((m) => m.statut !== 'livree' && m.statut !== 'annulee');
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return {
+    ...prof,
+    resume: {
+      missions_actives: active.length,
+      missions_aujourdhui: missions.filter((m) => m.created_at >= d.toISOString()).length,
+      total_historique: Number(prof.livreur.nb_livraisons_total ?? prof.resume?.total_historique ?? 0),
+      reussies_historique: Number(prof.livreur.nb_livraisons_reussies ?? prof.resume?.reussies_historique ?? 0),
+    },
+  };
+}
+
 export const useCourier = create<CourierStore>((set, get) => ({
   profile: null,
   missions: [],
   loading: true,
   error: null,
   refresh: async () => {
-    set({ loading: true, error: null });
+    // L'écran de chargement n'apparaît qu'au tout premier chargement :
+    // dès que des données existent, un refresh reste silencieux.
+    const hasData = get().profile !== null || get().missions.length > 0;
+    set({ error: null });
+    if (!hasData) set({ loading: true });
     try {
       const { getSessionToken } = await import('@/lib/auth');
       const token = await getSessionToken();
@@ -105,25 +127,28 @@ export const useCourier = create<CourierStore>((set, get) => ({
       }
 
       const deduped = dedupeCourierMissions(rows);
-      const active = deduped.filter((m) => m.statut !== 'livree' && m.statut !== 'annulee');
-      prof = {
-        ...prof,
-        resume: {
-          missions_actives: active.length,
-          missions_aujourdhui: deduped.filter((m) => {
-            const d = new Date();
-            d.setHours(0, 0, 0, 0);
-            return m.created_at >= d.toISOString();
-          }).length,
-          total_historique: Number(prof.livreur.nb_livraisons_total ?? prof.resume?.total_historique ?? 0),
-          reussies_historique: Number(prof.livreur.nb_livraisons_reussies ?? prof.resume?.reussies_historique ?? 0),
-        },
-      };
-
-      set({ profile: prof, missions: deduped, loading: false });
+      const updated = withResume(prof, deduped);
+      set({ profile: updated, missions: deduped, loading: false });
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : 'Erreur.', loading: false });
+      // En refresh silencieux (données déjà affichées), on ne pollue pas l'UI
+      // avec un bandeau d'erreur : les données actuelles restent affichées.
+      if (!hasData) set({ error: e instanceof Error ? e.message : 'Erreur.', loading: false });
       throw e;
+    }
+  },
+  refreshMissions: async () => {
+    const { getSessionToken } = await import('@/lib/auth');
+    const token = await getSessionToken();
+    if (!token) return;
+    try {
+      const rows = await fetchCourierMissions(token);
+      const deduped = dedupeCourierMissions(rows);
+      set((state) => ({
+        missions: deduped,
+        profile: state.profile ? withResume(state.profile, deduped) : state.profile,
+      }));
+    } catch {
+      // Silencieux : on conserve les données actuelles en cas d'échec réseau.
     }
   },
   setDisponible: async (value: boolean) => {

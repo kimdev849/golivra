@@ -16,9 +16,15 @@ export async function fetchUserAddresses(token: string): Promise<UserAddress[]> 
   return Array.isArray(data) ? data : [];
 }
 
+export type AddressBody = DeliveryAddressFields & {
+  est_principale?: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
+};
+
 export async function createUserAddress(
   token: string,
-  body: DeliveryAddressFields & { libelle?: string; est_principale?: boolean },
+  body: AddressBody,
 ): Promise<UserAddress> {
   return apiFetch<UserAddress>('/api/addresses', { method: 'POST', token, jsonBody: body });
 }
@@ -26,7 +32,7 @@ export async function createUserAddress(
 export async function updateUserAddress(
   token: string,
   addressId: string,
-  body: Partial<DeliveryAddressFields> & { libelle?: string; est_principale?: boolean },
+  body: Partial<AddressBody>,
 ): Promise<UserAddress> {
   return apiFetch<UserAddress>(`/api/addresses/${addressId}`, {
     method: 'PATCH',

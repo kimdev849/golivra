@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import Carousel from 'react-native-reanimated-carousel';
 
+import { CalendarDays, Flame, Megaphone, Rocket, Tag, type LucideIcon } from 'lucide-react-native';
 import type { MarketingCampaign } from '@/lib/campaigns';
 
 const H_PAD = 16;
@@ -47,15 +48,18 @@ export function HomeCampaignBanner({ campaigns, onPress, colors }: Props) {
     return Math.min(Math.max(h, 160), 240);
   }, [carouselWidth]);
 
-  const typeStyle = useCallback((type: string) => {
-    switch (type) {
-      case 'offre_jour': return { gradient: ['#D4380D', '#E8590C'] as const, emoji: '🔥' };
-      case 'promo': return { gradient: ['#B45309', '#D97706'] as const, emoji: '🏷️' };
-      case 'lancement': return { gradient: ['#065F46', '#059669'] as const, emoji: '🚀' };
-      case 'saisonniere': return { gradient: ['#5B21B6', '#7C3AED'] as const, emoji: '📅' };
-      default: return { gradient: ['#0C4F36', '#155C3F'] as const, emoji: '📢' };
-    }
-  }, []);
+  const typeStyle = useCallback(
+    (type: string): { gradient: readonly [string, string]; Icon: LucideIcon } => {
+      switch (type) {
+        case 'offre_jour': return { gradient: ['#D4380D', '#E8590C'] as const, Icon: Flame };
+        case 'promo': return { gradient: ['#B45309', '#D97706'] as const, Icon: Tag };
+        case 'lancement': return { gradient: ['#065F46', '#059669'] as const, Icon: Rocket };
+        case 'saisonniere': return { gradient: ['#5B21B6', '#7C3AED'] as const, Icon: CalendarDays };
+        default: return { gradient: ['#0C4F36', '#155C3F'] as const, Icon: Megaphone };
+      }
+    },
+    [],
+  );
 
   if (campaigns.length === 0) return null;
 
@@ -107,7 +111,7 @@ export function HomeCampaignBanner({ campaigns, onPress, colors }: Props) {
               {/* Contenu */}
               <View style={styles.content}>
                 <View style={styles.typeBadge}>
-                  <Text style={styles.typeBadgeEmoji}>{style.emoji}</Text>
+                  <style.Icon size={13} color="#FFFFFF" strokeWidth={2.2} />
                   <Text style={styles.typeBadgeTxt}>
                     {TYPE_LABEL[item.type] || item.type}
                   </Text>
@@ -123,13 +127,14 @@ export function HomeCampaignBanner({ campaigns, onPress, colors }: Props) {
                   </Text>
                 ) : null}
 
-                <View style={styles.ctaRow}>
+                {/* CTA « Voir l'offre » temporairement désactivé (commenté). */}
+                {/* <View style={styles.ctaRow}>
                   <View style={styles.ctaPill}>
                     <Text style={[styles.ctaTxt, { color: style.gradient[0] }]}>
-                      Voir l'offre
+                      Voir l&apos;offre
                     </Text>
                   </View>
-                </View>
+                </View> */}
               </View>
             </Pressable>
           );
@@ -180,7 +185,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 999,
   },
-  typeBadgeEmoji: { fontSize: 12 },
   typeBadgeTxt: {
     color: '#FFFFFF',
     fontSize: 11,

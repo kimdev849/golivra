@@ -20,6 +20,7 @@
       },
       "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "resize",
       "package": "kimjaver.golivra"
     },
     "web": {
@@ -43,6 +44,19 @@
       ],
       "expo-web-browser",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "GoLivra accède à vos photos pour personnaliser votre profil et vos produits.",
+          "cameraPermission": "GoLivra utilise la caméra pour prendre la photo de preuve lors de la livraison."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "GoLivra utilise votre position pour enregistrer votre adresse de livraison et aider le livreur à vous trouver plus facilement."
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/images/icon.png",
@@ -56,7 +70,7 @@
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": false
     },
     "extra": {
       "router": {},

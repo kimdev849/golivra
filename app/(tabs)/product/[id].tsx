@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   Check,
   ChevronDown,
+  Clock,
   Heart,
   ImageIcon,
   Minus,
@@ -36,7 +37,14 @@ import { DETAIL_SCREEN_PADDING_BOTTOM } from '@/constants/layout';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
-import { fetchProductById, peekProductById, trackProductClick, type ProductPublic } from '@/lib/catalog';
+import {
+  fetchEnterpriseById,
+  fetchProductById,
+  peekProductById,
+  trackProductClick,
+  type ProductPublic,
+} from '@/lib/catalog';
+import { peekEnterpriseById } from '@/lib/client-data';
 import { trackInteraction } from '@/lib/tracking';
 import { resolveRemoteImageUrl, type ResizeOptions } from '@/lib/images';
 import { getEffectiveUnitPrice } from '@/lib/product-promo';
@@ -46,7 +54,14 @@ import {
   isProductOrderable,
   stockDisplayLabel,
 } from '@/lib/product-stock';
-import { addProductToCartPrompt } from '@/lib/cart-local';
+import {
+  addProductToCartPrompt,
+  removeProductLineSync,
+  saveCart,
+  updateLineQuantitySync,
+} from '@/lib/cart-local';
+import { useCart } from '@/contexts/cart-context';
+import { showToast } from '@/lib/app-toast';
 import { isFavoriteProduct, toggleFavoriteProduct } from '@/lib/favorites';
 import { getProductGalleryUrls } from '@/lib/listing-utils';
 
@@ -75,8 +90,9 @@ export default function ProductDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
-  const { showSuccess, showError, FeedbackOverlay } = useActionFeedback();
+  const { showError, FeedbackOverlay } = useActionFeedback();
   const params = useLocalSearchParams<{ id: string; kind?: string }>();
+  const cart = useCart((s) => s.cart);
 
   const productId = typeof params.id === 'string' ? params.id : '';
   const kindParam = typeof params.kind === 'string' ? params.kind.toLowerCase() : '';
@@ -130,8 +146,31 @@ export default function ProductDetailScreen() {
   const unitPrice = basePrice + optionSupplement;
   const totalPrice = unitPrice * Math.max(1, quantity);
 
+  // Horaires du commerce : on bloque l'ajout si la boutique/resto est fermé OU s'il
+  // est trop tard pour commander (préparation impossible avant la fermeture).
+  // Le serveur applique la même règle à la création de commande (source de vérité).
+  const { data: enterprise } = useQuery({
+    queryKey: ['enterprise', product?.entreprise_id],
+    queryFn: () => fetchEnterpriseById(product!.entreprise_id),
+    staleTime: 1000 * 60 * 3,
+    placeholderData: () =>
+      product?.entreprise_id ? (peekEnterpriseById(product.entreprise_id) ?? undefined) : undefined,
+    enabled: !!product?.entreprise_id,
+  });
+
+  const heuresBloquees =
+    !!enterprise &&
+    (enterprise.est_ouvert_maintenant === false ||
+      enterprise.ouvert === false ||
+      enterprise.accepte_commandes === false ||
+      enterprise.peut_commander_maintenant === false);
+  const tropTard =
+    !!enterprise &&
+    enterprise.est_ouvert_maintenant === true &&
+    enterprise.peut_commander_maintenant === false;
+
   const stockAvailable = product ? effectiveStockCap(product) : 0;
-  const orderable = product ? isProductOrderable(product) : false;
+  const orderable = product ? isProductOrderable(product) && !heuresBloquees : false;
   const stockLabel = product ? stockDisplayLabel(product) : '';
 
   const enterpriseName = product?.enterprise_nom || '';
@@ -154,8 +193,9 @@ export default function ProductDetailScreen() {
 
   const onAddToCart = () => {
     if (!product) return;
+    // Chaque clic ajoute +1 unité. stockAvailable = plafond réel (stock dispo),
+    // pas la quantité : sinon la ligne du panier resterait bloquée à 1.
     const stockCap = effectiveStockCap(product);
-    const qty = Math.max(1, Math.min(Math.max(1, stockCap || 999), quantity));
 
     addProductToCartPrompt({
       enterpriseId: product.entreprise_id,
@@ -164,15 +204,38 @@ export default function ProductDetailScreen() {
       productId: product.id,
       nom: product.nom || 'Produit',
       prixUnitaire: unitPrice,
-      stockAvailable: qty,
+      stockAvailable: stockCap,
       onDone: () => {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        showSuccess('Ajouté au panier', `${qty} × ${product.nom}`, {
-          primaryLabel: 'Voir le panier',
-          onPrimary: () => router.push('/(tabs)/cart'),
+        showToast({
+          message: 'Ajouté au panier',
+          action: {
+            label: 'Voir le panier',
+            onPress: () => router.navigate('/(tabs)/cart'),
+          },
         });
       },
     });
+  };
+
+  /** Ligne du panier correspondant à ce produit (si déjà ajouté). */
+  const cartLine = useMemo(() => {
+    if (!product) return null;
+    const seg = cart?.segments.find((s) => s.enterpriseId === product.entreprise_id);
+    return seg?.lines.find((l) => l.productId === product.id) ?? null;
+  }, [cart, product]);
+
+  const changeCartQty = (q: number) => {
+    if (!product) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (q <= 0) {
+      const next = cart ? removeProductLineSync(cart, product.entreprise_id, product.id) : null;
+      void saveCart(next);
+      return;
+    }
+    if (!cart) return;
+    const next = updateLineQuantitySync(cart, product.entreprise_id, product.id, q, stockAvailable);
+    void saveCart(next);
   };
 
   if (isLoading && !product) {
@@ -362,6 +425,33 @@ export default function ProductDetailScreen() {
           {/* vendor */}
           <EnterpriseBadge />
 
+          {/* Blocage horaires : commerce fermé ou trop tard pour commander */}
+          {heuresBloquees && enterprise ? (
+            <View
+              style={[
+                styles.stockBadge,
+                {
+                  borderColor: tropTard ? colors.warning : colors.error,
+                  backgroundColor: tropTard ? colors.warningSoft : colors.errorSoft,
+                },
+              ]}>
+              <Clock size={14} color={tropTard ? colors.warning : colors.error} strokeWidth={LUCIDE_STROKE} />
+              <ThemedText
+                style={[
+                  styles.stockTxt,
+                  { color: tropTard ? colors.warning : colors.error, flex: 1 },
+                ]}>
+                {tropTard
+                  ? enterprise.message_commande ??
+                    'Il est trop tard pour commander aujourd\'hui : la préparation ne peut pas finir avant la fermeture.'
+                  : enterprise.message_fermeture ??
+                    (enterpriseType === 'restaurant'
+                      ? 'Ce restaurant est fermé pour le moment.'
+                      : 'Cette boutique est fermée pour le moment.')}
+              </ThemedText>
+            </View>
+          ) : null}
+
           {/* description */}
           {product.description ? (
             <View style={styles.section}>
@@ -492,26 +582,76 @@ export default function ProductDetailScreen() {
             borderTopColor: colors.border,
           },
         ]}>
-        <Pressable
-          style={[
-            styles.addBtn,
-            {
-              backgroundColor: orderable ? colors.primary : colors.surfaceMuted,
-              opacity: orderable ? 1 : 0.5,
-            },
-          ]}
-          onPress={() => (orderable ? onAddToCart() : null)}
-          disabled={!orderable}
-          accessibilityLabel="Ajouter au panier">
-          <ShoppingCart size={20} color={orderable ? colors.onPrimary : colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-          <ThemedText
+        {cartLine ? (
+          <>
+            {/* Contrôles de quantité — le produit est déjà au panier */}
+            <View
+              style={[
+                styles.qtyGroup,
+                {
+                  backgroundColor: colors.surfaceMuted,
+                  borderColor: colors.border,
+                },
+              ]}>
+              <Pressable
+                style={({ pressed }) => [styles.qtyBtn, { opacity: pressed ? 0.6 : 1 }]}
+                onPress={() => changeCartQty(cartLine.quantite - 1)}
+                hitSlop={6}
+                accessibilityLabel="Diminuer la quantité">
+                <Minus size={18} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+              </Pressable>
+              <ThemedText style={[styles.qtyTxt, { color: colors.text }]}>
+                {cartLine.quantite}
+              </ThemedText>
+              <Pressable
+                style={({ pressed }) => [styles.qtyBtn, { opacity: pressed ? 0.6 : 1 }]}
+                onPress={() => changeCartQty(cartLine.quantite + 1)}
+                disabled={cartLine.quantite >= stockAvailable}
+                hitSlop={6}
+                accessibilityLabel="Augmenter la quantité">
+                <Plus
+                  size={18}
+                  color={cartLine.quantite >= stockAvailable ? colors.textMuted : colors.primary}
+                  strokeWidth={LUCIDE_STROKE}
+                />
+              </Pressable>
+            </View>
+            <Pressable
+              style={[styles.addBtn, { backgroundColor: colors.primary }]}
+              onPress={() => router.navigate('/(tabs)/cart')}
+              accessibilityLabel="Voir le panier">
+              <ShoppingCart size={20} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
+              <ThemedText style={[styles.addBtnTxt, { color: colors.onPrimary }]}>
+                Voir le panier · {formatFcfa(cartLine.quantite * unitPrice)}
+              </ThemedText>
+            </Pressable>
+          </>
+        ) : (
+          <Pressable
             style={[
-              styles.addBtnTxt,
-              { color: orderable ? colors.onPrimary : colors.textMuted },
-            ]}>
-            {orderable ? `Ajouter au panier · ${formatFcfa(totalPrice)}` : 'Indisponible'}
-          </ThemedText>
-        </Pressable>
+              styles.addBtn,
+              {
+                backgroundColor: orderable ? colors.primary : colors.surfaceMuted,
+                opacity: orderable ? 1 : 0.5,
+              },
+            ]}
+            onPress={() => (orderable ? onAddToCart() : null)}
+            disabled={!orderable}
+            accessibilityLabel="Ajouter au panier">
+            <ShoppingCart size={20} color={orderable ? colors.onPrimary : colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+            <ThemedText
+              style={[
+                styles.addBtnTxt,
+                { color: orderable ? colors.onPrimary : colors.textMuted },
+              ]}>
+              {orderable
+                ? `Ajouter au panier · ${formatFcfa(totalPrice)}`
+                : heuresBloquees
+                  ? "Fermé pour le moment"
+                  : 'Indisponible'}
+            </ThemedText>
+          </Pressable>
+        )}
       </View>
 
       {/* gallery modal plein écran (swipe + zoom) */}
@@ -673,19 +813,23 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  qtyBox: {
+  qtyGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 2,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
   },
   qtyBtn: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  qtyTxt: { fontSize: 16, fontWeight: '800', minWidth: 24, textAlign: 'center' },
+  qtyTxt: { fontSize: 16, fontWeight: '800', minWidth: 28, textAlign: 'center' },
   addBtn: {
     flex: 1,
     flexDirection: 'row',

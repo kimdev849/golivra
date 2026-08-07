@@ -19,6 +19,8 @@ import { getSessionToken } from '@/lib/auth';
 import { fetchPreferences, updatePreferences } from '@/lib/preferences-api';
 
 const STORAGE_KEY = 'golivra_theme_preference_v1';
+/** Migration unique : purge une ancienne préférence 'dark' stockée sans choix explicite. */
+const MIGRATION_KEY = 'golivra_theme_migration_v1';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
@@ -50,18 +52,49 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
-        let pref: ThemePreference =
-          stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system';
+
+        // Migration unique : une ancienne version a pu verrouiller le thème en
+        // 'dark' (toggle ou synchro serveur) sans choix explicite. On ne touche
+        // QUE les appareils réellement bloqués en 'dark' — les choix volontaires
+        // clair/sombre restent intacts. On repart sur « système » pour que l'app
+        // suive le téléphone, et on nettoie le serveur.
+        let effectiveStored = stored;
+        const migrated = await AsyncStorage.getItem(MIGRATION_KEY);
+        if (!migrated && stored === 'dark') {
+          await AsyncStorage.setItem(STORAGE_KEY, 'system');
+          await AsyncStorage.setItem(MIGRATION_KEY, '1');
+          effectiveStored = 'system';
+          const migrationToken = await getSessionToken();
+          if (migrationToken) {
+            try {
+              await updatePreferences(migrationToken, { dark_mode: null });
+            } catch {
+              /* réseau indisponible : la prochaine synchro suffira */
+            }
+          }
+        }
+
+        const hasLocalPref =
+          effectiveStored === 'light' || effectiveStored === 'dark' || effectiveStored === 'system';
+        let pref: ThemePreference = hasLocalPref ? (effectiveStored as ThemePreference) : 'system';
 
         const token = await getSessionToken();
-        if (token) {
+        if (!token) {
+          // Sans session (connexion / inscription) : l'app suit fidèlement le
+          // téléphone. On purge aussi une ancienne valeur sombre résiduelle.
+          pref = 'system';
+        } else if (!hasLocalPref) {
+          // Premier lancement / nouvel appareil sans préférence locale : on peut
+          // reprendre celle du compte. Sinon, le choix local fait foi : un
+          // téléphone en mode clair garde l'app claire, même si le serveur
+          // garde une ancienne valeur sombre.
           try {
             const remote = await fetchPreferences(token);
             if (remote.dark_mode === true) pref = 'dark';
             else if (remote.dark_mode === false) pref = 'light';
-            else if (remote.dark_mode === null) pref = 'system';
+            else pref = 'system';
           } catch {
-            /* garde le stockage local */
+            /* garde le défaut system */
           }
         }
 

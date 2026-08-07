@@ -1,7 +1,9 @@
 import { QUARTIERS_BRAZZAVILLE } from '@/constants/quartiers-brazzaville';
 
-/** Champs alignés sur la table `adresses` (schéma v3) — sans GPS. */
+/** Champs alignés sur la table `adresses` (schéma v3). */
 export type DeliveryAddressFields = {
+  /** Nom court affiché (ex. "Maison", "Travail") — optionnel (nullable côté serveur). */
+  libelle?: string | null;
   quartier: string;
   ligne1: string;
   instructions?: string | null;
@@ -54,6 +56,7 @@ export function quartierForForm(stored: string | null | undefined, hasLigne1: bo
 
 export function snapshotFromFields(fields: DeliveryAddressFields) {
   return {
+    libelle: fields.libelle?.trim() || null,
     quartier: fields.quartier.trim(),
     ligne1: fields.ligne1.trim(),
     instructions: fields.instructions?.trim() || null,
@@ -61,4 +64,10 @@ export function snapshotFromFields(fields: DeliveryAddressFields) {
     ville: fields.ville?.trim() || 'Brazzaville',
     pays: fields.pays?.trim() || 'Congo',
   };
+}
+
+/** Nom affichable d'une adresse (retombe sur "Domicile" si absent). */
+export function addressLabel(libelle?: string | null): string {
+  const l = (libelle ?? '').trim();
+  return l || 'Domicile';
 }

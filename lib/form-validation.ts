@@ -73,7 +73,7 @@ export function validatePersonName(value: string): ValidationResult {
   if (PUNCTUATION_ONLY_REGEX.test(v)) return fail('Un nom ne peut pas être uniquement de la ponctuation.');
   if (EMOJI_ONLY_REGEX.test(v)) return fail('Un nom ne peut pas être uniquement des emojis.');
   if (!HAS_LETTER_REGEX.test(v)) return fail('Le nom doit contenir au moins une lettre.');
-  if (!NAME_REGEX_PERSON.test(v)) return fail('Caractères non autorisés (lettres, espaces, tirets et apostrophes seulement).');
+  if (!NAME_REGEX_PERSON.test(v)) return fail('Ce champ n\'accepte que des lettres, espaces, tirets et apostrophes (ex. Jean-Claude).');
   return ok(titleCase(v));
 }
 
@@ -85,7 +85,7 @@ export function validateCommerceName(value: string): ValidationResult {
   if (PUNCTUATION_ONLY_REGEX.test(v)) return fail('Un nom de commerce ne peut pas être uniquement de la ponctuation.');
   if (EMOJI_ONLY_REGEX.test(v)) return fail('Un nom de commerce ne peut pas être uniquement des emojis.');
   if (!HAS_LETTER_REGEX.test(v)) return fail('Le nom du commerce doit contenir au moins une lettre.');
-  if (!NAME_REGEX_COMMERCE.test(v)) return fail('Caractères non autorisés.');
+  if (!NAME_REGEX_COMMERCE.test(v)) return fail('Ce champ n\'accepte que des lettres, chiffres, espaces, tirets, &, parenthèses et virgules.');
   return ok(smartTitleCase(v));
 }
 
@@ -217,12 +217,18 @@ export function validateDescription(value: string, max: number = 500): Validatio
   return ok(v);
 }
 
+/**
+ * Prix maximal autorisé pour un produit / plat (FCFA) — miroir du backend.
+ * Porté de 10 M à 999 999 999 (près d'un milliard).
+ */
+export const MAX_PRICE = 999_999_999;
+
 export function validatePrice(value: string | number): ValidationResult {
   const raw = typeof value === 'number' ? String(value) : sanitizeText(String(value));
   const n = Number(raw.replace(/\s/g, '').replace(',', '.'));
   if (!Number.isFinite(n)) return fail('Prix invalide (ex. 1500).');
   if (n <= 0) return fail('Le prix doit être supérieur à 0.');
-  if (n > 10_000_000) return fail('Le prix est trop élevé.');
+  if (n > MAX_PRICE) return fail(`Le prix est trop élevé (maximum ${MAX_PRICE.toLocaleString('fr-FR')} FCFA).`);
   return ok(String(n));
 }
 

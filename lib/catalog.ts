@@ -23,8 +23,35 @@ export type EnterprisePublic = {
   frais_livraison?: number;
   note_moyenne?: number;
   nb_avis?: number;
+  /** Date de création du commerce (tri « plus récents »). */
+  cree_le?: string | null;
+  created_at?: string | null;
   /** Présent si l’API le renvoie : hors `active`, le commerce n’apparaît pas sur le marketplace public. */
   statut_moderation?: 'en_attente' | 'active' | 'suspendu' | string | null;
+  /** Horaires d'ouverture (jour 0=Dimanche … 6=Samedi). Présents sur la fiche détail. */
+  horaires?: EnterpriseHoraires[];
+  /** Calculé côté serveur : le commerce est-il ouvert à cet instant ? */
+  est_ouvert_maintenant?: boolean;
+  /** `false` si le commerce n'a pas encore défini ses horaires (commandes bloquées). */
+  accepte_commandes?: boolean;
+  /** Message à afficher quand le commerce est fermé (ex. « Réouverture demain à 10h00 »). */
+  message_fermeture?: string | null;
+  /** Heure de la prochaine ouverture (HH:MM). */
+  prochaine_ouverture?: string | null;
+  /** Calculé côté serveur : peut-on encore commander maintenant ? `false` si le temps de préparation ne peut pas finir avant la fermeture. */
+  peut_commander_maintenant?: boolean;
+  /** Heure de fermeture de la plage en cours (HH:MM). */
+  fermeture_plage?: string | null;
+  /** Dernière heure à laquelle une commande peut être passée aujourd'hui (HH:MM). */
+  derniere_commande?: string | null;
+  /** Message serveur quand il est trop tard pour commander (préparation > temps restant avant fermeture). */
+  message_commande?: string | null;
+};
+
+export type EnterpriseHoraires = {
+  jour: number;
+  ouverture: string | null;
+  fermeture: string | null;
 };
 
 export type ProductPublic = {
@@ -79,6 +106,31 @@ export type CatalogSearchResult = {
   products: ProductPublic[];
   enterprises: EnterprisePublic[];
 };
+
+/** Trie les commerces par popularité : note moyenne, puis nombre d'avis. */
+export function sortEnterprisesByPopularity<
+  T extends { note_moyenne?: number | null; nb_avis?: number | null },
+>(list: T[]): T[] {
+  return [...list].sort((a, b) => {
+    const noteA = a.note_moyenne ?? 0;
+    const noteB = b.note_moyenne ?? 0;
+    if (noteB !== noteA) return noteB - noteA;
+    return (b.nb_avis ?? 0) - (a.nb_avis ?? 0);
+  });
+}
+
+/** Trie les commerces du plus récent au plus ancien (date de création). */
+export function sortEnterprisesByRecency<
+  T extends { cree_le?: string | null; created_at?: string | null },
+>(list: T[]): T[] {
+  const time = (e: T): number => {
+    const raw = e.cree_le ?? e.created_at;
+    if (!raw) return 0;
+    const t = new Date(raw).getTime();
+    return Number.isFinite(t) ? t : 0;
+  };
+  return [...list].sort((a, b) => time(b) - time(a));
+}
 
 function isPromoProduct(p: ProductPublic): boolean {
   return p.prix_promo != null && Number(p.prix_promo) < Number(p.prix);

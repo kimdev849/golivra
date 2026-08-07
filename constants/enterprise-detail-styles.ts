@@ -64,12 +64,48 @@ export function createEnterpriseDetailStyles(c: AppPalette) {
       borderColor: c.border,
     },
     heroBadgeText: { fontWeight: '800', color: c.primary, fontSize: 12 },
+    // Moyenne des avis du commerce, posée sur la photo en bas à droite.
+    ratingBadge: {
+      position: 'absolute',
+      right: 16,
+      bottom: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 11,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: 'rgba(0,0,0,0.62)',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.18)',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 6,
+      elevation: 3,
+    },
+    ratingBadgeValue: { color: '#FFFFFF', fontWeight: '900', fontSize: 13 },
+    ratingBadgeCount: { color: 'rgba(255,255,255,0.85)', fontWeight: '700', fontSize: 11 },
     block: { paddingHorizontal: 20, paddingTop: 18, gap: 10 },
     name: { fontSize: 26, fontWeight: '800', color: c.text },
+    // Pastille de statut compacte (Ouvert / Fermé / Plus de commandes).
+    statusRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: -4 },
+    statusDot: { width: 9, height: 9, borderRadius: 5 },
+    statusText: { fontSize: 13, fontWeight: '800', letterSpacing: 0.1 },
     desc: { fontSize: 15, lineHeight: 22, color: c.textSecondary },
     infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
     infoText: { flex: 1, fontSize: 14, color: c.textMuted, lineHeight: 20 },
-    sectionHead: {
+    hoursBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  hoursBannerText: { flex: 1, fontSize: 13, fontWeight: '700', lineHeight: 18 },
+  sectionHead: {
       flexDirection: 'row',
       alignItems: 'baseline',
       justifyContent: 'space-between',
@@ -78,7 +114,6 @@ export function createEnterpriseDetailStyles(c: AppPalette) {
       marginBottom: 12,
     },
     sectionTitle: { fontSize: 18, fontWeight: '800', color: c.text },
-    sectionHint: { fontSize: 13, color: c.textMuted },
     emptyProducts: {
       marginHorizontal: 20,
       padding: 24,
@@ -128,7 +163,9 @@ export function createEnterpriseDetailStyles(c: AppPalette) {
     productDesc: { fontSize: 13, color: c.textMuted, marginTop: 4 },
     productPrice: { fontSize: 15, fontWeight: '800', color: c.primary, marginTop: 6 },
     stock: { fontSize: 12, color: c.textMuted, marginTop: 4 },
-    stockOut: { color: c.error, fontWeight: '700' },
+    // Raison d'indisponibilité (produit indisponible, commerce fermé…) :
+    // gris discret + bouton désactivé, pour éviter l'ambiguïté du rouge.
+    stockDisabled: { color: c.textSecondary, fontWeight: '600' },
     addBtn: {
       width: 48,
       height: 48,
@@ -137,6 +174,6 @@ export function createEnterpriseDetailStyles(c: AppPalette) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    addBtnDisabled: { backgroundColor: c.border, opacity: 0.85 },
+    addBtnDisabled: { backgroundColor: c.surfaceMuted },
   });
 }

@@ -28,32 +28,11 @@ export default function HowMultiDeliveryScreen() {
           Livraisons multiples
         </ThemedText>
         <ThemedText style={[styles.lead, { color: colors.textSecondary }]}>
-          Si votre panier contient des articles de plusieurs commerces, GoLivra crée une commande par commerce. Chaque
-          partie est préparée et livrée séparément.
+          Chaque commerce est livré séparément par son propre livreur.
         </ThemedText>
 
-        <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.primarySoft }]}>
-          <ThemedText type="defaultSemiBold" style={[styles.cardTitle, { color: colors.primaryDeep }]}>
-            Pourquoi ?
-          </ThemedText>
-          <ThemedText style={[styles.p, { color: colors.textSecondary }]}>
-            Un seul livreur qui court entre un restaurant, une boutique et une pharmacie serait lent, coûteux en erreurs
-            et peu fiable. En séparant les livraisons au lancement, le service reste simple et prévisible.
-          </ThemedText>
-        </View>
-
-        <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.primarySoft }]}>
-          <ThemedText type="defaultSemiBold" style={[styles.cardTitle, { color: colors.primaryDeep }]}>
-            Frais de livraison
-          </ThemedText>
-          <ThemedText style={[styles.p, { color: colors.textSecondary }]}>
-            Chaque commerce a ses propres frais de livraison, car un livreur est mobilisé à chaque fois. Le total affiché
-            dans votre panier additionne ces frais.
-          </ThemedText>
-        </View>
-
         <ThemedText type="defaultSemiBold" style={[styles.exampleTitle, { color: colors.primaryDeep }]}>
-          Exemple (après validation)
+          Exemple
         </ThemedText>
         <View style={[styles.exampleBox, { borderColor: colors.border, backgroundColor: colors.primarySoft }]}>
           <Row icon={<UtensilsCrossed size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />} text="Restaurant A → ~30 min" />
@@ -64,7 +43,7 @@ export default function HowMultiDeliveryScreen() {
         </View>
 
         <ThemedText style={[styles.note, { color: colors.textMuted }]}>
-          Les délais indiqués après commande sont des estimations ; ils peuvent varier selon la préparation et le trafic.
+          Les frais de livraison de chaque commerce s’additionnent dans votre panier.
         </ThemedText>
       </ScrollView>
     </ThemedView>
@@ -89,14 +68,6 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 20 },
   title: { fontSize: 24, fontWeight: '800', marginBottom: 12 },
   lead: { fontSize: 15, lineHeight: 22, marginBottom: 20 },
-  card: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 16,
-    marginBottom: 14,
-  },
-  cardTitle: { fontSize: 16, marginBottom: 8 },
-  p: { fontSize: 14, lineHeight: 21 },
   exampleTitle: { fontSize: 15, marginBottom: 10, marginTop: 4 },
   exampleBox: {
     borderRadius: 14,

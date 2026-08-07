@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { ArrowLeft, Bike, MapPin, PhoneCall, Star, ExternalLink, CheckCircle2 } from 'lucide-react-native';
+import { ArrowLeft, Bike, CheckCircle2, Clock, ExternalLink, MapPin, Package, PhoneCall, Sparkles, Star } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 
@@ -13,6 +13,8 @@ import { useAppColors } from '@/hooks/use-app-colors';
 import { apiFetch } from '@/lib/api';
 import { getSessionToken } from '@/lib/auth';
 import type { TimelineStep as _TimelineStep } from '@/lib/datetime';
+import { orderPollingIntervalMs } from '@/lib/order-status';
+import { orderRefundMessage, orderStatusLabel } from '@/lib/ux-copy';
 
 type LocalTimelineStep = {
   titre: string;
@@ -65,26 +67,42 @@ export default function OrderTrackingScreen() {
 
   useEffect(() => {
     let alive = true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
     const fetchOrder = async () => {
       try {
         const token = await getSessionToken();
         if (!token) throw new Error('Non authentifié');
-        
-        // Simuler le fetch ou faire le vrai call si l'API l'expose. 
-        // Pour l'instant on tente un GET /api/orders/:id
+
         const res = await apiFetch<OrderDetail>(`/api/orders/${id}`, { method: 'GET', token });
-        if (alive) {
-          setOrder(res);
-          setLoading(false);
+        if (!alive) return;
+        setOrder(res);
+        setLoading(false);
+        // Suivi en temps réel : on replanifie un refresh silencieux selon
+        // l'avancement (5 s pendant la livraison, 15 s en préparation, 30 s
+        // en attente) et on s'arrête dès que la commande est livrée/annulée.
+        if (timer) clearTimeout(timer);
+        const interval = orderPollingIntervalMs(res.statut);
+        if (interval !== false) {
+          timer = setTimeout(() => void fetchOrder(), interval);
         }
-      } catch (err) {
+      } catch {
+        // Silencieux : on conserve l'état actuel, mais on replanifie quand même
+        // un refresh (15 s) pour reprendre le suivi après une erreur réseau
+        // transitoire au lieu de figer l'écran.
         if (alive) {
           setLoading(false);
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => void fetchOrder(), 15_000);
         }
       }
     };
+
     void fetchOrder();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+      if (timer) clearTimeout(timer);
+    };
   }, [id]);
 
   if (loading) {
@@ -108,6 +126,8 @@ export default function OrderTrackingScreen() {
   }
 
   const isDelivered = order?.statut === 'livree';
+  const refundMessage = orderRefundMessage(order?.statut);
+  const isRefunded = refundMessage !== null;
   const rawSteps = order?.timeline?.livraisons?.[0]?.timeline || order?.timeline?.commande || [];
   const steps: _TimelineStep[] = rawSteps.map((s, i) => ({
     key: `step-${i}`,
@@ -134,19 +154,60 @@ export default function OrderTrackingScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 20 }]}>
         
-        {/* CARTE STATIQUE / PREVIEW - Uniquement si non livrée */}
-        {!isDelivered && (
+        {/* CARTE REMBOURSEMENT - commande expirée / annulée */}
+        {isRefunded && (
+          <View
+            style={[
+              styles.mapPreviewCard,
+              { backgroundColor: colors.surface, borderColor: colors.warning },
+            ]}>
+            <View style={[styles.staticMapContainer, { backgroundColor: colors.warningSoft, justifyContent: 'center' }]}>
+              <View style={{ alignItems: 'center', gap: 10, paddingHorizontal: 20 }}>
+                <View style={[styles.etaIconBox, { backgroundColor: colors.warning }]}>
+                  <Clock size={26} color="#FFFFFF" strokeWidth={LUCIDE_STROKE} />
+                </View>
+                <ThemedText style={[styles.etaTime, { color: colors.text, textAlign: 'center' }]}>
+                  {orderStatusLabel(order?.statut)}
+                </ThemedText>
+                <ThemedText style={[styles.etaLabel, { color: colors.textMuted, textAlign: 'center', lineHeight: 20 }]}>
+                  {refundMessage}
+                </ThemedText>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* CARTE STATUT / PREVIEW - Uniquement si non livrée et non remboursée */}
+        {!isDelivered && !isRefunded && (
           <View style={[styles.mapPreviewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.staticMapContainer, { backgroundColor: colors.surfaceMuted }]}>
-              {/* Image placeholder statique simulant une map */}
-              <Image
-                source={{ uri: 'https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&q=80&w=800' }}
-                style={StyleSheet.absoluteFillObject}
-                contentFit="cover"
-              />
-              {/* Overlay Gradient pour la lisibilité */}
-              <View style={[StyleSheet.absoluteFillObject, { backgroundColor: colors.background, opacity: 0.2 }]} />
-              
+            <View style={[styles.staticMapContainer, { backgroundColor: colors.primarySoft }]}>
+              {/* Illustration personnalisée GoLivra — plus d'image externe.
+                  Halos + anneau d'icône + badges flottants, aux couleurs de la
+                  palette (fonctionne en clair ET en sombre). */}
+              <View style={[styles.artHalo, styles.artHaloA, { backgroundColor: colors.accentSoft }]} />
+              <View style={[styles.artHalo, styles.artHaloB, { backgroundColor: colors.surface }]} />
+              <View style={[styles.artRing, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={styles.artIconBox}>
+                  {order?.statut === 'en_livraison' ? (
+                    <Bike size={42} color="#FFFFFF" strokeWidth={2} />
+                  ) : (
+                    <Package size={42} color="#FFFFFF" strokeWidth={2} />
+                  )}
+                </View>
+              </View>
+              <View style={[styles.artBadge, styles.artBadgeA, { backgroundColor: colors.surface }]}>
+                <Clock size={15} color={colors.primary} strokeWidth={2.4} />
+              </View>
+              <View style={[styles.artBadge, styles.artBadgeB, { backgroundColor: colors.surface }]}>
+                <MapPin size={15} color={colors.primary} strokeWidth={2.4} />
+              </View>
+              <View style={[styles.artBadge, styles.artBadgeC, { backgroundColor: colors.surface }]}>
+                <Sparkles size={14} color={colors.accent} strokeWidth={2.4} />
+              </View>
+              <View style={[styles.artDot, styles.artDotA, { backgroundColor: colors.accent }]} />
+              <View style={[styles.artDot, styles.artDotB, { backgroundColor: colors.primary }]} />
+              <View style={[styles.artDot, styles.artDotC, { backgroundColor: colors.borderStrong }]} />
+
               {/* Overlay Distance + Statut */}
               <View style={[styles.mapOverlay, { backgroundColor: colors.surface }]}>
                 {order?.statut === 'en_livraison' ? (
@@ -168,11 +229,16 @@ export default function OrderTrackingScreen() {
                     <ThemedText style={[styles.statusHighlight, { color: colors.primary }]}>En route vers vous</ThemedText>
                   </>
                 ) : (
-                  <View style={{ alignItems: 'center', paddingVertical: 8 }}>
-                    <ThemedText style={[styles.etaTime, { color: colors.text }]}>Préparation en cours</ThemedText>
-                    <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 4 }]}>
-                      Votre livreur sera assigné prochainement.
-                    </ThemedText>
+                  <View style={styles.statusRow}>
+                    <View style={[styles.etaIconBox, { backgroundColor: colors.primarySoft }]}>
+                      <Package size={24} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <ThemedText style={[styles.etaTime, { color: colors.text }]}>Préparation en cours</ThemedText>
+                      <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 2 }]}>
+                        Votre livreur sera assigné prochainement.
+                      </ThemedText>
+                    </View>
                   </View>
                 )}
               </View>
@@ -300,12 +366,64 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
   },
+  // 270px : assez haut pour que l'illustration (halos + anneau + badges) reste
+  // visible au-dessus de l'overlay dans les DEUX états — « Préparation en cours »
+  // (overlay court) et « En livraison » (overlay ETA plus haut).
   staticMapContainer: {
-    height: 220,
+    height: 270,
     width: '100%',
     justifyContent: 'flex-end',
     padding: 12,
   },
+  // Illustration personnalisée (halos + anneau + badges flottants).
+  artHalo: { position: 'absolute', borderRadius: 999 },
+  artHaloA: { width: 200, height: 200, top: -70, left: -50 },
+  artHaloB: { width: 150, height: 150, bottom: -60, right: -40 },
+  artRing: {
+    position: 'absolute',
+    alignSelf: 'center',
+    top: 26,
+    width: 98,
+    height: 98,
+    borderRadius: 49,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  artIconBox: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0C4F36',
+  },
+  artBadge: {
+    position: 'absolute',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  artBadgeA: { top: 22, right: 52 },
+  artBadgeB: { top: 96, left: 40 },
+  artBadgeC: { bottom: 142, left: 112 },
+  artDot: { position: 'absolute', width: 9, height: 9, borderRadius: 4.5 },
+  artDotA: { top: 40, left: 60 },
+  artDotB: { top: 56, right: 74 },
+  artDotC: { bottom: 92, right: 116 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   mapOverlay: {
     borderRadius: 16,
     padding: 16,

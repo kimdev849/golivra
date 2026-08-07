@@ -26,6 +26,7 @@ import { LUCIDE_STROKE } from '@/constants/icons';
 import { pickVendorImageAsset } from '@/components/vendor-form-shared';
 import { apiFetch } from '@/lib/api';
 import { getSessionToken } from '@/lib/auth';
+import { patchAuthMeCache } from '@/lib/client-data';
 import { resolveRemoteImageUrl } from '@/lib/images';
 import { formatPhone, toE164 } from '@/lib/phone';
 import { isMerchantRole } from '@/lib/roles';
@@ -116,7 +117,8 @@ export default function AccountSettingsScreen() {
       const token = await getSessionToken();
       if (!token) throw new Error('Session expirée.');
       const up = await uploadImageBase64(token, { dataUrl: avatarDataUrl, folder: 'profiles' });
-      await apiFetch<Me>('/api/auth/me', { method: 'PATCH', token, jsonBody: { imageUrl: up.url } });
+      const updated = await apiFetch<Me>('/api/auth/me', { method: 'PATCH', token, jsonBody: { imageUrl: up.url } });
+      patchAuthMeCache(token, { ...updated, imageUrl: up.url, image_url: up.url });
       setAvatarUri(up.url);
       setAvatarDataUrl(null);
       setProfileOk('Photo de profil mise à jour.');
@@ -156,11 +158,12 @@ export default function AccountSettingsScreen() {
     try {
       const token = await getSessionToken();
       if (!token) throw new Error('Session expirée.');
-      await apiFetch<Me>('/api/auth/me', {
+      const updated = await apiFetch<Me>('/api/auth/me', {
         method: 'PATCH',
         token,
         jsonBody: { nom: cleanedNom, telephone: phoneE164 },
       });
+      patchAuthMeCache(token, { ...updated, nom: cleanedNom, telephone: phoneE164 });
       setError(null);
       setProfileOk('Informations enregistrées.');
     } catch (e) {

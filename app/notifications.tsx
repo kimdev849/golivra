@@ -2,7 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
-import { Bell, ChevronLeft, Package } from 'lucide-react-native';
+import { BadgePercent, Bell, ChevronLeft, Package, ShoppingBag, Truck, Wallet, type LucideIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -24,6 +24,21 @@ function formatWhen(iso: string | null | undefined): string {
     const d = new Date(iso);
     return d.toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   } catch { return ''; }
+}
+
+/** Icône selon le type de notification (déduit du préfixe du type). */
+function iconFor(type: string): LucideIcon {
+  if (type.startsWith('commande')) return Package;
+  if (type.startsWith('paiement')) return Wallet;
+  if (type.includes('livraison') || type.startsWith('retard')) return Truck;
+  if (type.startsWith('promotion')) return BadgePercent;
+  if (type.includes('commerce')) return ShoppingBag;
+  return Bell;
+}
+
+/** Paiement / promotion → teinte accent (jaune), le reste → vert marque. */
+function moneyType(type: string): boolean {
+  return type.startsWith('paiement') || type.startsWith('promotion');
 }
 
 export default function NotificationsScreen() {
@@ -92,6 +107,7 @@ export default function NotificationsScreen() {
         keyExtractor={(n) => n.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomPad }]}
+        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         ListHeaderComponent={
           <ThemedText style={[styles.intro, { color: colors.textSecondary }]}>
             Vos alertes commandes, paiements et livraisons GoLivra.{unreadCount > 0 ? ` (${unreadCount} non lue${unreadCount > 1 ? 's' : ''})` : ''}
@@ -114,24 +130,50 @@ export default function NotificationsScreen() {
               </View>
               <ThemedText style={[styles.cardTitle, { color: colors.primaryDeep }]}>Aucune notification</ThemedText>
               <ThemedText style={[styles.cardBody, { color: colors.textMuted }]}>Vous serez informé ici des événements importants sur vos commandes.</ThemedText>
-              <Pressable style={[styles.retry, { backgroundColor: colors.primary }]} onPress={() => router.push('/(tabs)/marketplace')}>
+              <Pressable style={[styles.retry, { backgroundColor: colors.primary }]} onPress={() => router.navigate('/(tabs)/marketplace')}>
                 <ThemedText style={styles.retryText}>Parcourir le marketplace</ThemedText>
               </Pressable>
             </View>
           )
         }
-        renderItem={({ item: n }) => (
-          <Pressable style={({ pressed }) => [styles.row, { borderColor: !n.est_lue ? colors.successSoft : colors.border, backgroundColor: !n.est_lue ? colors.successSoft : colors.surface }, pressed && styles.rowPressed]} onPress={() => void handleOpen(n)} android_ripple={{ color: colors.primaryMuted }}>
-            <View style={[styles.rowIcon, { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong }]}>
-              <Package size={22} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-            </View>
-            <View style={{ flex: 1, gap: 6 }}>
-              <ThemedText type="defaultSemiBold" style={[styles.rowTitle, { color: colors.text }]}>{n.titre}</ThemedText>
-              {n.corps ? <ThemedText style={[styles.body, { color: colors.textSecondary }]}>{n.corps}</ThemedText> : null}
-              {n.created_at ? <ThemedText style={[styles.when, { color: colors.textMuted }]}>{formatWhen(n.created_at)}</ThemedText> : null}
-            </View>
-          </Pressable>
-        )}
+        renderItem={({ item: n }) => {
+          const Icon = iconFor(n.type);
+          const isMoney = moneyType(n.type);
+          return (
+            <Pressable
+              style={({ pressed }) => [
+                styles.row,
+                {
+                  borderColor: !n.est_lue ? colors.successSoft : colors.border,
+                  backgroundColor: !n.est_lue ? colors.successSoft : colors.surface,
+                },
+                pressed && styles.rowPressed,
+              ]}
+              onPress={() => void handleOpen(n)}
+              android_ripple={{ color: colors.primaryMuted }}>
+              <View
+                style={[
+                  styles.rowIcon,
+                  { backgroundColor: isMoney ? colors.accentSoft : colors.primarySoft, borderColor: colors.border },
+                ]}>
+                <Icon size={18} color={isMoney ? colors.accentDeep : colors.primary} strokeWidth={LUCIDE_STROKE} />
+              </View>
+              <View style={styles.rowBody}>
+                <ThemedText type="defaultSemiBold" style={[styles.rowTitle, { color: colors.text }]} numberOfLines={2}>
+                  {n.titre}
+                </ThemedText>
+                {n.corps ? (
+                  <ThemedText style={[styles.body, { color: colors.textSecondary }]} numberOfLines={3}>
+                    {n.corps}
+                  </ThemedText>
+                ) : null}
+                {n.created_at ? (
+                  <ThemedText style={[styles.when, { color: colors.textMuted }]}>{formatWhen(n.created_at)}</ThemedText>
+                ) : null}
+              </View>
+            </Pressable>
+          );
+        }}
       />
     </ThemedView>
   );
@@ -146,20 +188,32 @@ const styles = StyleSheet.create({
   markAllBtn: { paddingHorizontal: 8, paddingVertical: 6 },
   markAllText: { fontWeight: '800', fontSize: 13 },
   scroll: { paddingHorizontal: 20, paddingTop: 16 },
-  intro: { fontSize: 14, lineHeight: 21, opacity: 0.92, marginBottom: 18 },
+  intro: { fontSize: 13.5, lineHeight: 20, opacity: 0.92, marginBottom: 14 },
   loader: { marginTop: 32, alignItems: 'center', gap: 12 },
   muted: { fontSize: 14 },
-  card: { borderWidth: 1, borderRadius: 22, padding: 22, gap: 12, alignItems: 'center', elevation: 4 },
+  card: { borderWidth: 1, borderRadius: 16, padding: 20, gap: 12, alignItems: 'center', elevation: 2 },
   emptyIcon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   cardTitle: { fontSize: 17, fontWeight: '800' },
   cardBody: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
   errText: { fontWeight: '700', textAlign: 'center' },
   retry: { paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14, marginTop: 4 },
   retryText: { color: '#FFFFFF', fontWeight: '800' },
-  row: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, borderWidth: 1, borderRadius: 20, padding: 16, elevation: 4 },
+  // Cartes compactes, aérées : séparées de 10px par ItemSeparatorComponent,
+  // ombre douce au lieu d'une grosse élévation.
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    boxShadow: '0px 1px 3px rgba(12, 48, 32, 0.05)',
+    elevation: 1,
+  },
   rowPressed: { opacity: 0.96 },
-  rowIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  rowTitle: { fontSize: 16 },
-  body: { fontSize: 14, lineHeight: 20 },
-  when: { fontSize: 12 },
+  rowBody: { flex: 1, gap: 4 },
+  rowIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  rowTitle: { fontSize: 15, lineHeight: 20 },
+  body: { fontSize: 13, lineHeight: 18 },
+  when: { fontSize: 11.5, marginTop: 2 },
 });

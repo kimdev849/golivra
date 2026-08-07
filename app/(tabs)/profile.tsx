@@ -1,23 +1,27 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import Constants from 'expo-constants';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import type { LucideIcon } from 'lucide-react-native';
 import {
-  BadgeCheck,
-  Bookmark,
+  Bell,
+  CalendarDays,
+  Camera,
+  Check,
   ChevronRight,
   ClipboardList,
-  CreditCard,
+  Clock,
   Heart,
-  History,
+  HelpCircle,
+  LogOut,
   MapPin,
   Pencil,
-  Smartphone,
+  Phone,
+  Settings,
+  ShoppingBag,
   User,
+  type LucideIcon,
 } from 'lucide-react-native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -26,23 +30,23 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
-import { AppLogoutButton } from '@/components/app-logout-button';
-import { getSessionToken } from '@/lib/auth';
-import { fetchAuthMe, peekAuthMe, fetchAllEnterprises, type AuthMe } from '@/lib/client-data';
-import { fetchFavorites, type FavoriteEnterprise } from '@/lib/favorites-api';
+import { TAB_BAR_CONTENT_PADDING_BOTTOM } from '@/constants/layout';
+import { useActionFeedback } from '@/hooks/use-action-feedback';
+import { useAppColors } from '@/hooks/use-app-colors';
+import { useLogout } from '@/hooks/use-logout';
+import { useUnreadNotifications } from '@/hooks/use-unread-notifications';
 import { fetchUserAddresses } from '@/lib/addresses';
 import { apiFetch } from '@/lib/api';
+import { getSessionToken } from '@/lib/auth';
+import { fetchAuthMe, peekAuthMe, type AuthMe } from '@/lib/client-data';
+import { fetchFavorites, type FavoriteEnterprise } from '@/lib/favorites-api';
 import { resolveRemoteImageUrl } from '@/lib/images';
-import { isMerchantRole } from '@/lib/roles';
 import { isActiveOrderStatus } from '@/lib/order-status';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useActionFeedback } from '@/hooks/use-action-feedback';
-import { TAB_BAR_CONTENT_PADDING_BOTTOM } from '@/constants/layout';
-import { useAppColors } from '@/hooks/use-app-colors';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -60,9 +64,9 @@ type ProfileStats = {
   totalAddresses: number;
 };
 
-// ─── Stat tile ────────────────────────────────────────────────────
+// ─── Stat cell (carte 3 colonnes) ────────────────────────────────
 
-function StatTile({
+function StatCell({
   Icon,
   value,
   label,
@@ -74,184 +78,77 @@ function StatTile({
   colors: ReturnType<typeof useAppColors>;
 }) {
   return (
-    <View style={styles.statTile}>
-      <Icon size={18} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+    <View style={styles.statCell}>
+      <Icon size={19} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
       <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
       <Text style={[styles.statLabel, { color: colors.textMuted }]}>{label}</Text>
     </View>
   );
 }
 
-// ─── Section label ─────────────────────────────────────────────────
+// ─── Ligne du menu « Mon activité » ───────────────────────────────
 
-function SectionLabel({
-  label,
-  colors,
-}: {
-  label: string;
-  colors: ReturnType<typeof useAppColors>;
-}) {
-  return (
-    <ThemedText style={[styles.sectionLabel, { color: colors.primaryDeep }]}>
-      {label}
-    </ThemedText>
-  );
-}
-
-// ─── Activity Row ─────────────────────────────────────────────────
-
-function ActivityRow({
+function MenuRow({
   Icon,
   title,
-  subtitle,
   onPress,
   colors,
-  rightBadge,
-  rightImages,
-  rightExtra,
+  pill,
+  count,
+  danger,
 }: {
   Icon: LucideIcon;
   title: string;
-  subtitle: string;
   onPress: () => void;
   colors: ReturnType<typeof useAppColors>;
-  rightBadge?: string;
-  rightImages?: string[];
-  rightExtra?: number; // overflow count for images
+  pill?: string;
+  count?: number | string;
+  danger?: boolean;
 }) {
   return (
     <Pressable
       style={({ pressed }) => [
-        styles.activityRow,
-        { backgroundColor: colors.surface },
-        pressed && { backgroundColor: colors.primarySoft },
+        styles.menuRow,
+        { backgroundColor: colors.surfaceMuted },
+        pressed && styles.menuRowPressed,
       ]}
       onPress={onPress}
       android_ripple={{ color: colors.primaryMuted }}>
-      {/* Icon circle */}
       <View
         style={[
-          styles.activityIconCircle,
-          { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong },
+          styles.menuIconBox,
+          { backgroundColor: danger ? colors.errorSoft : colors.primarySoft },
         ]}>
-        <Icon size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+        <Icon
+          size={18}
+          color={danger ? colors.error : colors.primaryDeep}
+          strokeWidth={LUCIDE_STROKE}
+        />
       </View>
 
-      {/* Text */}
-      <View style={{ flex: 1 }}>
-        <ThemedText
-          type="defaultSemiBold"
-          style={[styles.activityTitle, { color: colors.text }]}>
-          {title}
-        </ThemedText>
-        <ThemedText style={[styles.activitySub, { color: colors.textMuted }]}>
-          {subtitle}
-        </ThemedText>
-      </View>
+      <Text
+        style={[
+          styles.menuTitle,
+          { color: danger ? colors.error : colors.text },
+        ]}
+        numberOfLines={1}>
+        {title}
+      </Text>
 
-      {/* Right: badge */}
-      {rightBadge ? (
-        <View
-          style={[
-            styles.countBadge,
-            { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong },
-          ]}>
-          <Text style={[styles.countBadgeText, { color: colors.primaryDeep }]}>
-            {rightBadge}
-          </Text>
+      {pill ? (
+        <View style={[styles.pill, { backgroundColor: colors.primary }]}>
+          <Text style={styles.pillText}>{pill}</Text>
         </View>
-      ) : null}
-
-      {/* Right: images stack */}
-      {rightImages && rightImages.length > 0 ? (
-        <View style={styles.favImagesStack}>
-          {rightImages.slice(0, 2).map((uri, i) => (
-            <Image
-              key={i}
-              source={{ uri }}
-              style={[
-                styles.favThumb,
-                {
-                  marginLeft: i === 0 ? 0 : -10,
-                  zIndex: 10 - i,
-                  borderColor: colors.surface,
-                },
-              ]}
-              contentFit="cover"
-            />
-          ))}
-          {(rightExtra ?? 0) > 0 ? (
-            <View
-              style={[
-                styles.favMoreBubble,
-                { backgroundColor: colors.primary, borderColor: colors.surface },
-              ]}>
-              <Text style={styles.favMoreText}>+{rightExtra}</Text>
-            </View>
-          ) : null}
-        </View>
+      ) : count !== undefined ? (
+        <Text style={[styles.menuCount, { color: colors.textMuted }]}>{count}</Text>
       ) : null}
 
       <ChevronRight
-        size={18}
+        size={17}
         color={colors.textMuted}
         strokeWidth={LUCIDE_STROKE}
-        style={{ marginLeft: 4 }}
       />
     </Pressable>
-  );
-}
-
-// ─── Settings row ─────────────────────────────────────────────────
-
-function SettingsRow({
-  Icon,
-  title,
-  subtitle,
-  onPress,
-  colors,
-  isLast,
-}: {
-  Icon: LucideIcon;
-  title: string;
-  subtitle: string;
-  onPress: () => void;
-  colors: ReturnType<typeof useAppColors>;
-  isLast?: boolean;
-}) {
-  return (
-    <>
-      <Pressable
-        style={({ pressed }) => [
-          styles.settingsRow,
-          { backgroundColor: colors.surface },
-          pressed && { backgroundColor: colors.primarySoft },
-        ]}
-        onPress={onPress}
-        android_ripple={{ color: colors.primaryMuted }}>
-        <View
-          style={[
-            styles.settingsIconCircle,
-            { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong },
-          ]}>
-          <Icon size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <ThemedText
-            type="defaultSemiBold"
-            style={[styles.settingsTitle, { color: colors.text }]}>
-            {title}
-          </ThemedText>
-          <ThemedText style={[styles.settingsSub, { color: colors.textMuted }]}>
-            {subtitle}
-          </ThemedText>
-        </View>
-        <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-      </Pressable>
-      {!isLast && (
-        <View style={[styles.divider, { backgroundColor: colors.border }]} />
-      )}
-    </>
   );
 }
 
@@ -261,7 +158,9 @@ export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
-  const { showInfo, FeedbackOverlay } = useActionFeedback();
+  const { unreadCount } = useUnreadNotifications();
+  const { performLogout } = useLogout({ clearCart: true });
+  const { showConfirm, FeedbackOverlay } = useActionFeedback();
 
   // User profile
   const [me, setMe] = useState<Me | null>(null);
@@ -276,9 +175,8 @@ export default function ProfileScreen() {
     totalAddresses: 0,
   });
 
-  // Favorite enterprise images for the stack preview
-  const [favImages, setFavImages] = useState<string[]>([]);
-  const [favTotal, setFavTotal] = useState(0);
+  // Bannière « Ajoutez une photo de profil » : une seule fois par utilisateur.
+  const [showPhotoBanner, setShowPhotoBanner] = useState(false);
 
   // ── Load everything in parallel ──────────────────────────────────
 
@@ -298,13 +196,12 @@ export default function ProfileScreen() {
       }
 
       // Fetch profile + orders + favorites + addresses in parallel
-      const [profileData, ordersData, favData, addressesData, allEnterprises] =
+      const [profileData, ordersData, favData, addressesData] =
         await Promise.allSettled([
           fetchAuthMe(token, force),
           apiFetch<OrderSummary[]>('/api/orders', { method: 'GET', token }),
           fetchFavorites(token),
           fetchUserAddresses(token),
-          fetchAllEnterprises(force),
         ]);
 
       // Profile
@@ -321,29 +218,11 @@ export default function ProfileScreen() {
         activeOrders = orders.filter((o) => isActiveOrderStatus(o.statut)).length;
       }
 
-      // Favorites stats + image preview
+      // Favorites stats
       let totalFavorites = 0;
-      let previewImages: string[] = [];
       if (favData.status === 'fulfilled') {
         const items: FavoriteEnterprise[] = favData.value.items ?? [];
         totalFavorites = items.length;
-
-        // Resolve image URLs using the enterprises list
-        const enterpriseList =
-          allEnterprises.status === 'fulfilled' ? allEnterprises.value : [];
-
-        const enterpriseMap = new Map(
-          enterpriseList.map((e) => [e.id, e.image_url]),
-        );
-
-        // Build preview images from favorites (enterprise images)
-        previewImages = items
-          .map((fav) => {
-            const imgUrl = enterpriseMap.get(fav.enterprise_id) ?? null;
-            return resolveRemoteImageUrl(imgUrl, { width: 80, height: 80 });
-          })
-          .filter((u): u is string => u !== null)
-          .slice(0, 5); // keep up to 5 for display
       }
 
       // Addresses stats
@@ -355,8 +234,6 @@ export default function ProfileScreen() {
       }
 
       setStats({ totalOrders, activeOrders, totalFavorites, totalAddresses });
-      setFavImages(previewImages);
-      setFavTotal(totalFavorites);
     } catch (e) {
       setError(
         e instanceof Error ? e.message : 'Impossible de charger le profil.',
@@ -373,6 +250,29 @@ export default function ProfileScreen() {
   );
 
   const avatarUri = resolveRemoteImageUrl(me?.imageUrl ?? me?.image_url);
+
+  // La bannière photo ne s'affiche qu'une seule fois par utilisateur.
+  useEffect(() => {
+    if (!me?.id) return;
+    let alive = true;
+    void (async () => {
+      try {
+        const key = `golivra_profile_banner_seen_v1_${me.id}`;
+        const seen = await AsyncStorage.getItem(key);
+        if (!alive || seen) return;
+        if (!avatarUri) {
+          setShowPhotoBanner(true);
+          await AsyncStorage.setItem(key, '1');
+        }
+      } catch {
+        /* sans stockage, la bannière s'affichera à nouveau */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [me?.id, avatarUri]);
+
   const memberSince =
     me?.created_at != null || me?.cree_le != null
       ? new Date(
@@ -385,24 +285,25 @@ export default function ProfileScreen() {
       : null;
 
   const bottomPad = Math.max(insets.bottom, 12) + TAB_BAR_CONTENT_PADDING_BOTTOM;
-  const appVersion = Constants.expoConfig?.version ?? '1.0.0';
 
-  // Active orders badge label
-  const ordersBadge =
-    stats.activeOrders > 0
-      ? `${stats.activeOrders} en cours`
-      : stats.totalOrders > 0
-        ? `${stats.totalOrders} commande${stats.totalOrders > 1 ? 's' : ''}`
-        : null;
+  const ordersPill =
+    stats.totalOrders > 0
+      ? `${stats.totalOrders} commande${stats.totalOrders > 1 ? 's' : ''}`
+      : undefined;
 
-  // Addresses badge label
-  const addressesBadge =
-    stats.totalAddresses > 0
-      ? `${stats.totalAddresses} adresse${stats.totalAddresses > 1 ? 's' : ''}`
-      : null;
+  const openOrders = () => router.navigate('/(tabs)/explore');
+  const openFavorites = () => router.navigate('/(tabs)/favorites');
+  const openAddresses = () => router.push('/my-addresses');
 
-  // Favorites overflow count for image stack
-  const favOverflow = favTotal > 2 ? favTotal - 2 : 0;
+  const confirmLogout = () => {
+    showConfirm({
+      title: 'Déconnexion',
+      message: 'Voulez-vous vraiment vous déconnecter ?',
+      primaryLabel: 'Se déconnecter',
+      secondaryLabel: 'Annuler',
+      onPrimary: () => void performLogout(),
+    });
+  };
 
   // ── Render ─────────────────────────────────────────────────────
 
@@ -414,7 +315,7 @@ export default function ProfileScreen() {
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: Math.max(insets.top, 10),
+            paddingTop: Math.max(insets.top, 12),
             paddingBottom: bottomPad,
           },
         ]}>
@@ -450,243 +351,247 @@ export default function ProfileScreen() {
         ) : me ? (
           <>
             {/* ══════════════════════════════════════════════════
-                PROFILE HERO CARD
+                EN-TÊTE : Bonjour, + cloche + réglages
             ══════════════════════════════════════════════════ */}
-            <View style={styles.profileShell}>
-              <LinearGradient
-                colors={['#0C4F36', '#1A6B40', '#C8920A'] as unknown as readonly [string, string]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.profileGradient}>
-
-                {/* Compte vérifié badge */}
-                <View style={styles.verifiedBadge}>
-                  <BadgeCheck size={13} color="#0C4F36" strokeWidth={2.5} />
-                  <Text style={styles.verifiedBadgeText}>Compte vérifié</Text>
+            <View style={styles.header}>
+              <View style={styles.headerTextBlock}>
+                <Text style={[styles.greeting, { color: colors.textMuted }]}>
+                  Bonjour,
+                </Text>
+                <View style={styles.nameRow}>
+                  <Text
+                    style={[styles.displayName, { color: colors.text }]}
+                    numberOfLines={1}>
+                    {me.nom?.trim() || 'Client GoLivra'}
+                  </Text>
+                  <View style={[styles.verifiedBadge, { backgroundColor: colors.primary }]}>
+                    <Check size={12} color="#FFFFFF" strokeWidth={3} />
+                  </View>
                 </View>
+              </View>
 
-                {/* Row: avatar left, info right */}
-                <View style={styles.profileHeroRow}>
-                  {/* Avatar */}
-                  <View style={styles.avatarContainer}>
+              <View style={styles.headerActions}>
+                <Pressable
+                  style={[
+                    styles.headerBtn,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                  ]}
+                  onPress={() => router.push('/notifications')}
+                  hitSlop={8}>
+                  <Bell size={18} color={colors.text} strokeWidth={LUCIDE_STROKE} />
+                  {unreadCount > 0 ? (
                     <View
                       style={[
-                        styles.avatarWrap,
-                        { backgroundColor: colors.primarySoft },
+                        styles.notifDot,
+                        { backgroundColor: colors.primary, borderColor: colors.surface },
                       ]}>
-                      {avatarUri ? (
-                        <Image
-                          source={{ uri: avatarUri }}
-                          style={styles.avatarImg}
-                          contentFit="cover"
-                        />
-                      ) : (
-                        <User
-                          size={36}
-                          color={colors.primary}
-                          strokeWidth={LUCIDE_STROKE}
-                        />
-                      )}
-                    </View>
-                    {/* Gold star badge */}
-                    <View style={styles.starBadge}>
-                      <Text style={styles.starEmoji}>⭐</Text>
-                    </View>
-                  </View>
-
-                  {/* Name & info */}
-                  <View style={styles.profileInfo}>
-                    <View style={styles.nameRow}>
-                      <Text style={styles.displayName} numberOfLines={1}>
-                        {me?.nom?.trim() || 'Client GoLivra'}
+                      <Text style={styles.notifDotTxt}>
+                        {unreadCount > 9 ? '9+' : String(unreadCount)}
                       </Text>
-                      <BadgeCheck
-                        size={18}
-                        color="#4FFFB0"
-                        strokeWidth={2.5}
-                        style={{ marginLeft: 4, marginTop: 2 }}
-                      />
                     </View>
-
-                    <View style={styles.phoneRow}>
-                      <Smartphone
-                        size={13}
-                        color="rgba(255,255,255,0.75)"
-                        strokeWidth={2}
-                      />
-                      <Text style={styles.phoneText}>{me?.telephone}</Text>
-                    </View>
-
-                    {memberSince ? (
-                      <Text style={styles.memberSinceText}>
-                        Membre depuis le {memberSince}
-                      </Text>
-                    ) : null}
-
-                    {/* Edit button */}
-                    <Pressable
-                      style={styles.editBtn}
-                      onPress={() => router.push('/account-settings')}>
-                      <Pencil size={13} color="#FFFFFF" strokeWidth={2.5} />
-                      <Text style={styles.editBtnText}>Modifier le profil</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              </LinearGradient>
-
-              {/* ── Stats strip ── */}
-              <View
-                style={[
-                  styles.statsStrip,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                ]}>
-                <StatTile
-                  Icon={ClipboardList}
-                  value={stats.totalOrders}
-                  label={'Commandes\npassées'}
-                  colors={colors}
-                />
-                <View
-                  style={[styles.statDivider, { backgroundColor: colors.border }]}
-                />
-                <StatTile
-                  Icon={Heart}
-                  value={stats.totalFavorites}
-                  label={'Favoris\nenregistrés'}
-                  colors={colors}
-                />
-                <View
-                  style={[styles.statDivider, { backgroundColor: colors.border }]}
-                />
-                <StatTile
-                  Icon={MapPin}
-                  value={stats.totalAddresses}
-                  label={'Adresses\nenregistrées'}
-                  colors={colors}
-                />
-                <View
-                  style={[styles.statDivider, { backgroundColor: colors.border }]}
-                />
-                <StatTile
-                  Icon={Bookmark}
-                  value={
-                    stats.activeOrders > 0 ? stats.activeOrders : '—'
-                  }
-                  label={'Commandes\nen cours'}
-                  colors={colors}
-                />
+                  ) : null}
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.headerBtn,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                  ]}
+                  onPress={() => router.push('/settings')}
+                  hitSlop={8}>
+                  <Settings size={18} color={colors.text} strokeWidth={LUCIDE_STROKE} />
+                </Pressable>
               </View>
             </View>
 
-            {/* Merchant space if applicable */}
-            {me && isMerchantRole(me.role) ? (
-              <>
-                <SectionLabel label="MON COMMERCE" colors={colors} />
+            {/* ══════════════════════════════════════════════════
+                BLOC PROFIL : avatar + contact
+            ══════════════════════════════════════════════════ */}
+            <View style={styles.profileRow}>
+              {/* Avatar */}
+              <Pressable
+                style={styles.avatarContainer}
+                onPress={() => router.push('/profile-edit')}>
                 <View
                   style={[
-                    styles.menuCard,
-                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    styles.avatarWrap,
+                    { backgroundColor: colors.primarySoft },
                   ]}>
-                  <SettingsRow
-                    Icon={ClipboardList}
-                    title={me.role === 'restaurateur' ? 'Espace restaurant' : 'Espace boutique'}
-                    subtitle={
-                      me.role === 'restaurateur'
-                        ? 'Menu, commandes, livraisons'
-                        : 'Catalogue, commandes, livraisons'
-                    }
-                    onPress={() => router.push('/vendor')}
-                    colors={colors}
-                    isLast
-                  />
+                  {avatarUri ? (
+                    <Image
+                      source={{ uri: avatarUri }}
+                      style={styles.avatarImg}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <User
+                      size={42}
+                      color={colors.primaryDeep}
+                      strokeWidth={LUCIDE_STROKE}
+                    />
+                  )}
                 </View>
-              </>
+                {/* Bouton caméra */}
+                <View style={[styles.cameraBadge, { backgroundColor: colors.primary }]}>
+                  <Camera size={13} color="#FFFFFF" strokeWidth={2.6} />
+                </View>
+              </Pressable>
+
+              {/* Contact + bouton éditer */}
+              <View style={styles.profileInfo}>
+                <View style={styles.infoRow}>
+                  <Phone size={15} color={colors.primaryDeep} strokeWidth={LUCIDE_STROKE} />
+                  <Text style={[styles.infoPhone, { color: colors.text }]} numberOfLines={1}>
+                    {me.telephone}
+                  </Text>
+                </View>
+
+                {memberSince ? (
+                  <View style={styles.infoRow}>
+                    <CalendarDays
+                      size={15}
+                      color={colors.primaryDeep}
+                      strokeWidth={LUCIDE_STROKE}
+                    />
+                    <Text
+                      style={[styles.infoMember, { color: colors.textMuted }]}
+                      numberOfLines={1}>
+                      Membre depuis le {memberSince}
+                    </Text>
+                  </View>
+                ) : null}
+
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.editBtn,
+                    { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+                    pressed && styles.editBtnPressed,
+                  ]}
+                  onPress={() => router.push('/profile-edit')}>
+                  <Pencil size={13} color={colors.primaryDeep} strokeWidth={2.4} />
+                  <Text style={[styles.editBtnText, { color: colors.primaryDeep }]}>
+                    Modifier le profil
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+
+            {/* ══════════════════════════════════════════════════
+                CARTE STATS (3 colonnes)
+            ══════════════════════════════════════════════════ */}
+            <View
+              style={[
+                styles.statsCard,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}>
+              <StatCell
+                Icon={ClipboardList}
+                value={stats.totalOrders}
+                label="Commandes"
+                colors={colors}
+              />
+              <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+              <StatCell
+                Icon={Heart}
+                value={stats.totalFavorites}
+                label="Favoris"
+                colors={colors}
+              />
+              <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+              <StatCell
+                Icon={MapPin}
+                value={stats.totalAddresses}
+                label="Adresses"
+                colors={colors}
+              />
+            </View>
+
+            {/* ══════════════════════════════════════════════════
+                BANNIÈRE PHOTO DE PROFIL
+            ══════════════════════════════════════════════════ */}
+            {showPhotoBanner && !avatarUri ? (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.photoBanner,
+                  { backgroundColor: colors.primarySoft },
+                  pressed && styles.photoBannerPressed,
+                ]}
+                onPress={() => router.push('/profile-edit')}
+                android_ripple={{ color: colors.primaryMuted }}>
+                <View style={[styles.photoBannerIcon, { backgroundColor: colors.primaryDeep }]}>
+                  <Camera size={20} color="#FFFFFF" strokeWidth={LUCIDE_STROKE} />
+                </View>
+                <View style={styles.photoBannerBody}>
+                  <Text style={[styles.photoBannerTitle, { color: colors.primaryDeep }]}>
+                    Ajoutez une photo de profil
+                  </Text>
+                  <Text style={[styles.photoBannerSub, { color: colors.textSecondary }]}>
+                    Personnalisez votre compte
+                  </Text>
+                </View>
+                <ChevronRight
+                  size={20}
+                  color={colors.primaryDeep}
+                  strokeWidth={LUCIDE_STROKE}
+                />
+              </Pressable>
             ) : null}
 
             {/* ══════════════════════════════════════════════════
                 MON ACTIVITÉ
             ══════════════════════════════════════════════════ */}
-            <SectionLabel label="MON ACTIVITÉ" colors={colors} />
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Mon activité
+            </Text>
 
-            <View
-              style={[
-                styles.menuCard,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}>
-              {/* Commandes */}
-              <ActivityRow
-                Icon={ClipboardList}
-                title="Commandes"
-                subtitle="Suivi, historique et avis"
-                onPress={() => router.push('/(tabs)/explore')}
+            <View style={styles.menuList}>
+              <MenuRow
+                Icon={ShoppingBag}
+                title="Mes commandes"
+                onPress={openOrders}
                 colors={colors}
-                rightBadge={ordersBadge ?? undefined}
+                pill={ordersPill}
               />
-              <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-              {/* Favoris avec vraies images */}
-              <ActivityRow
+              <MenuRow
                 Icon={Heart}
-                title="Favoris"
-                subtitle="Restaurants, boutiques et produits"
-                onPress={() => router.push('/(tabs)/favorites')}
+                title="Mes favoris"
+                onPress={openFavorites}
                 colors={colors}
-                rightImages={favImages.length > 0 ? favImages : undefined}
-                rightExtra={favOverflow}
+                count={stats.totalFavorites}
               />
-              <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-              {/* Adresses */}
-              <ActivityRow
+              <MenuRow
                 Icon={MapPin}
-                title="Adresses de livraison"
-                subtitle="Gérer vos lieux de livraison"
-                onPress={() => router.push('/my-addresses')}
+                title="Mes adresses"
+                onPress={openAddresses}
                 colors={colors}
-                rightBadge={addressesBadge ?? undefined}
+                count={stats.totalAddresses}
               />
-            </View>
-
-            {/* ══════════════════════════════════════════════════
-                PARAMÈTRES DU COMPTE
-            ══════════════════════════════════════════════════ */}
-            <SectionLabel label="PARAMÈTRES DU COMPTE" colors={colors} />
-
-            <View
-              style={[
-                styles.menuCard,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}>
-              <SettingsRow
-                Icon={CreditCard}
-                title="Paiements"
-                subtitle="Méthodes de paiement et sécurité"
-                onPress={() => router.push('/payment-methods')}
+              <MenuRow
+                Icon={Clock}
+                title="Commandes en cours"
+                onPress={openOrders}
+                colors={colors}
+                count={stats.activeOrders}
+              />
+              <MenuRow
+                Icon={Settings}
+                title="Paramètres"
+                onPress={() => router.push('/settings')}
                 colors={colors}
               />
-              <SettingsRow
-                Icon={History}
-                title="Historique des paiements"
-                subtitle="Toutes vos transactions"
-                onPress={() =>
-                  showInfo(
-                    'Historique',
-                    "L'historique des paiements sera disponible prochainement.",
-                  )
-                }
+              <MenuRow
+                Icon={HelpCircle}
+                title="Centre d'aide"
+                onPress={() => router.push('/help-center')}
                 colors={colors}
-                isLast
+              />
+              <MenuRow
+                Icon={LogOut}
+                title="Se déconnecter"
+                onPress={confirmLogout}
+                colors={colors}
+                danger
               />
             </View>
-
-            {/* ── Déconnexion ────────────────────────────────────── */}
-            <View style={styles.logoutWrapper}>
-              <AppLogoutButton variant="ghost" clearCart />
-            </View>
-
-            <ThemedText style={[styles.versionLine, { color: colors.textMuted }]}>
-              GoLivra · version {appVersion}
-            </ThemedText>
           </>
         ) : null}
       </ScrollView>
@@ -700,7 +605,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { paddingHorizontal: 16 },
 
-  // Error
+  // Error / loading
   errorCard: {
     borderRadius: 16,
     borderWidth: 1,
@@ -715,8 +620,6 @@ const styles = StyleSheet.create({
     borderRadius: 11,
   },
   retryText: { fontWeight: '800', fontSize: 13 },
-
-  // Loading
   loadingCard: {
     borderRadius: 20,
     padding: 32,
@@ -726,267 +629,235 @@ const styles = StyleSheet.create({
   },
   loadingText: { fontSize: 14, fontWeight: '600' },
 
-  // ── Profile hero card ──────────────────────────────────────────
-  profileShell: {
-    marginTop: 8,
-    marginBottom: 20,
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#0C3020',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-
-  profileGradient: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 20,
-    gap: 14,
-  },
-
-  // Compte vérifié badge
-  verifiedBadge: {
+  // ── Header ───────────────────────────────────────────────────
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    alignSelf: 'flex-start',
-    backgroundColor: '#4FFFB0',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
+    justifyContent: 'space-between',
+    marginBottom: 20,
   },
-  verifiedBadgeText: {
-    color: '#0C4F36',
-    fontSize: 12,
-    fontWeight: '800',
+  headerTextBlock: { flex: 1, paddingRight: 12 },
+  greeting: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 2,
   },
-
-  // Hero row: avatar + info
-  profileHeroRow: {
+  nameRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 14,
+    alignItems: 'center',
+    gap: 7,
+    marginTop: 1,
   },
+  displayName: {
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    flexShrink: 1,
+  },
+  verifiedBadge: {
+    width: 19,
+    height: 19,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    position: 'relative',
+  },
+  notifDot: {
+    position: 'absolute',
+    top: 1,
+    right: 1,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  notifDotTxt: { color: '#FFF', fontSize: 9, fontWeight: '800' },
 
-  // Avatar
+  // ── Bloc profil ──────────────────────────────────────────────
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 18,
+  },
   avatarContainer: {
     position: 'relative',
   },
   avatarWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 92,
+    height: 92,
+    borderRadius: 46,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.35)',
     overflow: 'hidden',
   },
   avatarImg: { width: '100%', height: '100%' },
-  starBadge: {
+  cameraBadge: {
     position: 'absolute',
     bottom: 0,
-    right: -2,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#F5A524',
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#FFFFFF',
   },
-  starEmoji: { fontSize: 12 },
-
-  // Profile info (right column)
   profileInfo: {
     flex: 1,
-    gap: 4,
+    gap: 8,
   },
-  nameRow: {
+  infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'nowrap',
+    gap: 7,
   },
-  displayName: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '800',
+  infoPhone: {
+    fontSize: 14,
+    fontWeight: '600',
     flexShrink: 1,
   },
-  phoneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginTop: 2,
-  },
-  phoneText: {
-    color: 'rgba(255,255,255,0.9)',
+  infoMember: {
     fontSize: 13,
-    fontWeight: '600',
-  },
-  memberSinceText: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 12,
-    marginTop: 2,
+    flexShrink: 1,
   },
   editBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 10,
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-  },
-  editBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-
-  // Stats strip
-  statsStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    borderTopWidth: 1,
-  },
-  statTile: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 3,
-  },
-  statDivider: {
-    width: 1,
-    height: 36,
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: '800',
     marginTop: 2,
   },
-  statLabel: {
-    fontSize: 10,
-    fontWeight: '500',
-    textAlign: 'center',
-    lineHeight: 13,
-  },
+  editBtnPressed: { opacity: 0.8 },
+  editBtnText: { fontSize: 12.5, fontWeight: '600' },
 
-  // Section label
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    marginBottom: 8,
-    letterSpacing: 0.7,
-  },
-
-  // Menu card
-  menuCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    overflow: 'hidden',
+  // ── Stats card ───────────────────────────────────────────────
+  statsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 16,
+    paddingHorizontal: 6,
     marginBottom: 16,
     shadowColor: '#0C3020',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  statCell: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  statDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 34,
+  },
+  statValue: {
+    fontSize: 19,
+    fontWeight: '700',
+    marginTop: 2,
+    letterSpacing: -0.2,
+  },
+  statLabel: {
+    fontSize: 12,
+    fontWeight: '400',
   },
 
-  // Activity row
-  activityRow: {
+  // ── Bannière photo ───────────────────────────────────────────
+  photoBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    borderRadius: 16,
     paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingVertical: 13,
+    marginBottom: 20,
   },
-  activityIconCircle: {
+  photoBannerPressed: { opacity: 0.9 },
+  photoBannerIcon: {
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
   },
-  activityTitle: { fontSize: 15 },
-  activitySub: { fontSize: 12, marginTop: 2 },
+  photoBannerBody: { flex: 1, gap: 2 },
+  photoBannerTitle: {
+    fontSize: 14.5,
+    fontWeight: '600',
+  },
+  photoBannerSub: {
+    fontSize: 12.5,
+    lineHeight: 17,
+  },
 
-  // Count badge
-  countBadge: {
-    paddingHorizontal: 10,
+  // ── Mon activité ─────────────────────────────────────────────
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+    marginBottom: 12,
+  },
+  menuList: {
+    gap: 10,
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 16,
+    paddingHorizontal: 13,
+    paddingVertical: 12,
+  },
+  menuRowPressed: { opacity: 0.82 },
+  menuIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuTitle: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  menuCount: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  pill: {
+    paddingHorizontal: 11,
     paddingVertical: 5,
     borderRadius: 999,
-    borderWidth: 1,
   },
-  countBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-
-  // Favorites image stack
-  favImagesStack: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  favThumb: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 2,
-  },
-  favMoreBubble: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -10,
-    borderWidth: 2,
-    zIndex: 0,
-  },
-  favMoreText: {
+  pillText: {
     color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-
-  // Settings row
-  settingsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-  },
-  settingsIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  settingsTitle: { fontSize: 15 },
-  settingsSub: { fontSize: 12, marginTop: 2 },
-
-  divider: { height: StyleSheet.hairlineWidth, marginLeft: 70 },
-
-  // Logout
-  logoutWrapper: { marginTop: 16, marginBottom: 8 },
-  versionLine: {
-    textAlign: 'center',
-    fontSize: 11,
-    marginTop: 12,
-    marginBottom: 4,
+    fontSize: 12,
     fontWeight: '600',
   },
 });

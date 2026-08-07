@@ -156,7 +156,7 @@ async function readCartFromStorage(): Promise<CartState | null> {
 /** Charge SecureStore une fois au démarrage. */
 export async function hydrateCart(): Promise<CartState | null> {
   if (memoryHydrated) return memoryCart;
-  const loaded = await readCartFromStorage();
+  const loaded = normalizeCart(await readCartFromStorage());
   memoryCart = loaded;
   memoryHydrated = true;
   currentCartCount = getCartItemCount(loaded);
@@ -169,10 +169,30 @@ export async function loadCart(): Promise<CartState | null> {
   return hydrateCart();
 }
 
+/** Fusionne les lignes en double d'un même produit (garde la quantité max). */
+export function dedupeLines(lines: CartLine[]): CartLine[] {
+  const byId = new Map<string, CartLine>();
+  for (const l of lines) {
+    const prev = byId.get(l.productId);
+    if (!prev || l.quantite > prev.quantite) byId.set(l.productId, l);
+  }
+  return [...byId.values()];
+}
+
 function normalizeCart(state: CartState | null): CartState | null {
   if (!state) return null;
-  const segments = state.segments.filter((s) => s.lines.length > 0);
+  const segments = state.segments
+    .map((s) => ({ ...s, lines: dedupeLines(s.lines) }))
+    .filter((s) => s.lines.length > 0);
   return segments.length > 0 ? { segments } : null;
+}
+
+// File du push serveur : sérialise les envois pour éviter les courses
+// (« efface puis insère » non atomique côté serveur → doublons).
+let pushChain: Promise<void> = Promise.resolve();
+
+function queueServerPush(fn: () => Promise<void>): void {
+  pushChain = pushChain.then(fn).catch(() => {});
 }
 
 function persistCartAsync(state: CartState | null): void {
@@ -180,11 +200,11 @@ function persistCartAsync(state: CartState | null): void {
     try {
       if (!state) {
         await safeDeleteItem(STORAGE_KEY);
-        void pushCartToServer(null);
-        return;
+      } else {
+        await safeSetItem(STORAGE_KEY, JSON.stringify(state));
       }
-      await safeSetItem(STORAGE_KEY, JSON.stringify(state));
-      void pushCartToServer(state);
+      // Toujours en file d'attente : jamais deux PUT /api/cart simultanés.
+      queueServerPush(() => pushCartToServer(state));
     } catch {
       /* mémoire reste source de vérité */
     }
@@ -202,6 +222,19 @@ export async function saveCart(state: CartState | null): Promise<void> {
   const next = normalizeCart(state);
   setMemoryCart(next);
   persistCartAsync(next);
+}
+
+/** Vide le panier local (mémoire + stockage) sans toucher au serveur. */
+export async function clearCart(): Promise<void> {
+  memoryCart = null;
+  memoryHydrated = true;
+  currentCartCount = 0;
+  try {
+    await safeDeleteItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+  notifyCartChanged();
 }
 
 async function pushCartToServer(state: CartState | null): Promise<void> {

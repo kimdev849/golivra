@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { X } from 'lucide-react-native';
+import { ImageIcon, X } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { Dimensions, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -65,6 +65,7 @@ export function ImageZoomViewer({ visible, source, onClose, caption }: Props) {
   // opacité qui suit le swipe de fermeture pour un effet "tirer vers le bas"
   const dismissOpacity = useSharedValue(1);
   const [loaded, setLoaded] = useState(false);
+  const [errored, setErrored] = useState(false);
 
   const resetTransform = useCallback(() => {
     scale.value = withTiming(1, { duration: 200 });
@@ -80,6 +81,7 @@ export function ImageZoomViewer({ visible, source, onClose, caption }: Props) {
     if (visible) {
       resetTransform();
       setLoaded(false);
+      setErrored(false);
     }
   }, [visible, resetTransform]);
 
@@ -190,10 +192,18 @@ export function ImageZoomViewer({ visible, source, onClose, caption }: Props) {
                 style={styles.img}
                 contentFit="contain"
                 onLoad={() => setLoaded(true)}
+                onError={() => setErrored(true)}
               />
             ) : (
               <Image source={source as any} style={styles.img} contentFit="contain" />
             )}
+
+            {errored ? (
+              <View style={styles.fallback} pointerEvents="none">
+                <ImageIcon size={42} color="rgba(255,255,255,0.55)" strokeWidth={1.6} />
+                <Text style={styles.fallbackTxt}>Image indisponible</Text>
+              </View>
+            ) : null}
           </Animated.View>
         </GestureDetector>
 
@@ -234,6 +244,17 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   img: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT },
+  fallback: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  fallbackTxt: { color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: '600' },
   header: {
     position: 'absolute',
     top: 0,

@@ -41,11 +41,11 @@ export function navigateFromNotification(router: Router, n: AppNotification): vo
   }
 
   if (action === 'open_orders' || n.type.includes('commande') || n.type.includes('paiement')) {
-    router.push('/(tabs)/explore');
+    router.navigate('/(tabs)/explore');
     return;
   }
 
   if (n.type.includes('livraison')) {
-    router.push('/(tabs)/explore');
+    router.navigate('/(tabs)/explore');
   }
 }

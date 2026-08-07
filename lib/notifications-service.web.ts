@@ -4,6 +4,10 @@
 
 export type NotificationPermissionStatus = 'granted' | 'denied' | 'undetermined';
 
+export async function markNotificationHandled(_id: string | null | undefined): Promise<void> {
+  /* no-op web */
+}
+
 export async function requestNotificationPermission(): Promise<NotificationPermissionStatus> {
   return 'denied';
 }
@@ -14,6 +18,10 @@ export async function getExpoPushToken(): Promise<string | null> {
 
 export async function initializeNotifications(): Promise<NotificationPermissionStatus> {
   return 'denied';
+}
+
+export async function ensurePushTokenRegistered(): Promise<void> {
+  /* no-op web : pas de push natif sur le web */
 }
 
 export function handleNotificationNavigation(_data: Record<string, unknown> | null | undefined): void {

@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, MapPin, Trash2 } from 'lucide-react-native';
+import { ChevronLeft, Home, MapPin, Pencil, Trash2 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,11 +11,12 @@ import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
-import { createUserAddress, deleteUserAddress, fetchUserAddresses, setPrincipalAddress, type UserAddress } from '@/lib/addresses';
+import { createUserAddress, deleteUserAddress, fetchUserAddresses, setPrincipalAddress, updateUserAddress, type UserAddress } from '@/lib/addresses';
 import { getSessionToken } from '@/lib/auth';
-import { deliveryAddressError, formatDeliveryAddressText } from '@/lib/format-address';
+import { addressLabel, deliveryAddressError, formatDeliveryAddressText } from '@/lib/format-address';
+import { captureCurrentPosition } from '@/lib/location';
 
-const emptyForm = (): DeliveryAddressFormValue => ({ quartier: '', ligne1: '', instructions: '', point_reperes: '', ville: 'Brazzaville', pays: 'Congo' });
+const emptyForm = (): DeliveryAddressFormValue => ({ libelle: '', quartier: '', ligne1: '', instructions: '', point_reperes: '', ville: 'Brazzaville', pays: 'Congo' });
 
 export default function MyAddressesScreen() {
   const router = useRouter();
@@ -24,7 +25,10 @@ export default function MyAddressesScreen() {
   const { showError, showConfirm, FeedbackOverlay } = useActionFeedback();
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<UserAddress[]>([]);
-  const [editing, setEditing] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  // Mode création : permet d'afficher le formulaire vide (« + Ajouter une
+  // adresse ») en plus du mode modification (editingId !== null).
+  const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<DeliveryAddressFormValue>(emptyForm());
   const [saving, setSaving] = useState(false);
 
@@ -42,15 +46,61 @@ export default function MyAddressesScreen() {
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
-  const saveNew = async () => {
+  const startCreate = () => {
+    setCreating(true);
+    setEditingId(null);
+    setForm(emptyForm());
+  };
+
+  const closeForm = () => {
+    setCreating(false);
+    setEditingId(null);
+    setForm(emptyForm());
+  };
+
+  const startEdit = (a: UserAddress) => {
+    setCreating(false);
+    setForm({
+      libelle: a.libelle ?? '',
+      quartier: a.quartier || '',
+      ligne1: a.ligne1,
+      instructions: a.instructions ?? '',
+      point_reperes: a.point_reperes ?? '',
+      ville: a.ville || 'Brazzaville',
+      pays: a.pays || 'Congo',
+    });
+    setEditingId(a.id);
+  };
+
+  const save = async () => {
     const e = deliveryAddressError(form);
     if (e) { showError('Adresse invalide', e); return; }
     setSaving(true);
     try {
       const token = await getSessionToken();
       if (!token) throw new Error('Session expirée.');
-      await createUserAddress(token, { ...form, est_principale: rows.length === 0 });
-      setEditing(false); setForm(emptyForm()); await load();
+      // GPS en arrière-plan, en parallèle de l'enregistrement : n'attend jamais
+      // la réponse de l'utilisateur ni le satellite pour sauvegarder.
+      const coordsPromise = captureCurrentPosition();
+      const current = editingId ? rows.find((r) => r.id === editingId) : undefined;
+      const saved = editingId
+        ? await updateUserAddress(token, editingId, {
+            ...form,
+            // Préserve le statut « principale » lors de la modification.
+            est_principale: current?.est_principale === true,
+          })
+        : await createUserAddress(token, { ...form, est_principale: rows.length === 0 });
+      const coords = await coordsPromise;
+      // Rattache la position GPS une fois connue (si l'utilisateur a accordé la permission).
+      if (coords && saved?.id) {
+        await updateUserAddress(token, saved.id, {
+          ...form,
+          est_principale: saved.est_principale === true,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        }).catch(() => {});
+      }
+      closeForm(); await load();
     } catch (e) { showError('Erreur', e instanceof Error ? e.message : 'Enregistrement impossible.'); }
     finally { setSaving(false); }
   };
@@ -81,7 +131,10 @@ export default function MyAddressesScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: insets.bottom + 24 }}>
+      <ScrollView
+        contentContainerStyle={{ padding: 18, paddingBottom: insets.bottom + 24 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}>
         {loading ? (
           <ActivityIndicator color={colors.primary} size="large" style={{ marginTop: 40 }} />
         ) : (
@@ -90,7 +143,13 @@ export default function MyAddressesScreen() {
               <View key={a.id} style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
                 <MapPin size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
                 <View style={{ flex: 1 }}>
-                  {a.est_principale ? <ThemedText style={[styles.principal, { color: colors.primary }]}>Principale</ThemedText> : null}
+                  <View style={styles.cardTitleRow}>
+                    <Home size={15} color={colors.primaryDeep} strokeWidth={LUCIDE_STROKE} />
+                    <ThemedText type="defaultSemiBold" style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
+                      {addressLabel(a.libelle)}
+                    </ThemedText>
+                    {a.est_principale ? <ThemedText style={[styles.principal, { color: colors.primary }]}>Principale</ThemedText> : null}
+                  </View>
                   <ThemedText style={[styles.addrTxt, { color: colors.text }]}>{formatDeliveryAddressText({ quartier: a.quartier || '', ligne1: a.ligne1, point_reperes: a.point_reperes, instructions: a.instructions, ville: a.ville, pays: a.pays })}</ThemedText>
                   {!a.est_principale ? (
                     <Pressable onPress={() => { void (async () => { const token = await getSessionToken(); if (!token) return; await setPrincipalAddress(token, a.id); await load(); })(); }}>
@@ -98,24 +157,32 @@ export default function MyAddressesScreen() {
                     </Pressable>
                   ) : null}
                 </View>
-                <Pressable onPress={() => remove(a.id)} hitSlop={10}>
-                  <Trash2 size={20} color={colors.error} strokeWidth={LUCIDE_STROKE} />
-                </Pressable>
+                <View style={styles.actions}>
+                  <Pressable onPress={() => startEdit(a)} hitSlop={10} style={styles.iconBtn}>
+                    <Pencil size={18} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+                  </Pressable>
+                  <Pressable onPress={() => remove(a.id)} hitSlop={10} style={styles.iconBtn}>
+                    <Trash2 size={18} color={colors.error} strokeWidth={LUCIDE_STROKE} />
+                  </Pressable>
+                </View>
               </View>
             ))}
 
-            {editing ? (
+            {creating || editingId !== null ? (
               <View style={[styles.formBox, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                <ThemedText style={[styles.formTitle, { color: colors.text }]}>
+                  {creating ? "Nouvelle adresse" : "Modifier l'adresse"}
+                </ThemedText>
                 <DeliveryAddressForm value={form} onChange={setForm} />
-                <Pressable style={[styles.saveBtn, { backgroundColor: colors.primary }, saving && styles.saveDisabled]} onPress={() => void saveNew()} disabled={saving}>
-                  {saving ? <ActivityIndicator color="#FFF" /> : <ThemedText style={styles.saveTxt}>Enregistrer</ThemedText>}
+                <Pressable style={[styles.saveBtn, { backgroundColor: colors.primary }, saving && styles.saveDisabled]} onPress={() => void save()} disabled={saving}>
+                  {saving ? <ActivityIndicator color="#FFF" /> : <ThemedText style={styles.saveTxt}>{creating ? "Enregistrer l'adresse" : 'Enregistrer les modifications'}</ThemedText>}
                 </Pressable>
-                <Pressable onPress={() => setEditing(false)}>
+                <Pressable onPress={closeForm}>
                   <ThemedText style={[styles.cancel, { color: colors.textMuted }]}>Annuler</ThemedText>
                 </Pressable>
               </View>
             ) : (
-              <Pressable style={[styles.addBtn, { borderColor: colors.primary }]} onPress={() => setEditing(true)}>
+              <Pressable style={[styles.addBtn, { borderColor: colors.primary }]} onPress={startCreate}>
                 <ThemedText style={[styles.addTxt, { color: colors.primaryDeep }]}>+ Ajouter une adresse</ThemedText>
               </Pressable>
             )}
@@ -133,10 +200,15 @@ const styles = StyleSheet.create({
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700' },
   headerSpacer: { width: 44 },
   card: { flexDirection: 'row', gap: 10, padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 10, alignItems: 'flex-start' },
-  principal: { fontSize: 11, fontWeight: '800', marginBottom: 4 },
+  actions: { flexDirection: 'row', gap: 14 },
+  iconBtn: { padding: 4 },
+  cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 },
+  cardTitle: { fontSize: 15, flexShrink: 1 },
+  principal: { fontSize: 11, fontWeight: '800' },
   addrTxt: { fontSize: 14, lineHeight: 20 },
   setMain: { marginTop: 8, fontSize: 13, fontWeight: '700' },
   formBox: { marginTop: 12, padding: 12, borderRadius: 12, borderWidth: 1 },
+  formTitle: { fontSize: 15, fontWeight: '800', marginBottom: 4 },
   saveBtn: { marginTop: 16, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   saveDisabled: { opacity: 0.7 },
   saveTxt: { color: '#FFF', fontWeight: '800' },

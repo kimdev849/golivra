@@ -1,7 +1,8 @@
 import { Image } from 'expo-image';
-import { X } from 'lucide-react-native';
+import { ImageIcon, X } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
   FlatList,
   Modal,
@@ -174,6 +175,12 @@ function GalleryItem({
   onClose: () => void;
 }) {
   const resolved = resolveRemoteImageUrl(uri);
+  const [loadState, setLoadState] = useState<'idle' | 'ok' | 'error'>('idle');
+
+  // Réinitialise l'état de chargement quand l'URL change (swipe entre images).
+  useEffect(() => {
+    setLoadState('idle');
+  }, [uri]);
 
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -282,10 +289,28 @@ function GalleryItem({
       <GestureDetector gesture={composed}>
         <Animated.View style={[styles.imgWrap, animatedStyle]}>
           {resolved ? (
-            <Image source={{ uri: resolved }} style={styles.img} contentFit="contain" />
-          ) : (
-            <View style={styles.imgFallback} />
-          )}
+            <Image
+              source={{ uri: resolved }}
+              style={styles.img}
+              contentFit="contain"
+              onLoadStart={() => setLoadState((s) => (s === 'ok' ? s : 'idle'))}
+              onLoad={() => setLoadState('ok')}
+              onError={() => setLoadState('error')}
+            />
+          ) : null}
+
+          {loadState === 'error' || !resolved ? (
+            <View style={styles.imgFallback} pointerEvents="none">
+              <ImageIcon size={42} color="rgba(255,255,255,0.55)" strokeWidth={1.6} />
+              <Text style={styles.fallbackTxt}>Image indisponible</Text>
+            </View>
+          ) : null}
+
+          {resolved && loadState === 'idle' ? (
+            <View pointerEvents="none" style={styles.loaderWrap}>
+              <ActivityIndicator color="rgba(255,255,255,0.75)" />
+            </View>
+          ) : null}
         </Animated.View>
       </GestureDetector>
 
@@ -310,7 +335,24 @@ const styles = StyleSheet.create({
   },
   imgWrap: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT, alignItems: 'center', justifyContent: 'center' },
   img: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT },
-  imgFallback: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT * 0.6 },
+  imgFallback: {
+    position: 'absolute',
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT * 0.6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  fallbackTxt: { color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: '600' },
+  loaderWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   header: {
     position: 'absolute',
     top: 0,

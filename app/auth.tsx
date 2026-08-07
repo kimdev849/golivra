@@ -1,9 +1,8 @@
 import { Link, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Keyboard,
   Platform,
   Pressable,
   ScrollView,
@@ -14,13 +13,18 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import * as Haptics from 'expo-haptics';
+import { ArrowRight, Eye, EyeOff, Lock, LogIn, Moon, Smartphone, Sun, UserPlus } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { AuthBackdrop } from '@/components/auth-backdrop';
 import { FormErrorBanner } from '@/components/form-error-banner';
-import type { AppPalette } from '@/constants/app-palette';
-import { brandGradient3 } from '@/constants/app-palette';
+import { BUILD_LABEL } from '@/lib/build-info';
+import { accentGradient2, type AppPalette } from '@/constants/app-palette';
+import { useAppTheme } from '@/contexts/app-theme-context';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { loginAccount, persistAuthSession } from '@/lib/auth';
 import { prefetchClientCatalog } from '@/lib/client-data';
@@ -29,30 +33,50 @@ import { homeHrefForRole } from '@/lib/roles';
 import { UX_ERRORS, friendlyErrorMessage } from '@/lib/ux-copy';
 import { validatePassword, validatePhone } from '@/lib/form-validation';
 
+// Animation d'entrée du header uniquement (aucun champ de saisie dedans : les
+// Animated.View autour des TextInput faisaient perdre le focus et fermer le
+// clavier dès la saisie).
+const HEADER_ENTER = FadeInDown.duration(460);
+
 export default function AuthScreen() {
   const router = useRouter();
-  const colors = useAppColors();
-  const styles = useMemo(() => makeAuthStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const colors = useAppColors();
+  const { isDark, setDarkMode } = useAppTheme();
+  const styles = useMemo(() => makeAuthStyles(colors), [colors]);
   const [loginPhone, setLoginPhone] = useState('+242 ');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const passwordRef = useRef<TextInput>(null);
   const phoneE164 = toE164(loginPhone);
   const canSubmit = Boolean(phoneE164) && Boolean(password) && password.length >= 6 && !isSubmitting;
+  const formWidth = Math.min(width - 40, 460);
+
+  // Secousse simple en transform JS quand la connexion échoue. Volontairement
+  // SANS reanimated : un Animated.View autour des champs faisait perdre le
+  // focus au TextInput et fermer le clavier dès la saisie.
+  const [shakeX, setShakeX] = useState(0);
+  const shakeTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(() => {
+    const timers = shakeTimersRef.current;
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
+  const triggerShake = () => {
+    shakeTimersRef.current.forEach(clearTimeout);
+    shakeTimersRef.current = [];
+    const frames = [-12, 12, -8, 8, 0];
+    frames.forEach((x, i) => {
+      shakeTimersRef.current.push(setTimeout(() => setShakeX(x), i * 60));
+    });
+  };
 
   useEffect(() => {
     initPhoneCountries().catch(() => {});
-
-    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
-    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
   }, []);
 
   const handleLogin = async () => {
@@ -60,19 +84,23 @@ export default function AuthScreen() {
     const e1 = validatePhone(loginPhone);
     if (!e1.ok) {
       setError(e1.message);
+      triggerShake();
       return;
     }
     if (!phoneE164) {
       setError('Numéro invalide.');
+      triggerShake();
       return;
     }
     const e2 = validatePassword(password);
     if (!e2.ok) {
       setError(e2.message);
+      triggerShake();
       return;
     }
 
     setIsSubmitting(true);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const session = await loginAccount({
         telephone: phoneE164,
@@ -82,9 +110,12 @@ export default function AuthScreen() {
       prefetchClientCatalog();
       void import('@/lib/favorites').then((m) => m.syncFavoritesWithServer());
       void import('@/lib/cart-local').then((m) => m.syncCartWithServer());
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace(homeHrefForRole(session.user.role));
     } catch (e) {
       setError(friendlyErrorMessage(e, UX_ERRORS.auth));
+      triggerShake();
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setIsSubmitting(false);
     }
@@ -92,25 +123,49 @@ export default function AuthScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <View style={styles.heroGlowTop} />
-      <View style={styles.heroGlowBottom} />
+      <AuthBackdrop colors={colors} />
+
+      {/* Bascule rapide du thème clair/sombre */}
+      <Pressable
+        style={({ pressed }) => [
+          styles.themeToggle,
+          {
+            top: Math.max(insets.top + 10, 20),
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+          },
+          pressed ? styles.pressed : undefined,
+        ]}
+        onPress={() => {
+          void Haptics.selectionAsync();
+          void setDarkMode(!isDark);
+        }}
+        hitSlop={8}>
+        {isDark ? (
+          <Sun size={20} color={colors.primary} strokeWidth={2.2} />
+        ) : (
+          <Moon size={20} color={colors.primary} strokeWidth={2.2} />
+        )}
+      </Pressable>
+
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        // Sur Android on laisse le système gérer le redimensionnement (adjustResize) :
+        // behavior="height" réduisait l'écran une 2ᵉ fois et faisait fermer le clavier dès la saisie.
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}>
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
-            {
-              paddingTop: 20,
-              paddingBottom: keyboardVisible ? 140 : 32,
-            },
             Platform.OS === 'android' ? styles.scrollContentAndroid : undefined,
           ]}
           keyboardShouldPersistTaps="always"
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}>
-          <View style={styles.header}>
+          {/* En-tête : logo + titre + slogan. Contenu aligné en HAUT (comme
+              l'inscription) : un contenu centré se recentrerait quand le
+              clavier s'ouvre → les champs bougent → perte de focus. */}
+          <Animated.View entering={HEADER_ENTER} style={styles.header}>
             <Image
               source={require('@/assets/images/logo25292922882.png')}
               style={styles.logo}
@@ -118,105 +173,179 @@ export default function AuthScreen() {
               cachePolicy="memory-disk"
               priority="high"
             />
-            <ThemedText type="title">Bon retour</ThemedText>
-          </View>
+            <ThemedText type="title" style={styles.title}>
+              Bon retour 👋
+            </ThemedText>
+            <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>
+              Vos favoris, vos commandes,
+              {'\n'}livrés en un clin d&apos;œil.
+            </ThemedText>
+          </Animated.View>
 
-          <View style={[styles.formWrapper, { width }]}>
-            <FormErrorBanner
-              message={error}
-              colors={colors}
-              title="Connexion impossible"
-              onDismiss={() => setError(null)}
-            />
-
-            <ThemedView style={styles.inputCard}>
-              <View style={styles.inputIcon}>
-                <MaterialIcons name="call" size={18} color={colors.primary} />
-              </View>
-              <View style={styles.inputBody}>
-                <ThemedText style={styles.inputLabel}>Numéro de téléphone</ThemedText>
-                <TextInput
-                  style={styles.inputField}
-                  placeholder="+242 06 XXX XX XX"
-                  keyboardType="phone-pad"
-                  placeholderTextColor={colors.placeholder}
-                  selectionColor={colors.primary}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  value={loginPhone}
-                  onChangeText={(text) => setLoginPhone(formatPhone(text))}
-                  returnKeyType="next"
-                  onSubmitEditing={() => {}}
-                />
-              </View>
-            </ThemedView>
-
-            <ThemedView style={styles.inputCard}>
-              <View style={styles.inputIcon}>
-                <MaterialIcons name="lock" size={18} color={colors.primary} />
-              </View>
-              <View style={styles.inputBody}>
-                <ThemedText style={styles.inputLabel}>Mot de passe</ThemedText>
-                <TextInput
-                  style={styles.inputField}
-                  placeholder="Votre mot de passe"
-                  secureTextEntry={!passwordVisible}
-                  placeholderTextColor={colors.placeholder}
-                  selectionColor={colors.primary}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  textContentType="password"
-                  value={password}
-                  onChangeText={setPassword}
-                />
-              </View>
-              <Pressable style={styles.eyeButton} onPress={() => setPasswordVisible((v) => !v)} hitSlop={10}>
-                <MaterialIcons name={passwordVisible ? 'visibility-off' : 'visibility'} size={20} color="#95ACA0" />
-              </Pressable>
-            </ThemedView>
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.submitButton,
-                pressed ? styles.buttonPressed : undefined,
-                isSubmitting ? styles.buttonDisabled : undefined,
-                !canSubmit ? styles.buttonDisabled : undefined,
-              ]}
-              disabled={!canSubmit}
-              onPress={handleLogin}>
-              <LinearGradient
-                colors={canSubmit ? brandGradient3(colors) : [colors.primaryMuted, colors.primaryMuted]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
+          <View style={[styles.formPage, { width }]}>
+            <View
+              style={[
+                styles.formCard,
+                { width: formWidth, borderColor: colors.border, backgroundColor: colors.surface },
+                // Transform de secousse appliqué UNIQUEMENT pendant la secousse : au
+                // repos, la carte est strictement identique à celle de l'inscription
+                // (aucune couche transform native sur le parent des champs).
+                shakeX !== 0 ? { transform: [{ translateX: shakeX }] } : null,
+              ]}>
+              <FormErrorBanner
+                message={error}
+                colors={colors}
+                title="Connexion impossible"
+                onDismiss={() => setError(null)}
               />
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                <ThemedText style={styles.submitButtonText}>{isSubmitting ? 'Connexion…' : 'Se connecter'}</ThemedText>
-                {isSubmitting ? <ActivityIndicator color={colors.onPrimary} style={{ marginLeft: 8 }} /> : null}
-              </View>
-            </Pressable>
-            <Link href="/forgot-password" asChild>
-              <Pressable style={({ pressed }) => [styles.linkButton, pressed ? styles.buttonPressed : undefined]}>
-                <ThemedText style={styles.linkText}>Mot de passe oublié ?</ThemedText>
-              </Pressable>
-            </Link>
 
-            {/* Lien d'inscription juste sous le formulaire, pas dans un footer */}
-            <ThemedView style={styles.signupHint} lightColor="transparent" darkColor="transparent">
-              <ThemedText style={[styles.signupHintText, { color: colors.textMuted }]}>
-                Pas de compte ?{' '}
-              </ThemedText>
-              <Link href="/signup/choose" asChild>
-                <Pressable hitSlop={8}>
-                  <ThemedText style={[styles.signupHintLink, { color: colors.primary }]}>
-                    {"S'inscrire"}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <View style={[styles.sectionNumber, { backgroundColor: colors.primary }]}>
+                    <LogIn size={14} color="#FFFFFF" strokeWidth={2.6} />
+                  </View>
+                  <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>Connexion</ThemedText>
+                </View>
+
+                {/* ── Téléphone ── */}
+                <View style={styles.field}>
+                  <ThemedText style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+                    Numéro de téléphone
+                  </ThemedText>
+                  {/* Même structure que l'inscription : pas de onFocus/onBlur ni de
+                      style dynamique au focus — le re-render + elevation sur le
+                      parent faisaient perdre le focus au TextInput sur Android. */}
+                  <View style={[styles.inputCard, { backgroundColor: colors.inputBg }]}>
+                    <Smartphone size={20} color={colors.primary} strokeWidth={2.2} />
+                    <TextInput
+                      style={[styles.inputField, { color: colors.text }]}
+                      placeholder="+242 06 XXX XX XX"
+                      keyboardType="phone-pad"
+                      placeholderTextColor={colors.placeholder}
+                      selectionColor={colors.primary}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      value={loginPhone}
+                      onChangeText={(text) => setLoginPhone(formatPhone(text))}
+                      returnKeyType="next"
+                      onSubmitEditing={() => passwordRef.current?.focus()}
+                    />
+                  </View>
+                </View>
+
+                {/* ── Mot de passe ── */}
+                <View style={styles.field}>
+                  <ThemedText style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+                    Mot de passe
+                  </ThemedText>
+                  <View style={[styles.inputCard, { backgroundColor: colors.inputBg }]}>
+                    <Lock size={20} color={colors.primary} strokeWidth={2.2} />
+                    <TextInput
+                      ref={passwordRef}
+                      style={[styles.inputField, { color: colors.text }]}
+                      placeholder="Votre mot de passe"
+                      secureTextEntry={!passwordVisible}
+                      placeholderTextColor={colors.placeholder}
+                      selectionColor={colors.primary}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      textContentType="password"
+                      value={password}
+                      onChangeText={setPassword}
+                      returnKeyType="go"
+                      onSubmitEditing={() => {
+                        if (canSubmit) void handleLogin();
+                      }}
+                    />
+                    <Pressable
+                      style={styles.eyeButton}
+                      onPress={() => setPasswordVisible((v) => !v)}
+                      hitSlop={10}>
+                      {passwordVisible ? (
+                        <EyeOff size={20} color={colors.textMuted} strokeWidth={2.2} />
+                      ) : (
+                        <Eye size={20} color={colors.textMuted} strokeWidth={2.2} />
+                      )}
+                    </Pressable>
+                  </View>
+                </View>
+
+                <Pressable
+                  style={({ pressed }) => [styles.forgotRow, pressed && styles.pressed]}
+                  onPress={() => router.push('/forgot-password')}
+                  hitSlop={6}>
+                  <ThemedText style={[styles.forgotText, { color: colors.primary }]}>
+                    Mot de passe oublié ?
                   </ThemedText>
                 </Pressable>
+              </View>
+
+              {/* ── Bouton principal ── */}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.submitWrap,
+                  pressed ? styles.pressed : undefined,
+                  !canSubmit ? styles.buttonDisabled : undefined,
+                ]}
+                disabled={!canSubmit}
+                onPress={handleLogin}>
+                <LinearGradient
+                  colors={[colors.primary, colors.primaryDeep]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.submitButton}>
+                  {isSubmitting ? (
+                    <ActivityIndicator color={colors.onPrimary} />
+                  ) : (
+                    <View style={styles.submitLabelRow}>
+                      <ThemedText style={styles.submitButtonText}>Se connecter</ThemedText>
+                      <ArrowRight size={20} color={colors.onPrimary} strokeWidth={2.6} />
+                    </View>
+                  )}
+                </LinearGradient>
+              </Pressable>
+
+              {/* ── Séparateur ── */}
+              <View style={styles.dividerRow}>
+                <View style={[styles.dividerLine, { backgroundColor: colors.borderStrong }]} />
+                <ThemedText style={[styles.dividerText, { color: colors.textMuted }]}>ou</ThemedText>
+                <View style={[styles.dividerLine, { backgroundColor: colors.borderStrong }]} />
+              </View>
+
+              <Link href="/signup/choose" asChild>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.signupButton,
+                    pressed ? styles.pressed : undefined,
+                  ]}
+                  hitSlop={8}>
+                  <LinearGradient
+                    colors={accentGradient2(colors)}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.signupButtonGradient}>
+                    {/* Icône en position absolue : le texte reste parfaitement centré. */}
+                    <UserPlus size={20} color={colors.onAccent} strokeWidth={2.4} style={styles.signupIcon} />
+                    <ThemedText style={[styles.signupButtonText, { color: colors.onAccent }]}>
+                      Créer un compte gratuit
+                    </ThemedText>
+                  </LinearGradient>
+                </Pressable>
               </Link>
-            </ThemedView>
+
+              {/* Une simple ligne discrète en bas, comme sur l'inscription. */}
+              <ThemedText style={[styles.formHint, { color: colors.textMuted }]}>
+                Vos informations sont sécurisées et confidentielles.
+              </ThemedText>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Marqueur de build : permet de vérifier que la version affichée est bien à jour. */}
+      <View style={[styles.buildBadge, { bottom: Math.max(insets.bottom, 6) }]} pointerEvents="none">
+        <ThemedText style={[styles.buildBadgeText, { color: colors.textMuted }]}>{BUILD_LABEL}</ThemedText>
+      </View>
     </ThemedView>
   );
 }
@@ -227,132 +356,197 @@ function makeAuthStyles(c: AppPalette) {
       flex: 1,
       backgroundColor: c.background,
     },
-    heroGlowTop: {
-      position: 'absolute',
-      top: -180,
-      left: -120,
-      width: 420,
-      height: 420,
-      borderRadius: 260,
-      backgroundColor: c.heroGlow,
-      opacity: 0.95,
-    },
-    heroGlowBottom: {
-      position: 'absolute',
-      bottom: -220,
-      right: -160,
-      width: 520,
-      height: 520,
-      borderRadius: 320,
-      backgroundColor: c.heroGlow,
-      opacity: 0.6,
-    },
     keyboardContainer: {
       flex: 1,
     },
+    // Padding bas généreux (fixe, sans contenu) : rend la page assez haute
+    // pour défiler quand le clavier est ouvert, comme l'inscription. Rien
+    // d'ajouté visuellement en bas.
     scrollContent: {
       flexGrow: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
+      justifyContent: 'flex-start',
+      paddingTop: 24,
+      paddingBottom: 150,
     },
     scrollContentAndroid: {
-      // Android specific adjustments if needed
+      paddingBottom: 140,
     },
-    scrollContentWithKeyboard: {
-      justifyContent: 'flex-start',
-      paddingBottom: 260,
+    themeToggle: {
+      position: 'absolute',
+      right: 20,
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 10,
     },
     header: {
-      paddingHorizontal: 20,
-      gap: 10,
       alignItems: 'center',
-      marginBottom: 16,
-      width: '100%',
+      gap: 12,
+      paddingHorizontal: 24,
+      marginBottom: 26,
     },
-    logo: { width: 140, height: 82, marginBottom: 6 },
-    signupHint: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginTop: 10,
-      marginBottom: 0,
-      width: '100%',
-      gap: 4,
+    logo: { width: 118, height: 68 },
+    title: {
+      fontSize: 26,
+      lineHeight: 32,
+      textAlign: 'center',
     },
-    signupHintText: { fontSize: 15, fontWeight: '700' },
-    signupHintLink: { fontSize: 15, fontWeight: '900' },
-    formWrapper: {
-      alignItems: 'center',
-      width: '100%',
+    subtitle: {
+      fontSize: 14.5,
+      lineHeight: 21,
+      textAlign: 'center',
+      maxWidth: 340,
+    },
+    formPage: {
       paddingHorizontal: 20,
+      alignItems: 'center',
+    },
+    // Carte du formulaire — même gabarit que l'inscription.
+    formCard: {
+      borderWidth: 1.2,
+      borderRadius: 24,
+      padding: 20,
+      gap: 14,
+      elevation: 6,
+    },
+    section: {
       gap: 14,
     },
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginBottom: 2,
+    },
+    sectionNumber: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sectionTitle: {
+      fontSize: 13.5,
+      fontWeight: '900',
+      letterSpacing: 0.8,
+      textTransform: 'uppercase',
+    },
+    field: {
+      gap: 10,
+    },
+    fieldLabel: {
+      fontSize: 13.5,
+      fontWeight: '700',
+    },
+    // Champ de saisie — identique à l'inscription (icône dans la rangée).
     inputCard: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
       borderWidth: 1,
-      borderColor: c.inputBorder,
-      borderRadius: 18,
-      paddingVertical: 12,
-      paddingHorizontal: 12,
-      backgroundColor: c.inputBg,
-      elevation: 4,
-      width: '100%',
-      maxWidth: 460,
+      borderRadius: 16,
+      paddingHorizontal: 16,
+      paddingVertical: 13,
     },
-    inputIcon: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      backgroundColor: c.primarySoft,
-      borderWidth: 1,
-      borderColor: c.border,
-      alignItems: 'center',
-      justifyContent: 'center',
+    inputField: {
+      flex: 1,
+      paddingVertical: 0,
+      fontSize: 15,
+      minHeight: 22,
     },
-    inputBody: { flex: 1, gap: 4 },
-    inputLabel: { fontSize: 12, fontWeight: '800', color: c.textSecondary },
-    inputField: { paddingVertical: 0, fontSize: 16, color: c.text, minHeight: 22 },
-    eyeButton: { paddingHorizontal: 4, paddingVertical: 6 },
-    buttonPressed: {
-      opacity: 0.88,
+    eyeButton: { paddingHorizontal: 2, paddingVertical: 6 },
+    forgotRow: {
+      alignSelf: 'flex-end',
+      paddingVertical: 4,
+    },
+    forgotText: {
+      fontSize: 13.5,
+      fontWeight: '700',
+    },
+    pressed: {
+      opacity: 0.86,
       transform: [{ scale: 0.995 }],
     },
-    submitButton: {
-      marginTop: 4,
-      backgroundColor: c.primary,
+    submitWrap: {
+      marginTop: 8,
       borderRadius: 999,
-      paddingVertical: 16,
-      minHeight: 52,
+      overflow: 'hidden',
+    },
+    submitButton: {
+      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      elevation: 8,
-      width: '100%',
-      maxWidth: 460,
-      overflow: 'hidden',
-      shadowColor: c.primaryDeep,
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.25,
-      shadowRadius: 14,
+      gap: 8,
+      borderRadius: 999,
+      paddingVertical: 16,
+      minHeight: 56,
+    },
+    submitLabelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
     },
     submitButtonText: {
-      color: c.onPrimary,
+      color: '#FFFFFF',
       fontWeight: '800',
-      fontSize: 17,
-    },
-    linkButton: {
-      marginTop: 4,
-      alignItems: 'center',
-      paddingVertical: 6,
-    },
-    linkText: {
-      color: c.primary,
-      fontWeight: '800',
-      fontSize: 14,
+      fontSize: 16.5,
     },
     buttonDisabled: {
       opacity: 0.65,
     },
+    dividerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginTop: 8,
+    },
+    dividerLine: {
+      flex: 1,
+      height: StyleSheet.hairlineWidth,
+    },
+    dividerText: {
+      fontSize: 12.5,
+      fontWeight: '600',
+      letterSpacing: 0.4,
+    },
+    // Bouton secondaire plein format — dégradé jaune marque (l'accent de la
+    // palette est réservé aux CTA secondaires) + texte foncé. Un vert plein se
+    // fondait dans le fond sombre et donnait l'impression d'un simple lien :
+    // le jaune est indiscutablement un bouton en clair ET en sombre.
+    signupButton: {
+      width: '100%',
+      borderRadius: 999,
+    },
+    signupButtonGradient: {
+      borderRadius: 999,
+      minHeight: 56,
+      paddingVertical: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1.5,
+      borderColor: 'rgba(0,0,0,0.14)',
+      boxShadow: '0px 6px 18px rgba(245, 165, 36, 0.25)',
+      elevation: 3,
+    },
+    signupIcon: {
+      position: 'absolute',
+      left: 18,
+    },
+    signupButtonText: { fontSize: 16.5, fontWeight: '800' },
+    formHint: {
+      marginTop: 8,
+      fontSize: 12,
+      lineHeight: 16,
+      textAlign: 'center',
+    },
+    buildBadge: {
+      position: 'absolute',
+      alignSelf: 'center',
+      zIndex: 5,
+    },
+    buildBadgeText: { fontSize: 10.5, fontWeight: '600', opacity: 0.75 },
   });
 }

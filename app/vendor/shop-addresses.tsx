@@ -18,7 +18,7 @@ export default function VendorShopAddressesScreen() {
   const router = useRouter();
   const colors = useAppColors();
   const { shop } = useVendor();
-  const { palette } = useVendorTheme();
+  const { palette, commerceType } = useVendorTheme();
 
   const summary = shop && formatDeliveryAddressText({ quartier: shop.adresse_quartier || '', ligne1: shop.adresse || '', ville: shop.adresse_ville || 'Brazzaville', pays: 'Congo' });
 
@@ -26,7 +26,11 @@ export default function VendorShopAddressesScreen() {
     <ThemedView style={styles.screen}>
       <VendorScreenHeader title="Adresse du commerce" />
       <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: insets.bottom + 24 }}>
-        <ThemedText style={[styles.intro, { color: colors.textMuted }]}>Chaque restaurant ou boutique possède une adresse principale (siège) enregistrée sur votre fiche commerce.</ThemedText>
+        <ThemedText style={[styles.intro, { color: colors.textMuted }]}>
+          {commerceType === 'restaurant'
+            ? 'Votre adresse principale (siège) est utilisée pour les livraisons sur place.'
+            : "Boutique en ligne ? L'adresse est optionnelle — renseignez-la uniquement si vous recevez des clients sur place."}
+        </ThemedText>
 
         <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}>
           <MapPin size={22} color={palette.primary} strokeWidth={LUCIDE_STROKE} />

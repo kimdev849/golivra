@@ -8,7 +8,6 @@ import {
   ScrollView,
   StyleSheet,
   TextInput,
-  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -109,9 +108,7 @@ export default function VendorCreateDirectDeliveryScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ padding: 18, paddingBottom: insets.bottom + 24 }}>
           <ThemedText style={[styles.intro, { color: colors.textMuted }]}>
-            <ThemedText type="defaultSemiBold">Livraison externe</ThemedText> : hors commande client (colis, client
-            au téléphone). Même réseau GoLivra.{' '}
-            <ThemedText type="defaultSemiBold">Votre commerce paie</ThemedText> la livraison (Mobile Money).
+            Colis ou commande hors ligne — votre commerce paie les frais (Mobile Money).
           </ThemedText>
 
           <ThemedText style={[styles.label, { color: palette.primaryDeep }]}>Client</ThemedText>
@@ -134,7 +131,7 @@ export default function VendorCreateDirectDeliveryScreen() {
           <ThemedText style={[styles.label, { color: palette.primaryDeep, marginTop: 16 }]}>
             Adresse de livraison
           </ThemedText>
-          <DeliveryAddressForm value={address} onChange={setAddress} compact accentColor={palette.primary} />
+          <DeliveryAddressForm value={address} onChange={setAddress} compact accentColor={palette.primary} hideLibelle />
 
           <ThemedText style={[styles.label, { color: palette.primaryDeep, marginTop: 8 }]}>
             Description du colis

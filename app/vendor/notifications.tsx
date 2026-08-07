@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { AlertCircle, Banknote, ShoppingBag, Star, Truck } from 'lucide-react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { AlertCircle, Banknote, BellOff, CheckCheck, ShoppingBag, Star, Truck } from 'lucide-react-native';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,6 +10,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
+import { formatDateTimeFr } from '@/lib/datetime';
 import { getSessionToken } from '@/lib/auth';
 import { fetchNotifications, markAllNotificationsRead, markNotificationRead, type AppNotification } from '@/lib/notifications-api';
 import { navigateFromNotification } from '@/lib/notification-navigation';
@@ -41,6 +42,23 @@ function NotifIcon({ kind, colors }: { kind: NotifIconKind; colors: ReturnType<t
   }
 }
 
+/** Horodatage relatif en français (« il y a 5 min », « il y a 2 h »…). */
+function timeAgoFr(iso?: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const min = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (min < 1) return "à l'instant";
+  if (min < 60) return `il y a ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `il y a ${h} h`;
+  const j = Math.floor(h / 24);
+  if (j < 7) return `il y a ${j} j`;
+  return formatDateTimeFr(iso);
+}
+
+type FilterKey = 'all' | 'unread';
+
 export default function VendorNotificationsScreen() {
   const router = useRouter();
   const colors = useAppColors();
@@ -48,6 +66,7 @@ export default function VendorNotificationsScreen() {
   const [items, setItems] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<FilterKey>('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -73,6 +92,14 @@ export default function VendorNotificationsScreen() {
       void load();
     }, [load]),
   );
+
+  const visible = useMemo(
+    () => (filter === 'unread' ? items.filter((n) => !n.est_lue) : items),
+    [items, filter],
+  );
+
+  /** Non lues parmi les notifications réellement affichées (cohérent avec la liste). */
+  const localUnread = useMemo(() => items.filter((n) => !n.est_lue).length, [items]);
 
   const handleOpen = async (n: AppNotification) => {
     const token = await getSessionToken();
@@ -115,28 +142,92 @@ export default function VendorNotificationsScreen() {
               onPress={() => void handleMarkAllRead()}
               hitSlop={8}
               style={[styles.markAllBtn, { borderColor: colors.primary }]}>
+              <CheckCheck size={14} color={colors.primary} strokeWidth={2.4} />
               <ThemedText style={[styles.markAllText, { color: colors.primary }]}>Tout lire</ThemedText>
             </Pressable>
           ) : null
         }
       />
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 80, paddingHorizontal: 18, paddingTop: 8 }}>
+
+      {/* ── Filtre Toutes / Non lues ── */}
+      {items.length > 0 ? (
+        <View style={[styles.filterRow, { borderBottomColor: colors.border }]}>
+          {(
+            [
+              { key: 'all', label: 'Toutes' },
+              { key: 'unread', label: `Non lues${localUnread > 0 ? ` (${localUnread})` : ''}` },
+            ] as const
+          ).map((f) => {
+            const on = filter === f.key;
+            return (
+              <Pressable
+                key={f.key}
+                onPress={() => setFilter(f.key)}
+                hitSlop={6}
+                style={[styles.filterTab, on && { borderBottomColor: colors.primary }]}>
+                <ThemedText style={[styles.filterText, { color: on ? colors.primary : colors.textMuted, fontWeight: on ? '800' : '600' }]}>
+                  {f.label}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 80, paddingHorizontal: 18, paddingTop: 12 }}>
         {loading ? (
-          <ActivityIndicator color={colors.primary} style={{ marginTop: 32 }} />
-        ) : items.length === 0 ? (
-          <ThemedText style={[styles.empty, { color: colors.textMuted }]}>Aucune notification pour le moment.</ThemedText>
+          <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
+        ) : visible.length === 0 ? (
+          <View style={styles.empty}>
+            <View style={[styles.emptyIconWrap, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
+              <BellOff size={30} color={colors.textMuted} strokeWidth={1.8} />
+            </View>
+            <ThemedText style={[styles.emptyTitle, { color: colors.text }]}>
+              {filter === 'unread' ? 'Tout est lu' : 'Aucune notification'}
+            </ThemedText>
+            <ThemedText style={[styles.emptyHint, { color: colors.textMuted }]}>
+              {filter === 'unread'
+                ? 'Vous n’avez pas de notification non lue.'
+                : 'Nouvelles commandes, livraisons et paiements s’afficheront ici.'}
+            </ThemedText>
+          </View>
         ) : (
-          items.map((n) => (
-            <Pressable key={n.id} style={[styles.row, { borderBottomColor: colors.border }, !n.est_lue && { backgroundColor: colors.primarySoft }]} onPress={() => void handleOpen(n)}>
-              <View style={[styles.iconWrap, { backgroundColor: colors.primarySoft }]}>
-                <NotifIcon kind={iconForType(n.type)} colors={colors} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <ThemedText style={[styles.titre, { color: colors.text }]}>{n.titre}</ThemedText>
-                {n.corps ? <ThemedText style={[styles.corps, { color: colors.textMuted }]}>{n.corps}</ThemedText> : null}
-              </View>
-            </Pressable>
-          ))
+          <View style={{ gap: 10 }}>
+            {visible.map((n) => {
+              const unread = !n.est_lue;
+              return (
+                <Pressable
+                  key={n.id}
+                  onPress={() => void handleOpen(n)}
+                  style={[
+                    styles.row,
+                    {
+                      backgroundColor: unread ? colors.primarySoft : colors.surface,
+                      borderColor: unread ? colors.primaryMuted : colors.border,
+                    },
+                  ]}>
+                  {unread ? <View style={[styles.unreadBar, { backgroundColor: colors.primary }]} /> : null}
+                  <View style={[styles.iconWrap, { backgroundColor: unread ? colors.surface : colors.surfaceMuted }]}>
+                    <NotifIcon kind={iconForType(n.type)} colors={colors} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.titleRow}>
+                      <ThemedText style={[styles.titre, { color: colors.text, fontWeight: unread ? '800' : '700' }]}>
+                        {n.titre}
+                      </ThemedText>
+                      {unread ? <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} /> : null}
+                    </View>
+                    {n.corps ? (
+                      <ThemedText style={[styles.corps, { color: unread ? colors.textSecondary : colors.textMuted }]}>
+                        {n.corps}
+                      </ThemedText>
+                    ) : null}
+                    <ThemedText style={[styles.time, { color: colors.textMuted }]}>{timeAgoFr(n.created_at)}</ThemedText>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
         )}
       </ScrollView>
     </ThemedView>
@@ -145,24 +236,67 @@ export default function VendorNotificationsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  empty: { textAlign: 'center', marginTop: 24 },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 20,
+    paddingHorizontal: 18,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  filterTab: {
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  filterText: { fontSize: 13.5 },
+  empty: { alignItems: 'center', marginTop: 48, gap: 6, paddingHorizontal: 24 },
+  emptyIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  emptyTitle: { fontSize: 16, fontWeight: '800' },
+  emptyHint: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  unreadBar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
   },
   iconWrap: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  titre: { fontWeight: '700', fontSize: 15 },
-  corps: { fontSize: 13, marginTop: 4 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  titre: { fontSize: 15, flexShrink: 1 },
+  unreadDot: { width: 8, height: 8, borderRadius: 4 },
+  corps: { fontSize: 13, marginTop: 3, lineHeight: 18 },
+  time: { fontSize: 11.5, fontWeight: '600', marginTop: 6, opacity: 0.75 },
   markAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,

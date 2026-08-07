@@ -14,6 +14,7 @@ export const VENDOR_HREF = {
   notifications: '/vendor/notifications' as Href,
   addProduct: '/vendor/add-product' as Href,
   shopInfo: '/vendor/shop-info' as Href,
+  horaires: '/vendor/horaires' as Href,
   shopAddresses: '/vendor/shop-addresses' as Href,
   shopPayments: '/vendor/shop-payments' as Href,
   shopSettings: '/vendor/shop-settings' as Href,

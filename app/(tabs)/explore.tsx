@@ -18,7 +18,7 @@ import { TAB_BAR_CONTENT_PADDING_BOTTOM } from '@/constants/layout';
 import { apiFetch } from '@/lib/api';
 import { getSessionToken } from '@/lib/auth';
 import { fetchAllEnterprises, peekAllEnterprises } from '@/lib/client-data';
-import { fetchCached, peekCached } from '@/lib/request-cache';
+import { fetchCached, invalidateCached, peekCached } from '@/lib/request-cache';
 import { EventTimeline } from '@/components/event-timeline';
 import { formatDateTimeFr } from '@/lib/datetime';
 import { formatFcfa } from '@/lib/format';
@@ -332,10 +332,13 @@ export default function OrdersScreen() {
   const load = useCallback(async (force = false) => {
     setError(null);
     const cachedEnt = peekAllEnterprises();
+    const hasCachedOrders = Boolean(
+      peekCached<OrderRow[]>(ORDERS_CACHE_KEY, Number.POSITIVE_INFINITY)?.length,
+    );
     if (cachedEnt?.length) {
       setEnterprises(cachedEnt as Enterprise[]);
       setLoading(false);
-    } else if (orders.length === 0) {
+    } else if (!hasCachedOrders) {
       setLoading(true);
     }
 
@@ -373,6 +376,11 @@ export default function OrdersScreen() {
     if (sousCommandeId) {
       setPendingReviews((prev) => prev.filter((p) => p.sous_commande_id !== sousCommandeId));
     }
+    // Sans ça, le cache 60 s des commandes renvoyait l'ancienne liste
+    // (peut_noter: true) au focus suivant : la carte de notation réapparaissait
+    // alors que la note était déjà envoyée. On invalide pour que le backend
+    // recalcule peut_noter / pending à la prochaine visite.
+    invalidateCached('orders:client');
   }, []);
 
   const onRefresh = useCallback(() => {
@@ -490,7 +498,7 @@ export default function OrdersScreen() {
             <ThemedText style={[styles.emptyBody, { color: colors.textMuted }]}>
               Passez une commande depuis le panier pour la voir apparaître ici.
             </ThemedText>
-            <Pressable style={[styles.retrySolid, { backgroundColor: colors.primary }]} onPress={() => router.push('/(tabs)/marketplace')}>
+            <Pressable style={[styles.retrySolid, { backgroundColor: colors.primary }]} onPress={() => router.navigate('/(tabs)/marketplace')}>
               <ThemedText style={[styles.retrySolidText, { color: colors.onPrimary }]}>Ouvrir le marketplace</ThemedText>
             </Pressable>
           </View>
