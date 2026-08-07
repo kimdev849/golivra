@@ -31,6 +31,8 @@ import { createEnterpriseDetailStyles } from '@/constants/enterprise-detail-styl
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
+import { useCurrentTime } from '@/hooks/use-current-time';
+import { computeLiveStatus } from '@/lib/horaires-status';
 import type { EnterprisePublic, ProductPublic } from '@/lib/catalog';
 import {
   fetchEnterpriseById,
@@ -73,6 +75,7 @@ export default function EnterpriseDetailScreen() {
     queryKey: ['enterprise', id],
     queryFn: () => fetchEnterpriseById(id),
     staleTime: 1000 * 60 * 3,
+    refetchInterval: 1000 * 60 * 2,
     placeholderData: () => peekEnterpriseById(id) ?? undefined,
     enabled: !!id,
   });
@@ -130,36 +133,36 @@ export default function EnterpriseDetailScreen() {
   const isRestaurant = enterprise?.type === 'restaurant';
   const prepMin = enterprise?.delai_preparation_min ?? 25;
   const shipMin = enterprise?.delai_livraison_min ?? 48;
-  // Horaires d'ouverture : fermé maintenant, fermé manuellement, ou horaires non
-  // définis (commandes bloquées) → on désactive l'ajout au panier.
-  const estFerme =
-    enterprise?.est_ouvert_maintenant === false ||
-    enterprise?.ouvert === false ||
-    enterprise?.accepte_commandes === false;
-  // Ouvert mais TROP TARD pour commander : le temps de préparation ne peut pas
-  // finir avant la fermeture (ex. fermeture 23h, préparation 25 min → plus de
-  // commande après 22h35). Le serveur calcule cette limite.
-  const tropTard = !estFerme && enterprise?.peut_commander_maintenant === false;
-  const commandesBloquees = estFerme || tropTard;
-  const derniereCommandeLabel = enterprise?.derniere_commande
-    ? `Dernière commande possible à ${enterprise.derniere_commande.replace(':', 'h')}.`
-    : null;
+  // ⚡ Statut ouvert/fermé RECALCULÉ EN DIRECT côté client.
+  // Le serveur calcule est_ouvert_maintenant / peut_commander_maintenant à
+  // l'instant de la requête, puis le cache client le fige (jusqu'à plusieurs
+  // minutes) : sans recalcul local, un commerce qui ouvre à 7h30 resterait
+  // affiché « Réouverture à 7h30 » à 7h53, et le panier resterait bloqué.
+  // On recalcule donc à partir des horaires de la fiche (déjà dans la réponse)
+  // avec une horloge locale qui rafraîchit l'écran toutes les 30 s.
+  const now = useCurrentTime(30_000);
+  const liveStatus = computeLiveStatus(enterprise?.horaires ?? [], {
+    prepMinutes: prepMin,
+    kind: isRestaurant ? 'restaurant' : 'boutique',
+    fermeManuellement: enterprise?.ouvert === false,
+    sansHoraires: enterprise?.accepte_commandes === false,
+  }, now);
+  const estFerme = liveStatus.estFerme;
+  const tropTard = liveStatus.tropTard;
+  const commandesBloquees = liveStatus.commandesBloquees;
+  const derniereCommandeLabel = liveStatus.derniereCommandeLabel;
   // Référence grammaticale du commerce (messages adaptés boutique / restaurant).
   const commerceRef = isRestaurant ? 'ce restaurant' : 'cette boutique';
-  const fermetureFallback = isRestaurant
-    ? 'Ce restaurant est actuellement fermé.'
-    : 'Cette boutique est actuellement fermée.';
   // Statut compact affiché près du nom (pastille colorée type Glovo / Uber Eats).
   const statusInfo = (() => {
     if (!enterprise) return { label: 'Ouvert', color: colors.success };
-    if (tropTard) return { label: 'Plus de commandes aujourd’hui', color: colors.warning };
-    if (enterprise.accepte_commandes === false) return { label: 'Fermé pour le moment', color: colors.warning };
-    if (enterprise.ouvert === false) return { label: 'Fermé pour le moment', color: colors.error };
-    if (enterprise.est_ouvert_maintenant === false) {
-      const reopen = enterprise.prochaine_ouverture ? ` · rouvre à ${enterprise.prochaine_ouverture}` : '';
-      return { label: `Fermé${reopen}`, color: colors.error };
-    }
-    return { label: 'Ouvert', color: colors.success };
+    const toneColor =
+      liveStatus.tone === 'error'
+        ? colors.error
+        : liveStatus.tone === 'warning'
+          ? colors.warning
+          : colors.success;
+    return { label: liveStatus.label, color: toneColor };
   })();
 
   const addProduct = (p: ProductPublic) => {
@@ -365,10 +368,8 @@ export default function EnterpriseDetailScreen() {
               ]}>
               <Clock size={16} color={colors.warning} strokeWidth={LUCIDE_STROKE} />
               <ThemedText style={[styles.hoursBannerText, { color: colors.warning }]}>
-                {enterprise.message_commande ??
-                  `Il est trop tard pour commander aujourd'hui : ${commerceRef} ferme à ${
-                    enterprise.fermeture_plage?.replace(':', 'h') ?? ''
-                  } et la préparation prend ${prepMin} min.`}
+                {liveStatus.messageCommande ??
+                  `Il est trop tard pour commander aujourd'hui : ${commerceRef} ferme et la préparation prend ${prepMin} min.`}
               </ThemedText>
             </View>
           ) : estFerme ? (
@@ -379,7 +380,7 @@ export default function EnterpriseDetailScreen() {
               ]}>
               <Clock size={16} color={colors.error} strokeWidth={LUCIDE_STROKE} />
               <ThemedText style={[styles.hoursBannerText, { color: colors.error }]}>
-                {enterprise.message_fermeture ?? fermetureFallback}
+                {liveStatus.messageFermeture}
               </ThemedText>
             </View>
           ) : (
@@ -403,8 +404,7 @@ export default function EnterpriseDetailScreen() {
             ]}>
             <Clock size={16} color={colors.warning} strokeWidth={LUCIDE_STROKE} />
             <ThemedText style={[styles.hoursBannerText, { color: colors.warning }]}>
-              {enterprise.message_fermeture ??
-                'Horaires non définis : les commandes sont momentanément indisponibles.'}
+              {liveStatus.messageFermeture}
             </ThemedText>
           </View>
         ) : null}

@@ -92,6 +92,191 @@ export function computeOpenStatus(
   return { open, todayHours, nextLabel };
 }
 
+/** Minutes → "HH:MM" (boucle sur 24 h pour les plages qui chevauchent minuit). */
+function minutesToHHMM(total: number): string {
+  const m = Math.max(0, Math.floor(Number(total) || 0));
+  const hh = Math.floor(m / 60) % 24;
+  const mm = m % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
+/**
+ * Faisabilité d'une commande à l'instant T (mêmes règles que le backend) :
+ * une commande n'est possible que si la préparation (`prepMinutes`) peut se
+ * terminer avant la fermeture de la plage en cours. Gère les plages qui
+ * chevauchent minuit (ex. 22:00 → 02:00).
+ */
+export function computeOrderFeasibility(
+  horaires: EnterpriseHoraires[],
+  prepMinutes = 0,
+  now: Date = new Date(),
+): { peutCommander: boolean; fermeture: string | null; derniereCommande: string | null } {
+  const list = Array.isArray(horaires) ? horaires : [];
+  if (list.length === 0) return { peutCommander: false, fermeture: null, derniereCommande: null };
+
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const todayIdx = now.getDay();
+  const prep = Math.max(0, Math.floor(Number(prepMinutes) || 0));
+
+  const active = list.find((w) => {
+    if (Number(w.jour) !== todayIdx) return false;
+    const start = toMinutes(w.ouverture);
+    const end = toMinutes(w.fermeture);
+    if (start == null || end == null) return false;
+    if (end > start) return nowMin >= start && nowMin < end;
+    return nowMin >= start || nowMin < end;
+  });
+  if (!active) return { peutCommander: false, fermeture: null, derniereCommande: null };
+
+  const startMin = toMinutes(active.ouverture)!;
+  let closeMin = toMinutes(active.fermeture)!;
+  // Plage qui chevauche minuit et on est AVANT minuit : la fermeture est demain.
+  if (closeMin <= startMin && nowMin >= startMin) closeMin += 1440;
+
+  const peutCommander = nowMin + prep <= closeMin;
+  const cutoff = closeMin - prep;
+  return {
+    peutCommander,
+    fermeture: formatHourLabel(active.fermeture),
+    derniereCommande: minutesToHHMM(cutoff),
+  };
+}
+
+export type LiveStatusOptions = {
+  /** Temps de préparation (min) pour la règle « trop tard pour commander ». */
+  prepMinutes?: number;
+  kind: 'boutique' | 'restaurant';
+  /** Le vendeur a fermé manuellement (serveur `ouvert === false`). */
+  fermeManuellement?: boolean;
+  /** Aucun horaire défini (serveur `accepte_commandes === false`). */
+  sansHoraires?: boolean;
+};
+
+export type LiveStatus = {
+  estFerme: boolean;
+  tropTard: boolean;
+  commandesBloquees: boolean;
+  /** « Ouvert » · « Fermé · rouvre aujourd'hui à 9h » · « Plus de commandes aujourd'hui ». */
+  label: string;
+  /** Pastille colorée : success | warning | error. */
+  tone: 'success' | 'warning' | 'error';
+  /** Bannière rouge (fermé). */
+  messageFermeture: string;
+  /** Bannière jaune (trop tard pour commander). */
+  messageCommande: string | null;
+  derniereCommandeLabel: string | null;
+};
+
+/**
+ * Statut ouvert/fermé recalculé EN DIRECT côté client, à l'heure locale
+ * (`now`). Le serveur calcule ce statut à l'instant de la requête et le cache
+ * client le fige (jusqu'à plusieurs minutes) : sans ce recalcul local, un
+ * commerce qui ouvre à 7h30 resterait affiché « Réouverture à 7h30 » à 7h53
+ * et le panier resterait bloqué.
+ */
+export function computeLiveStatus(
+  horaires: EnterpriseHoraires[],
+  options: LiveStatusOptions,
+  now: Date = new Date(),
+): LiveStatus {
+  const list = Array.isArray(horaires) ? horaires : [];
+  const kind = options.kind === 'boutique' ? 'boutique' : 'restaurant';
+  const typeRef = kind === 'boutique' ? 'cette boutique' : 'ce restaurant';
+  const typeCap = kind === 'boutique' ? 'Cette boutique' : 'Ce restaurant';
+  const fermeRef =
+    kind === 'boutique'
+      ? 'Cette boutique est actuellement fermée.'
+      : 'Ce restaurant est actuellement fermé.';
+  const prep = Math.max(0, Math.floor(Number(options.prepMinutes) || 0));
+
+  // Fermeture manuelle par le vendeur (toggle « ouvert/fermé » du dashboard)
+  // → prioritaire, même si les horaires n'ont pas encore été chargés.
+  if (options.fermeManuellement) {
+    return {
+      estFerme: true,
+      tropTard: false,
+      commandesBloquees: true,
+      label: 'Fermé pour le moment',
+      tone: 'error',
+      messageFermeture: 'Fermé pour le moment.',
+      messageCommande: null,
+      derniereCommandeLabel: null,
+    };
+  }
+
+  // Aucun horaire → on ne peut pas recalculer : on s'appuie sur le serveur
+  // (ou on laisse ouvert par défaut si l'info n'est pas arrivée).
+  if (list.length === 0) {
+    if (options.sansHoraires) {
+      return {
+        estFerme: true,
+        tropTard: false,
+        commandesBloquees: true,
+        label: 'Fermé pour le moment',
+        tone: 'warning',
+        messageFermeture: `${typeCap} n'a pas encore défini ses horaires d'ouverture.`,
+        messageCommande: null,
+        derniereCommandeLabel: null,
+      };
+    }
+    return {
+      estFerme: false,
+      tropTard: false,
+      commandesBloquees: false,
+      label: 'Ouvert',
+      tone: 'success',
+      messageFermeture: fermeRef,
+      messageCommande: null,
+      derniereCommandeLabel: null,
+    };
+  }
+
+  const { open, nextLabel } = computeOpenStatus(list, now);
+  const feas = computeOrderFeasibility(list, prep, now);
+
+  if (!open) {
+    const suite = nextLabel ? ` Réouverture ${nextLabel}.` : '';
+    return {
+      estFerme: true,
+      tropTard: false,
+      commandesBloquees: true,
+      label: nextLabel ? `Fermé · rouvre ${nextLabel}` : 'Fermé',
+      tone: 'error',
+      messageFermeture: `${fermeRef}${suite}`,
+      messageCommande: null,
+      derniereCommandeLabel: null,
+    };
+  }
+
+  if (!feas.peutCommander) {
+    return {
+      estFerme: false,
+      tropTard: true,
+      commandesBloquees: true,
+      label: 'Plus de commandes aujourd\'hui',
+      tone: 'warning',
+      messageFermeture: fermeRef,
+      messageCommande: `Il est trop tard pour commander aujourd'hui : ${typeRef} ferme à ${feas.fermeture ?? ''} et la préparation prend ${prep} min.`,
+      derniereCommandeLabel: feas.derniereCommande
+        ? `Dernière commande possible à ${feas.derniereCommande.replace(':', 'h')}.`
+        : null,
+    };
+  }
+
+  return {
+    estFerme: false,
+    tropTard: false,
+    commandesBloquees: false,
+    label: 'Ouvert',
+    tone: 'success',
+    messageFermeture: fermeRef,
+    messageCommande: null,
+    derniereCommandeLabel: feas.derniereCommande
+      ? `Dernière commande possible à ${feas.derniereCommande.replace(':', 'h')}.`
+      : null,
+  };
+}
+
 /** Résumé compact pour l'affichage vendeur. */
 export function summarizeHoraires(horaires: EnterpriseHoraires[]): string {
   const openDays = horaires.filter((h) => toMinutes(h.ouverture) != null && toMinutes(h.fermeture) != null);

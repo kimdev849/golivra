@@ -6,7 +6,7 @@ import type { EnterpriseCategory } from '@/lib/enterprise';
 const TTL_ENTERPRISES = 120_000;
 const TTL_CATEGORIES = 300_000;
 const TTL_PRODUCTS = 90_000;
-const TTL_ENTERPRISE = 180_000;
+const TTL_ENTERPRISE = 90_000;
 const TTL_ME = 180_000;
 
 export type AuthMe = {

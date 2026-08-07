@@ -37,6 +37,8 @@ import { DETAIL_SCREEN_PADDING_BOTTOM } from '@/constants/layout';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
+import { useCurrentTime } from '@/hooks/use-current-time';
+import { computeLiveStatus } from '@/lib/horaires-status';
 import {
   fetchEnterpriseById,
   fetchProductById,
@@ -153,21 +155,26 @@ export default function ProductDetailScreen() {
     queryKey: ['enterprise', product?.entreprise_id],
     queryFn: () => fetchEnterpriseById(product!.entreprise_id),
     staleTime: 1000 * 60 * 3,
+    refetchInterval: 1000 * 60 * 2,
     placeholderData: () =>
       product?.entreprise_id ? (peekEnterpriseById(product.entreprise_id) ?? undefined) : undefined,
     enabled: !!product?.entreprise_id,
   });
 
-  const heuresBloquees =
-    !!enterprise &&
-    (enterprise.est_ouvert_maintenant === false ||
-      enterprise.ouvert === false ||
-      enterprise.accepte_commandes === false ||
-      enterprise.peut_commander_maintenant === false);
-  const tropTard =
-    !!enterprise &&
-    enterprise.est_ouvert_maintenant === true &&
-    enterprise.peut_commander_maintenant === false;
+  // ⚡ Statut ouvert/fermé RECALCULÉ EN DIRECT côté client (horloge locale
+  // toutes les 30 s) : les champs serveur est_ouvert_maintenant /
+  // peut_commander_maintenant sont figés par le cache — sans recalcul, un
+  // commerce qui ouvre à 7h30 resterait « fermé » à 7h53 et le bouton
+  // d'ajout au panier resterait bloqué.
+  const now = useCurrentTime(30_000);
+  const liveStatus = computeLiveStatus(enterprise?.horaires ?? [], {
+    prepMinutes: enterprise?.delai_preparation_min ?? 25,
+    kind: enterprise?.type === 'restaurant' ? 'restaurant' : 'boutique',
+    fermeManuellement: enterprise?.ouvert === false,
+    sansHoraires: enterprise?.accepte_commandes === false,
+  }, now);
+  const heuresBloquees = !!enterprise && liveStatus.commandesBloquees;
+  const tropTard = !!enterprise && liveStatus.tropTard;
 
   const stockAvailable = product ? effectiveStockCap(product) : 0;
   const orderable = product ? isProductOrderable(product) && !heuresBloquees : false;
@@ -442,12 +449,9 @@ export default function ProductDetailScreen() {
                   { color: tropTard ? colors.warning : colors.error, flex: 1 },
                 ]}>
                 {tropTard
-                  ? enterprise.message_commande ??
+                  ? liveStatus.messageCommande ??
                     'Il est trop tard pour commander aujourd\'hui : la préparation ne peut pas finir avant la fermeture.'
-                  : enterprise.message_fermeture ??
-                    (enterpriseType === 'restaurant'
-                      ? 'Ce restaurant est fermé pour le moment.'
-                      : 'Cette boutique est fermée pour le moment.')}
+                  : liveStatus.messageFermeture}
               </ThemedText>
             </View>
           ) : null}
