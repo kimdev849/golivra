@@ -26,6 +26,8 @@ export function AppLogoutButton({ clearCart, variant = 'link' }: Props) {
       message: 'Voulez-vous vraiment vous déconnecter ?',
       primaryLabel: 'Se déconnecter',
       secondaryLabel: 'Annuler',
+      danger: true,
+      icon: LogOut,
       onPrimary: () => void performLogout(),
     });
   };

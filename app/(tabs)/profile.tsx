@@ -301,6 +301,8 @@ export default function ProfileScreen() {
       message: 'Voulez-vous vraiment vous déconnecter ?',
       primaryLabel: 'Se déconnecter',
       secondaryLabel: 'Annuler',
+      danger: true,
+      icon: LogOut,
       onPrimary: () => void performLogout(),
     });
   };

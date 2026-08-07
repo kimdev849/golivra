@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import * as Haptics from 'expo-haptics';
+import type { LucideIcon } from 'lucide-react-native';
 
 import {
   ActionFeedbackOverlay,
@@ -15,6 +16,10 @@ type FeedbackConfig = {
   secondaryLabel?: string;
   onPrimary?: () => void;
   onSecondary?: () => void;
+  /** Bouton principal en rouge (déconnexion, suppression…). */
+  danger?: boolean;
+  /** Icône personnalisée (ex. LogOut pour la déconnexion). */
+  icon?: LucideIcon;
 };
 
 const initial = {
@@ -26,6 +31,8 @@ const initial = {
   secondaryLabel: undefined as string | undefined,
   onPrimary: undefined as (() => void) | undefined,
   onSecondary: undefined as (() => void) | undefined,
+  danger: false,
+  icon: undefined as LucideIcon | undefined,
 };
 
 export function useActionFeedback() {
@@ -54,6 +61,8 @@ export function useActionFeedback() {
       secondaryLabel: config.secondaryLabel,
       onPrimary: config.onPrimary,
       onSecondary: config.onSecondary,
+      danger: config.danger ?? false,
+      icon: config.icon,
     });
   }, []);
 
@@ -92,6 +101,8 @@ export function useActionFeedback() {
       secondaryLabel?: string;
       onPrimary: () => void;
       onSecondary?: () => void;
+      danger?: boolean;
+      icon?: LucideIcon;
     }) => {
       open({
         variant: 'confirm',
@@ -101,6 +112,8 @@ export function useActionFeedback() {
         secondaryLabel: config.secondaryLabel,
         onPrimary: config.onPrimary,
         onSecondary: config.onSecondary,
+        danger: config.danger,
+        icon: config.icon,
       });
     },
     [open],
@@ -118,6 +131,8 @@ export function useActionFeedback() {
         onPrimary={state.onPrimary}
         onSecondary={state.onSecondary}
         onDismiss={dismiss}
+        danger={state.danger}
+        icon={state.icon}
       />
     ),
     [state, dismiss],
