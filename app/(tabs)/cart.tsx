@@ -511,7 +511,11 @@ export default function CartScreen() {
                     {seg.lines.map((line) => {
                       const cap = stockCap(line.productId, line.stockSnapshot);
                       const prod = productById[line.productId];
-                      const imgUrl = resolveRemoteImageUrl(prod?.image_url);
+                      const imgUrl = resolveRemoteImageUrl(prod?.image_url, {
+                        width: 120,
+                        format: 'webp',
+                        quality: 75,
+                      });
                       const subtitleParts = [line.nom, prod?.description?.trim()].filter(Boolean);
                       const subtitle = subtitleParts.join(' · ') || line.nom;
                       const lineTotal = line.prixUnitaire * line.quantite;

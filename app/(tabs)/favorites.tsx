@@ -234,7 +234,7 @@ export default function FavoritesScreen() {
             <RefreshControl refreshing={refreshingEnt} onRefresh={onRefreshEnt} tintColor={colors.primary} />
           }
           renderItem={({ item }) => {
-            const img = resolveRemoteImageUrl(item.image_url);
+            const img = resolveRemoteImageUrl(item.image_url, { width: 160, format: 'webp', quality: 75 });
             return (
               <Pressable
                 style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}
@@ -242,7 +242,14 @@ export default function FavoritesScreen() {
                 android_ripple={{ color: colors.primaryMuted }}>
                 <View style={[styles.thumbWrap, { backgroundColor: colors.primarySoft }]}>
                   {img ? (
-                    <Image source={{ uri: img }} style={styles.thumb} contentFit="cover" />
+                    <Image
+                      source={{ uri: img }}
+                      style={styles.thumb}
+                      contentFit="cover"
+                      transition={150}
+                      recyclingKey={img}
+                      cachePolicy="memory-disk"
+                    />
                   ) : (
                     <View style={[styles.thumb, styles.thumbPh]}>
                       {item.type === 'restaurant' ? (

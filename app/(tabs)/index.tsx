@@ -52,7 +52,7 @@ import {
   type ProductPublic,
 } from '@/lib/catalog';
 import { prefetchClientCatalog } from '@/lib/client-data';
-import { resolveRemoteImageUrl } from '@/lib/images';
+import { resolveRemoteImageUrl, type ResizeOptions } from '@/lib/images';
 import { toggleFavoriteProduct } from '@/lib/favorites';
 import { productDetailHref } from '@/lib/listing-utils';
 import { getEffectiveUnitPrice } from '@/lib/product-promo';
@@ -64,6 +64,9 @@ import { trackInteraction } from '@/lib/tracking';
 
 const H_PAD = 16;
 const FEED_PAGE_SIZE = 24;
+// Vignettes commerces (rangée / liste) : version webp redimensionnée pour
+// éviter de télécharger l'original pleine taille dans une case de 52px.
+const ENT_IMG: ResizeOptions = { width: 120, format: 'webp', quality: 75 };
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -158,6 +161,8 @@ function PremiumCard({
             style={{ width: '100%', height: '100%' }}
             contentFit="cover"
             transition={200}
+            recyclingKey={imageUrl}
+            cachePolicy="memory-disk"
           />
         ) : (
           <UtensilsCrossed size={28} color={colors.primary} strokeWidth={1.5} />
@@ -438,6 +443,31 @@ export default function HomeScreen() {
       initialPageParam: 0,
     });
   }, [queryClient]);
+
+  // Préchargement des images dès que les données arrivent : les vignettes du
+  // flux (grille) et des commerces sont mises en cache disque → défilement et
+  // navigation plus fluides, plus de pop-in lent. Les URL déjà préchargées ne
+  // sont pas relancées (dédupe par référence) à chaque pagination.
+  const prefetchedImages = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const urls: string[] = [];
+    for (const p of feedProducts.slice(0, 24)) {
+      const u = resolveRemoteImageUrl(p.images_urls?.[0] ?? p.image_url, {
+        width: 400,
+        format: 'webp',
+        quality: 80,
+      });
+      if (u) urls.push(u);
+    }
+    for (const e of [...restaurants, ...boutiques].slice(0, 8)) {
+      const u = resolveRemoteImageUrl(e.image_url, { width: 300, format: 'webp', quality: 80 });
+      if (u) urls.push(u);
+    }
+    const fresh = urls.filter((u) => !prefetchedImages.current.has(u));
+    if (fresh.length === 0) return;
+    for (const u of fresh) prefetchedImages.current.add(u);
+    void Image.prefetch(fresh);
+  }, [feedProducts, restaurants, boutiques]);
 
   // Le tri suit le type de contenu : commerces (populaire/récent) vs produits (prix).
   useEffect(() => {
@@ -745,11 +775,12 @@ export default function HomeScreen() {
               ]}
               onPress={() => router.push(`/(tabs)/marketplace/${ent.id}` as never)}>
               <View style={[styles.entRowImg, { backgroundColor: colors.primarySoft }]}>
-                {resolveRemoteImageUrl(ent.image_url) ? (
+                {resolveRemoteImageUrl(ent.image_url, ENT_IMG) ? (
                   <Image
-                    source={{ uri: resolveRemoteImageUrl(ent.image_url)! }}
+                    source={{ uri: resolveRemoteImageUrl(ent.image_url, ENT_IMG)! }}
                     style={{ width: '100%', height: '100%' }}
                     contentFit="cover"
+                    transition={150}
                   />
                 ) : (
                   <Store size={20} color={colors.primary} strokeWidth={1.5} />
@@ -792,11 +823,12 @@ export default function HomeScreen() {
               ]}
               onPress={() => router.push(`/(tabs)/marketplace/${ent.id}` as never)}>
               <View style={[styles.entRowImg, { backgroundColor: colors.primarySoft }]}>
-                {resolveRemoteImageUrl(ent.image_url) ? (
+                {resolveRemoteImageUrl(ent.image_url, ENT_IMG) ? (
                   <Image
-                    source={{ uri: resolveRemoteImageUrl(ent.image_url)! }}
+                    source={{ uri: resolveRemoteImageUrl(ent.image_url, ENT_IMG)! }}
                     style={{ width: '100%', height: '100%' }}
                     contentFit="cover"
+                    transition={150}
                   />
                 ) : (
                   <Store size={20} color={colors.primary} strokeWidth={1.5} />

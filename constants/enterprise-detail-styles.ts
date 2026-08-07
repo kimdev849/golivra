@@ -96,14 +96,18 @@ export function createEnterpriseDetailStyles(c: AppPalette) {
     infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
     infoText: { flex: 1, fontSize: 14, color: c.textMuted, lineHeight: 20 },
     hoursBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      // Marge horizontale alignée sur le reste du contenu (nom, produits) :
+      // la bannière « fermé / réouverture » ne doit pas toucher les bords.
+      marginHorizontal: 20,
+      marginTop: 6,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      borderRadius: 14,
+      borderWidth: 1,
+    },
   hoursBannerText: { flex: 1, fontSize: 13, fontWeight: '700', lineHeight: 18 },
   sectionHead: {
       flexDirection: 'row',

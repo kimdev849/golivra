@@ -140,7 +140,7 @@ export default function DiscoverAllScreen() {
         ) : (
           <>
             {visible.map((ent) => {
-              const img = resolveRemoteImageUrl(ent.image_url);
+              const img = resolveRemoteImageUrl(ent.image_url, { width: 120, format: 'webp', quality: 75 });
               return (
               <Pressable
                 key={ent.id}
@@ -156,6 +156,7 @@ export default function DiscoverAllScreen() {
                       source={{ uri: img }}
                       style={{ width: '100%', height: '100%' }}
                       contentFit="cover"
+                      transition={150}
                     />
                   ) : ent.type === 'restaurant' ? (
                     <UtensilsCrossed size={20} color={colors.primary} strokeWidth={1.5} />

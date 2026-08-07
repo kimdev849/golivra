@@ -195,6 +195,22 @@ export default function EnterpriseDetailScreen() {
     trackEnterpriseView(enterprise.id, products.map((p) => p.id));
   }, [enterprise, products]);
 
+  // Préchargement des images (hero + vignettes produits) dès que les données
+  // arrivent : expo-image les sert ensuite depuis son cache disque → affichage
+  // instantané au défilement, plus de pop-in lent. Limité aux 40 premiers
+  // produits pour ne pas saturer le réseau sur les gros catalogues.
+  useEffect(() => {
+    if (!enterprise && products.length === 0) return;
+    const urls: string[] = [];
+    if (hero) urls.push(hero);
+    for (const p of products.slice(0, 40)) {
+      for (const u of getProductGalleryUrls(p, IMG_THUMB)) {
+        urls.push(u);
+      }
+    }
+    if (urls.length > 0) void Image.prefetch(urls);
+  }, [enterprise, products, hero]);
+
   if (!id) {
     return (
       <ThemedView style={styles.center}>
@@ -431,7 +447,14 @@ export default function EnterpriseDetailScreen() {
                   }}
                   disabled={!img}>
                   {img ? (
-                    <Image source={{ uri: img }} style={styles.productImg} contentFit="cover" />
+                    <Image
+                      source={{ uri: img }}
+                      style={styles.productImg}
+                      contentFit="cover"
+                      transition={150}
+                      recyclingKey={img}
+                      cachePolicy="memory-disk"
+                    />
                   ) : (
                     <View style={[styles.productImg, styles.productImgPh]}>
                       <ShoppingBasket size={28} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
