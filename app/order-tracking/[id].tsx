@@ -89,21 +89,25 @@ function formatHeure(iso: string | null | undefined): string | null {
   }
 }
 
-/** Minutes restantes avant une échéance (borné ≥ 0), ou null si indéterminée. */
-function remainingUntil(iso: string | null | undefined): number | null {
+/** Secondes restantes avant une échéance (borné ≥ 0), ou null si indéterminée. */
+function remainingSeconds(iso: string | null | undefined, nowMs: number): number | null {
   if (!iso) return null;
   const at = new Date(iso).getTime();
   if (!Number.isFinite(at)) return null;
-  return Math.max(0, Math.ceil((at - Date.now()) / 60_000));
+  return Math.max(0, Math.ceil((at - nowMs) / 1000));
 }
 
-/** « ~3 min » / « moins d'une minute » / « expiré » depuis une échéance. */
-function countdownLabel(iso: string | null | undefined): string | null {
-  const mins = remainingUntil(iso);
-  if (mins == null) return null;
-  if (mins <= 0) return 'expiré';
-  if (mins === 1) return '~1 min restante';
-  return `~${mins} min restantes`;
+/** Minutes entières restantes avant une échéance (borné ≥ 0), ou null. */
+function remainingUntil(iso: string | null | undefined, nowMs: number): number | null {
+  const s = remainingSeconds(iso, nowMs);
+  return s == null ? null : Math.ceil(s / 60);
+}
+
+/** « 04:32 » depuis un nombre de secondes (compte à rebours vivant). */
+function mmss(totalSecs: number): string {
+  const m = Math.floor(totalSecs / 60);
+  const s = totalSecs % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 const SC_STATUS_LABEL: Record<string, string> = {
@@ -133,6 +137,21 @@ export default function OrderTrackingScreen() {
   const [payMethod, setPayMethod] = useState<'airtel' | 'mtn'>('airtel');
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
+
+  // Horloge locale : fait tourner les comptes à rebours (MM:SS) chaque seconde,
+  // uniquement tant qu'une échéance est active (attente de confirmation ou
+  // délai de paiement) — pas de re-render inutile sur les commandes terminées.
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const active =
+      order?.statut === 'en_attente' ||
+      order?.statut === 'acceptee' ||
+      order?.statut === 'partiellement_acceptee';
+    if (!active) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [order?.statut]);
 
   useEffect(() => {
     let alive = true;
@@ -219,6 +238,10 @@ export default function OrderTrackingScreen() {
     );
   };
 
+  const goHome = () => {
+    router.replace('/(tabs)/explore');
+  };
+
   if (loading) {
     return (
       <ThemedView style={styles.center} lightColor={colors.background} darkColor={colors.background}>
@@ -242,22 +265,38 @@ export default function OrderTrackingScreen() {
   const refundMessage = orderRefundMessage(order?.statut);
   const isRefunded = refundMessage !== null;
 
-  // Message d'annulation côté client : si le motif vient d'un paiement non
-  // effectué (délai expiré / refus de payer), on affiche un message humain
-  // au client — jamais le motif technique destiné au commerce.
+  const scs = order?.sousCommandes || [];
+  const refusedScs = scs.filter((s) => s.statut === 'refusee' || s.statut === 'remboursee');
+  const acceptedScs = scs.filter((s) => !['refusee', 'remboursee', 'annulee'].includes(s.statut));
+  const acceptedNames = acceptedScs.map((s) => s.commerce_nom).filter((n): n is string => !!n);
+  const allCommerceNames = scs.map((s) => s.commerce_nom).filter((n): n is string => !!n);
+  const commerceLabel = allCommerceNames.length > 0 ? allCommerceNames.join(', ') : 'la boutique';
+  const acceptedLabel =
+    acceptedNames.length > 1
+      ? `${acceptedNames.slice(0, -1).join(', ')} et ${acceptedNames[acceptedNames.length - 1]} ont accepté votre commande.`
+      : `${acceptedNames[0] || 'La boutique'} a accepté votre commande.`;
+
+  // Message d'annulation côté client : humain, jamais le motif technique
+  // destiné au commerce (paiement non effectué / boutique pas répondu…).
   const annulationMotif = order?.annulation_motif ? String(order.annulation_motif) : null;
   const unpaidCancel =
     order?.statut === 'annulee' && !!annulationMotif && annulationMotif.toLowerCase().includes('paiement');
+  const acceptanceTimeout = order?.statut === 'remboursee' || order?.statut === 'expiree';
   const refundTitle = unpaidCancel
     ? 'Paiement non effectué'
-    : annulationMotif && !unpaidCancel
-      ? 'Commande annulée'
-      : orderStatusLabel(order?.statut);
+    : acceptanceTimeout
+      ? "La boutique n'a pas pu confirmer votre commande"
+      : annulationMotif && !unpaidCancel
+        ? 'Commande annulée'
+        : orderStatusLabel(order?.statut);
   const refundBody = unpaidCancel
     ? "Vous n'avez pas confirmé le paiement dans les 5 minutes. Votre commande a été annulée — vous pouvez en passer une nouvelle quand vous le souhaitez."
-    : annulationMotif && !unpaidCancel
-      ? annulationMotif
-      : refundMessage;
+    : acceptanceTimeout
+      ? `Nous sommes désolés, ${commerceLabel} n'a pas répondu à temps. Votre commande a donc été annulée et aucun paiement n'a été effectué.`
+      : annulationMotif && !unpaidCancel
+        ? annulationMotif
+        : refundMessage;
+
   const rawSteps = order?.timeline?.livraisons?.[0]?.timeline || order?.timeline?.commande || [];
   const steps: _TimelineStep[] = rawSteps.map((s, i) => ({
     key: `step-${i}`,
@@ -276,18 +315,29 @@ export default function OrderTrackingScreen() {
   const readyToPay =
     !paid &&
     (order?.statut === 'acceptee' || order?.statut === 'partiellement_acceptee');
-  const scs = order?.sousCommandes || [];
-  const refusedScs = scs.filter((s) => s.statut === 'refusee' || s.statut === 'remboursee');
-  const confirmationCountdown = countdownLabel(order?.acceptation_limite_at);
-  const paymentCountdown = countdownLabel(order?.paiement_limite_at);
-  const paymentDeadlineExpired =
-    order?.paiement_limite_at != null && remainingUntil(order.paiement_limite_at) === 0;
+
+  // Comptes à rebours vivants (MM:SS) + messages évolutifs pendant l'attente.
+  const acceptRemaining = remainingSeconds(order?.acceptation_limite_at, now);
+  const payRemaining = remainingSeconds(order?.paiement_limite_at, now);
+  const acceptCountdown = acceptRemaining == null ? null : mmss(acceptRemaining);
+  const payCountdown = payRemaining == null ? null : mmss(payRemaining);
+  const paymentDeadlineExpired = payRemaining === 0;
+  const acceptanceMsg =
+    acceptRemaining == null
+      ? null
+      : acceptRemaining > 180
+        ? 'Nous attendons la confirmation de la boutique.'
+        : acceptRemaining > 60
+          ? 'La boutique vérifie encore votre commande. Merci de patienter 😊'
+          : acceptRemaining > 0
+            ? "Plus qu'une minute ! Nous attendons encore la réponse de la boutique."
+            : null;
   const totalAPayer = order?.total_a_payer ?? 0;
 
   // ETA réelle calculée par l'API : préparation (commerce) + livraison (zone GoLivra).
   const eta = order?.eta;
   const arriveeLabel = formatHeure(eta?.arriveeEstimeeAt);
-  const restantMin = remainingUntil(eta?.arriveeEstimeeAt);
+  const restantMin = remainingUntil(eta?.arriveeEstimeeAt, now);
   const zoneTierLabel = eta?.tierLabel || null;
   const quartierLivraison = eta?.quartierLivraison || null;
   const zoneLabel = zoneTierLabel || quartierLivraison || null;
@@ -313,18 +363,24 @@ export default function OrderTrackingScreen() {
               styles.mapPreviewCard,
               { backgroundColor: colors.surface, borderColor: colors.warning },
             ]}>
-            <View style={[styles.staticMapContainer, { backgroundColor: colors.warningSoft, justifyContent: 'center' }]}>
-              <View style={{ alignItems: 'center', gap: 10, paddingHorizontal: 20 }}>
-                <View style={[styles.etaIconBox, { backgroundColor: colors.warning }]}>
-                  <Clock size={26} color="#FFFFFF" strokeWidth={LUCIDE_STROKE} />
-                </View>
-                <ThemedText style={[styles.etaTime, { color: colors.text, textAlign: 'center' }]}>
-                  {refundTitle}
-                </ThemedText>
-                <ThemedText style={[styles.etaLabel, { color: colors.textMuted, textAlign: 'center', lineHeight: 20 }]}>
-                  {refundBody}
-                </ThemedText>
+            <View style={[styles.refundContainer, { backgroundColor: colors.warningSoft }]}>
+              <View style={[styles.etaIconBox, { backgroundColor: colors.warning }]}>
+                <Clock size={26} color="#FFFFFF" strokeWidth={LUCIDE_STROKE} />
               </View>
+              <ThemedText style={[styles.etaTime, { color: colors.text, textAlign: 'center' }]}>
+                {refundTitle}
+              </ThemedText>
+              <ThemedText style={[styles.refundBody, { color: colors.textMuted, textAlign: 'center' }]}>
+                {refundBody}
+              </ThemedText>
+              <Pressable style={[styles.refundCta, { backgroundColor: colors.primary }]} onPress={goHome}>
+                <ThemedText style={[styles.refundCtaText, { color: colors.onPrimary }]}>
+                  Retourner à l'accueil
+                </ThemedText>
+              </Pressable>
+              <ThemedText style={[styles.refundHint, { color: colors.textMuted }]}>
+                Vous pouvez essayer une autre boutique.
+              </ThemedText>
             </View>
           </View>
         )}
@@ -386,66 +442,84 @@ export default function OrderTrackingScreen() {
                     <ThemedText style={[styles.statusHighlight, { color: colors.primary }]}>En route vers vous</ThemedText>
                   </>
                 ) : waitingConfirmation ? (
-                  <View style={styles.statusRow}>
-                    <View style={[styles.etaIconBox, { backgroundColor: colors.warningSoft }]}>
-                      <Clock size={24} color={colors.warning} strokeWidth={LUCIDE_STROKE} />
+                  <>
+                    <View style={styles.statusRow}>
+                      <View style={[styles.etaIconBox, { backgroundColor: colors.warningSoft }]}>
+                        <Clock size={24} color={colors.warning} strokeWidth={LUCIDE_STROKE} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <ThemedText style={[styles.etaTime, { color: colors.text }]}>Commande envoyée 🛍️</ThemedText>
+                        <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 2, lineHeight: 18 }]}>
+                          Nous avons envoyé votre commande à {commerceLabel}.
+                        </ThemedText>
+                        <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 2, lineHeight: 18 }]}>
+                          La boutique est en train de vérifier votre commande.
+                        </ThemedText>
+                      </View>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <ThemedText style={[styles.etaTime, { color: colors.text }]}>En attente de confirmation</ThemedText>
-                      <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 2, lineHeight: 18 }]}>
-                        {scs.length > 1
-                          ? `Les ${scs.length} commerces ont 5 minutes pour confirmer votre commande.`
-                          : 'Le commerce a 5 minutes pour confirmer votre commande.'}
+
+                    <View style={[styles.countdownBox, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
+                      <ThemedText style={[styles.countdownTime, { color: colors.warning }]}>
+                        {acceptCountdown ?? '05:00'}
                       </ThemedText>
-                      {confirmationCountdown ? (
-                        <ThemedText style={[styles.deadlineText, { color: colors.warning }]}>
-                          ⏱️ {confirmationCountdown} · réponse avant {formatHeure(order?.acceptation_limite_at)}
+                      <ThemedText style={[styles.countdownLabel, { color: colors.textMuted }]}>
+                        En attente de confirmation de la boutique
+                      </ThemedText>
+                      {acceptanceMsg ? (
+                        <ThemedText style={[styles.countdownMsg, { color: colors.text }]}>
+                          {acceptanceMsg}
                         </ThemedText>
                       ) : null}
                     </View>
-                  </View>
+
+                    <ThemedText style={[styles.reassureText, { color: colors.textMuted }]}>
+                      Pas d'inquiétude, vous ne serez débité qu'après l'acceptation de votre commande.
+                    </ThemedText>
+                  </>
                 ) : readyToPay ? (
                   <>
                     <View style={styles.statusRow}>
                       <View style={[styles.etaIconBox, { backgroundColor: colors.successSoft }]}>
                         <CheckCircle2 size={24} color={colors.success} strokeWidth={LUCIDE_STROKE} />
                       </View>
-                    <View style={{ flex: 1 }}>
-                      <ThemedText style={[styles.etaTime, { color: colors.text }]}>
-                        Commande {scs.length > 1 && refusedScs.length > 0 ? 'partiellement ' : ''}acceptée
-                      </ThemedText>
-                      <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 2, lineHeight: 18 }]}>
-                        💳 Paiement requis — 5 min pour confirmer.
-                      </ThemedText>
-                      {paymentCountdown ? (
-                        <ThemedText style={[styles.deadlineText, { color: paymentDeadlineExpired ? colors.error : colors.warning }]}>
-                          ⏱️ {paymentCountdown}
+                      <View style={{ flex: 1 }}>
+                        <ThemedText style={[styles.etaTime, { color: colors.text }]}>Bonne nouvelle ! 🎉</ThemedText>
+                        <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 2, lineHeight: 18 }]}>
+                          {acceptedLabel}
                         </ThemedText>
-                      ) : null}
+                        <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 2, lineHeight: 18 }]}>
+                          Votre commande est maintenant confirmée. Vous pouvez procéder au paiement pour que la préparation commence.
+                        </ThemedText>
+                        {payCountdown != null ? (
+                          <ThemedText style={[styles.deadlineText, { color: paymentDeadlineExpired ? colors.error : colors.warning }]}>
+                            ⏱️ Il vous reste {payCountdown} pour payer
+                          </ThemedText>
+                        ) : null}
+                      </View>
                     </View>
-                  </View>
 
-                  {/* Répartition par commerce : acceptés / refusés / expirés */}
-                  {scs.length > 1 ? (
-                    <View style={[styles.breakdownBox, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
-                      {scs.map((sc) => (
-                        <View key={sc.id} style={styles.scRow}>
-                          <ThemedText style={[styles.scName, { color: colors.text }]} numberOfLines={1}>
-                            {sc.commerce_nom || 'Commerce'}
-                          </ThemedText>
-                          <ThemedText
-                            style={[
-                              styles.scStatut,
-                              {
-                                color: ['refusee', 'remboursee', 'annulee'].includes(sc.statut) ? colors.error : colors.primaryDeep,
-                              },
-                            ]}>
-                            {scStatusLabel(sc.statut)}
-                          </ThemedText>
-                        </View>
-                      ))}
-                    </View>
-                  ) : null}                    {refusedScs.length > 0 ? (
+                    {/* Répartition par commerce : acceptés / refusés / expirés */}
+                    {scs.length > 1 ? (
+                      <View style={[styles.breakdownBox, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
+                        {scs.map((sc) => (
+                          <View key={sc.id} style={styles.scRow}>
+                            <ThemedText style={[styles.scName, { color: colors.text }]} numberOfLines={1}>
+                              {sc.commerce_nom || 'Commerce'}
+                            </ThemedText>
+                            <ThemedText
+                              style={[
+                                styles.scStatut,
+                                {
+                                  color: ['refusee', 'remboursee', 'annulee'].includes(sc.statut) ? colors.error : colors.primaryDeep,
+                                },
+                              ]}>
+                              {scStatusLabel(sc.statut)}
+                            </ThemedText>
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+                    {refusedScs.length > 0 ? (
                       <ThemedText style={[styles.refusedHint, { color: colors.textMuted, lineHeight: 18 }]}>
                         {refusedScs.length > 1
                           ? `${refusedScs.length} commerces n'ont pas pu confirmer votre commande — ils ne seront pas facturés.`
@@ -460,7 +534,7 @@ export default function OrderTrackingScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <ThemedText style={[styles.etaTime, { color: colors.text }]}>
-                        {paid ? 'Commande confirmée' : 'Préparation en cours'}
+                        {paid ? 'Commande confirmée ✅' : '🍳 Préparation en cours'}
                       </ThemedText>
                       <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 2 }]}>
                         {eta?.totalMinutes != null
@@ -501,9 +575,9 @@ export default function OrderTrackingScreen() {
                 ]}>
                 {paymentDeadlineExpired
                   ? 'Délai expiré — la commande va être annulée.'
-                  : paymentCountdown
-                    ? `${paymentCountdown} pour valider la transaction`
-                    : '5 minutes pour valider la transaction'}
+                  : payCountdown != null
+                    ? `Il vous reste ${payCountdown} pour valider la transaction`
+                    : 'Il vous reste 5 minutes pour valider la transaction'}
               </ThemedText>
             </View>
 
@@ -550,7 +624,7 @@ export default function OrderTrackingScreen() {
                 <ActivityIndicator color={colors.onPrimary} size="small" />
               ) : (
                 <ThemedText style={[styles.payCtaText, { color: colors.onPrimary }]}>
-                  {paymentDeadlineExpired ? 'Délai expiré' : `Payer ${formatFcfa(totalAPayer)}`}
+                  {paymentDeadlineExpired ? 'Délai expiré' : 'Payer ma commande'}
                 </ThemedText>
               )}
             </Pressable>
@@ -767,6 +841,35 @@ const styles = StyleSheet.create({
   divider: { height: 1, marginVertical: 12, opacity: 0.6 },
   statusHighlight: { fontSize: 16, fontWeight: '800', textAlign: 'center' },
   deadlineText: { fontSize: 13, fontWeight: '800', marginTop: 4 },
+
+  countdownBox: {
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    gap: 6,
+  },
+  countdownTime: {
+    fontSize: 40,
+    fontWeight: '900',
+    letterSpacing: 2,
+    fontVariant: ['tabular-nums'],
+  },
+  countdownLabel: { fontSize: 13, fontWeight: '700' },
+  countdownMsg: { fontSize: 13, fontWeight: '500', textAlign: 'center', paddingHorizontal: 12 },
+  reassureText: { fontSize: 13, fontWeight: '600', textAlign: 'center', lineHeight: 19 },
+
+  refundContainer: { padding: 24, alignItems: 'center', gap: 10 },
+  refundBody: { fontSize: 14, lineHeight: 21, fontWeight: '500' },
+  refundCta: {
+    borderRadius: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 28,
+    marginTop: 6,
+    alignSelf: 'center',
+  },
+  refundCtaText: { fontWeight: '800', fontSize: 15 },
+  refundHint: { fontSize: 13, fontWeight: '600' },
 
   breakdownBox: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 4, gap: 2 },
   scRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5 },
