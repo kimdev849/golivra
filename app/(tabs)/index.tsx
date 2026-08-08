@@ -31,10 +31,12 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { HomeActiveOrderWidget } from '@/components/home-active-order-widget';
 import { HomeCampaignBanner } from '@/components/home-campaign-banner';
 import { ThemedView } from '@/components/themed-view';
+import { HomeFeedSkeleton } from '@/components/ui/skeleton';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { TAB_BAR_CONTENT_PADDING_BOTTOM } from '@/constants/layout';
 import { useActiveOrders } from '@/hooks/useActiveOrders';
@@ -855,14 +857,10 @@ export default function HomeScreen() {
       ) : null}
 
 
-      {/* Loading / searching */}
+      {/* Loading / searching — squelette fidèle à la mise en page : l'interface
+          « apparaît » progressivement au lieu d'un simple spinner. */}
       {(loading && showProductGrid) || (searchActive && searching && !searchResult) ? (
-        <View style={styles.loaderRow}>
-          <ActivityIndicator color={colors.primary} />
-          <Text style={[styles.loaderTxt, { color: colors.textMuted }]}>
-            {searchActive ? 'Recherche…' : 'Chargement…'}
-          </Text>
-        </View>
+        <HomeFeedSkeleton />
       ) : null}
 
       {/* API error */}
@@ -901,6 +899,9 @@ export default function HomeScreen() {
 
   return (
     <ThemedView style={[styles.screen, { backgroundColor: colors.background }]}>
+      {/* Fondu d'apparition de l'accueil (montage après connexion) :
+          l'interface se révèle doucement au lieu de « claquer ». */}
+      <Animated.View entering={FadeIn.duration(420)} style={{ flex: 1 }}>
       {showProductGrid ? (
         <FlatList
           ref={flatListRef}
@@ -977,6 +978,7 @@ export default function HomeScreen() {
           {listHeader}
         </ScrollView>
       )}
+      </Animated.View>
 
       {/* ── En-tête fixe (recherche + filtres) : toujours visible ── */}
       <View

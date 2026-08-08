@@ -1,7 +1,6 @@
 import { Link, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,9 +13,18 @@ import {
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { ArrowRight, Eye, EyeOff, Lock, LogIn, Moon, Smartphone, Sun, UserPlus } from 'lucide-react-native';
+import { ArrowRight, Eye, EyeOff, Lock, LogIn, Moon, ShieldCheck, Smartphone, Star, Sun, UserPlus, Zap } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  FadeInDown,
+  ZoomIn,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -37,6 +45,8 @@ import { validatePassword, validatePhone } from '@/lib/form-validation';
 // Animated.View autour des TextInput faisaient perdre le focus et fermer le
 // clavier dès la saisie).
 const HEADER_ENTER = FadeInDown.duration(460);
+// Logo : apparition ressort (spring) pour un démarrage vivant et premium.
+const LOGO_ENTER = ZoomIn.springify().damping(14).mass(0.9).stiffness(120);
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -50,6 +60,26 @@ export default function AuthScreen() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Reflet lumineux qui balaie le bouton « Se connecter » pendant la
+  // connexion : bien plus vivant qu'un simple spinner de chargement.
+  const sweep = useSharedValue(0);
+  useEffect(() => {
+    if (!isSubmitting) return;
+    sweep.value = withRepeat(
+      withTiming(1, { duration: 950, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      false,
+    );
+    return () => {
+      sweep.value = 0;
+    };
+  }, [isSubmitting, sweep]);
+  const sweepStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: interpolate(sweep.value, [0, 1], [-170, Math.max(width + 120, 420)]) },
+    ],
+  }));
   const passwordRef = useRef<TextInput>(null);
   const phoneE164 = toE164(loginPhone);
   const canSubmit = Boolean(phoneE164) && Boolean(password) && password.length >= 6 && !isSubmitting;
@@ -166,13 +196,24 @@ export default function AuthScreen() {
               l'inscription) : un contenu centré se recentrerait quand le
               clavier s'ouvre → les champs bougent → perte de focus. */}
           <Animated.View entering={HEADER_ENTER} style={styles.header}>
-            <Image
-              source={require('@/assets/images/logo25292922882.png')}
-              style={styles.logo}
-              contentFit="contain"
-              cachePolicy="memory-disk"
-              priority="high"
-            />
+            <View style={styles.logoWrap}>
+              {/* Halo doux derrière le logo : profondeur et confiance. */}
+              <View
+                style={[
+                  styles.logoGlow,
+                  { backgroundColor: colors.heroGlow, borderColor: colors.primaryMuted },
+                ]}
+              />
+              <Animated.View entering={LOGO_ENTER}>
+                <Image
+                  source={require('@/assets/images/logo25292922882.png')}
+                  style={styles.logo}
+                  contentFit="contain"
+                  cachePolicy="memory-disk"
+                  priority="high"
+                />
+              </Animated.View>
+            </View>
             <ThemedText type="title" style={styles.title}>
               Bon retour 👋
             </ThemedText>
@@ -180,6 +221,29 @@ export default function AuthScreen() {
               Vos favoris, vos commandes,
               {'\n'}livrés en un clin d&apos;œil.
             </ThemedText>
+
+            {/* Badges de confiance — la preuve sociale qui donne envie. */}
+            <View style={styles.trustRow}>
+              <View
+                style={[styles.trustChip, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <ShieldCheck size={13} color={colors.primary} strokeWidth={2.4} />
+                <ThemedText style={[styles.trustTxt, { color: colors.textSecondary }]}>
+                  Paiement sécurisé
+                </ThemedText>
+              </View>
+              <View
+                style={[styles.trustChip, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Zap size={13} color={colors.primary} strokeWidth={2.4} />
+                <ThemedText style={[styles.trustTxt, { color: colors.textSecondary }]}>
+                  Livraison rapide
+                </ThemedText>
+              </View>
+              <View
+                style={[styles.trustChip, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Star size={13} color="#F5A524" fill="#F5A524" strokeWidth={2} />
+                <ThemedText style={[styles.trustTxt, { color: colors.textSecondary }]}>4.8/5</ThemedText>
+              </View>
+            </View>
           </Animated.View>
 
           <View style={[styles.formPage, { width }]}>
@@ -281,29 +345,43 @@ export default function AuthScreen() {
               </View>
 
               {/* ── Bouton principal ── */}
-              <Pressable
-                style={({ pressed }) => [
-                  styles.submitWrap,
-                  pressed ? styles.pressed : undefined,
-                  !canSubmit ? styles.buttonDisabled : undefined,
-                ]}
-                disabled={!canSubmit}
-                onPress={handleLogin}>
-                <LinearGradient
-                  colors={[colors.primary, colors.primaryDeep]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.submitButton}>
-                  {isSubmitting ? (
-                    <ActivityIndicator color={colors.onPrimary} />
-                  ) : (
-                    <View style={styles.submitLabelRow}>
-                      <ThemedText style={styles.submitButtonText}>Se connecter</ThemedText>
-                      <ArrowRight size={20} color={colors.onPrimary} strokeWidth={2.6} />
-                    </View>
-                  )}
-                </LinearGradient>
-              </Pressable>
+              {/* Le glow porte sur un wrapper SANS overflow:hidden : un parent
+                  en overflow:hidden clipe l'ombre du bouton enfant sur iOS. */}
+              <View
+                style={[
+                  styles.submitGlow,
+                  !isSubmitting && { boxShadow: '0px 12px 30px rgba(22, 163, 74, 0.32)' },
+                ]}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.submitWrap,
+                    pressed ? styles.pressed : undefined,
+                    !canSubmit ? styles.buttonDisabled : undefined,
+                  ]}
+                  disabled={!canSubmit}
+                  onPress={handleLogin}>
+                  <LinearGradient
+                    colors={[colors.primary, colors.primaryDeep]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.submitButton}>
+                    {isSubmitting ? (
+                      <View style={styles.submitBusy}>
+                        {/* Reflet qui balaie le bouton pendant la connexion */}
+                        <View pointerEvents="none" style={styles.submitSweepRot}>
+                          <Animated.View style={[styles.submitSweep, sweepStyle]} />
+                        </View>
+                        <ThemedText style={styles.submitButtonText}>Connexion…</ThemedText>
+                      </View>
+                    ) : (
+                      <View style={styles.submitLabelRow}>
+                        <ThemedText style={styles.submitButtonText}>Se connecter</ThemedText>
+                        <ArrowRight size={20} color={colors.onPrimary} strokeWidth={2.6} />
+                      </View>
+                    )}
+                  </LinearGradient>
+                </Pressable>
+              </View>
 
               {/* ── Séparateur ── */}
               <View style={styles.dividerRow}>
@@ -388,7 +466,39 @@ function makeAuthStyles(c: AppPalette) {
       paddingHorizontal: 24,
       marginBottom: 26,
     },
+    logoWrap: {
+      position: 'relative',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 4,
+      marginBottom: 4,
+    },
+    logoGlow: {
+      position: 'absolute',
+      width: 158,
+      height: 158,
+      borderRadius: 79,
+      opacity: 0.85,
+      borderWidth: 1,
+    },
     logo: { width: 118, height: 68 },
+    trustRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      gap: 8,
+      marginTop: 6,
+    },
+    trustChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      borderWidth: 1,
+    },
+    trustTxt: { fontSize: 11.5, fontWeight: '700' },
     title: {
       fontSize: 26,
       lineHeight: 32,
@@ -410,6 +520,10 @@ function makeAuthStyles(c: AppPalette) {
       borderRadius: 24,
       padding: 20,
       gap: 14,
+      shadowColor: '#0C3020',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.1,
+      shadowRadius: 22,
       elevation: 6,
     },
     section: {
@@ -470,8 +584,11 @@ function makeAuthStyles(c: AppPalette) {
       opacity: 0.86,
       transform: [{ scale: 0.995 }],
     },
-    submitWrap: {
+    submitGlow: {
       marginTop: 8,
+      borderRadius: 999,
+    },
+    submitWrap: {
       borderRadius: 999,
       overflow: 'hidden',
     },
@@ -488,6 +605,27 @@ function makeAuthStyles(c: AppPalette) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
+    },
+    submitBusy: {
+      position: 'relative',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    submitSweepRot: {
+      position: 'absolute',
+      top: -46,
+      left: 0,
+      width: '120%',
+      height: 150,
+      transform: [{ rotate: '18deg' }],
+    },
+    submitSweep: {
+      width: 110,
+      height: '100%',
+      borderRadius: 999,
+      backgroundColor: 'rgba(255,255,255,0.32)',
     },
     submitButtonText: {
       color: '#FFFFFF',
