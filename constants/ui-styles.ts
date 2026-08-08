@@ -2,6 +2,12 @@ import { StyleSheet } from 'react-native';
 
 import type { AppPalette } from '@/constants/app-palette';
 
+/** Propriétés de « verre dépoli » (BlurView) selon le thème — le même effet
+ * que l'overlay de déconnexion, appliqué aux surfaces persistantes. */
+export function glassProps(isDark: boolean): { intensity: number; tint: 'dark' | 'light' } {
+  return { intensity: isDark ? 46 : 62, tint: isDark ? 'dark' : 'light' };
+}
+
 /** Styles communs dérivés de la palette (évite les couleurs en dur). */
 export function createScreenStyles(c: AppPalette) {
   return StyleSheet.create({

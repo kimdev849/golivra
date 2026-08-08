@@ -1,5 +1,6 @@
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { PlatformPressable } from '@react-navigation/elements';
+import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -12,7 +13,9 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LUCIDE_STROKE } from '@/constants/icons';
+import { useAppTheme } from '@/contexts/app-theme-context';
 import { useAppColors } from '@/hooks/use-app-colors';
+import { glassProps } from '@/constants/ui-styles';
 
 /**
  * Barre de navigation vendeur — pleine largeur, épurée et professionnelle,
@@ -114,6 +117,7 @@ function TabItem({
 
 export function VendorTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const colors = useAppColors();
+  const { isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 10);
 
@@ -125,11 +129,12 @@ export function VendorTabBar({ state, descriptors, navigation }: BottomTabBarPro
 
   return (
     <View style={styles.root}>
-      <View
+      {/* Verre dépoli : le contenu qui passe sous la barre est flouté. */}
+      <BlurView
+        {...glassProps(isDark)}
         style={[
           styles.bar,
           {
-            backgroundColor: colors.surfaceElevated,
             borderTopColor: colors.borderStrong,
             paddingBottom: bottomPad,
           },
@@ -173,7 +178,7 @@ export function VendorTabBar({ state, descriptors, navigation }: BottomTabBarPro
             />
           );
         })}
-      </View>
+      </BlurView>
     </View>
   );
 }

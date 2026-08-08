@@ -1,5 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -37,7 +38,9 @@ import { HomeActiveOrderWidget } from '@/components/home-active-order-widget';
 import { HomeCampaignBanner } from '@/components/home-campaign-banner';
 import { ThemedView } from '@/components/themed-view';
 import { HomeFeedSkeleton } from '@/components/ui/skeleton';
+import { useAppTheme } from '@/contexts/app-theme-context';
 import { LUCIDE_STROKE } from '@/constants/icons';
+import { glassProps } from '@/constants/ui-styles';
 import { TAB_BAR_CONTENT_PADDING_BOTTOM } from '@/constants/layout';
 import { useActiveOrders } from '@/hooks/useActiveOrders';
 import { useAppColors } from '@/hooks/use-app-colors';
@@ -293,6 +296,7 @@ export default function HomeScreen() {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
+  const { isDark } = useAppTheme();
   const { unreadCount } = useUnreadNotifications();
   const { heroOrder, isLoading: loadingOrders, refetch: refetchOrders } = useActiveOrders();
   // ⚡ Temps de livraison dynamique (GoLivra) selon la zone de l'adresse principale.
@@ -981,12 +985,14 @@ export default function HomeScreen() {
       </Animated.View>
 
       {/* ── En-tête fixe (recherche + filtres) : toujours visible ── */}
-      <View
+      {/* En-tête en verre dépoli : le contenu qui défile dessous est flouté,
+          le même effet pro que la déconnexion. */}
+      <BlurView
         pointerEvents="box-none"
+        {...glassProps(isDark)}
         style={[
           styles.fixedHeader,
           {
-            backgroundColor: colors.background,
             borderBottomColor: colors.border,
             paddingTop: Math.max(insets.top, 12),
           },
@@ -996,7 +1002,7 @@ export default function HomeScreen() {
           setHeaderHeight((prev) => (Math.abs(prev - h) > 1 ? h : prev));
         }}>
         {fixedHeaderContent}
-      </View>
+      </BlurView>
 
       {/* Back to top — positionné bien AU-DESSUS de la barre d'onglets pour
           ne jamais être recouvert. La barre mesure ~73px hors insets
