@@ -1,6 +1,5 @@
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { PlatformPressable } from '@react-navigation/elements';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -14,10 +13,8 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LUCIDE_STROKE } from '@/constants/icons';
-import { useAppTheme } from '@/contexts/app-theme-context';
 import { useCart } from '@/contexts/cart-context';
 import { useAppColors } from '@/hooks/use-app-colors';
-import { glassProps } from '@/constants/ui-styles';
 import { shouldShowTabBar } from '@/lib/tab-bar-visibility';
 
 /**
@@ -145,7 +142,6 @@ function TabItem({
 export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { itemCount } = useCart();
   const colors = useAppColors();
-  const { isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 10);
 
@@ -169,12 +165,11 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
 
   return (
     <Animated.View style={[styles.root, barAnimStyle]} pointerEvents={visible ? 'auto' : 'none'}>
-      {/* Verre dépoli : le contenu qui passe sous la barre est flouté. */}
-      <BlurView
-        {...glassProps(isDark)}
+      <View
         style={[
           styles.bar,
           {
+            backgroundColor: colors.surfaceElevated,
             borderTopColor: colors.borderStrong,
             paddingBottom: bottomPad,
           },
@@ -219,7 +214,7 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
             />
           );
         })}
-      </BlurView>
+      </View>
     </Animated.View>
   );
 }
