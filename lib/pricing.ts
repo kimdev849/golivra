@@ -253,7 +253,7 @@ export function deliveryEstimateForQuartier(
 
 /**
  * Temps de livraison estimé (min) pour le quartier du client, selon la zone :
- * proche 30 min · moyenne 45 min · éloignée 60 min.
+ * proche 25 min · moyenne 35 min · éloignée 45 min.
  * `null` si la zone n'est pas déterminable (pas de config zones / quartier inconnu).
  */
 export function deliveryMinutesForQuartier(

@@ -37,6 +37,16 @@ type OrderDetail = {
     articles: { id: string; nom: string; quantite: number; prix_unitaire: number }[];
     livraison_id?: string;
   }[];
+  /** Estimation d'arrivée calculée par l'API (préparation + zone de livraison). */
+  eta?: {
+    prepMinutes: number;
+    deliveryMinutes: number | null;
+    tier: string | null;
+    tierLabel: string | null;
+    quartierLivraison: string | null;
+    totalMinutes: number | null;
+    arriveeEstimeeAt: string | null;
+  };
   livraison_id?: string | null;
   livraisons?: { id: string; statut: string; type_livraison?: string }[];
   livreur?: {
@@ -54,6 +64,26 @@ type OrderDetail = {
 function formatFcfa(value: number | null | undefined): string {
   if (value == null) return '—';
   return `${Number(value).toLocaleString('fr-FR')} FCFA`;
+}
+
+/** « vers 14h32 » à partir d'un ISO — repli silencieux si invalide. */
+function formatHeure(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return null;
+    return `vers ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Minutes restantes avant l'arrivée estimée (borné ≥ 0), ou null. */
+function remainingMinutes(arriveeEstimeeAt: string | null | undefined): number | null {
+  if (!arriveeEstimeeAt) return null;
+  const at = new Date(arriveeEstimeeAt).getTime();
+  if (!Number.isFinite(at)) return null;
+  return Math.max(0, Math.ceil((at - Date.now()) / 60_000));
 }
 
 export default function OrderTrackingScreen() {
@@ -140,6 +170,14 @@ export default function OrderTrackingScreen() {
 
   const allArticles = (order?.sousCommandes || []).flatMap((sc) => sc.articles || []);
 
+  // ETA réelle calculée par l'API : préparation (commerce) + livraison (zone GoLivra).
+  const eta = order?.eta;
+  const arriveeLabel = formatHeure(eta?.arriveeEstimeeAt);
+  const restantMin = remainingMinutes(eta?.arriveeEstimeeAt);
+  const zoneTierLabel = eta?.tierLabel || null;
+  const quartierLivraison = eta?.quartierLivraison || null;
+  const zoneLabel = zoneTierLabel || quartierLivraison || null;
+
   return (
     <ThemedView style={styles.screen} lightColor={colors.backgroundAlt} darkColor={colors.backgroundAlt}>
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 10), backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
@@ -217,12 +255,20 @@ export default function OrderTrackingScreen() {
                         <Bike size={24} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <ThemedText style={[styles.etaLabel, { color: colors.textMuted }]}>Temps estimé</ThemedText>
-                        <ThemedText style={[styles.etaTime, { color: colors.text }]}>12 min</ThemedText>
+                        <ThemedText style={[styles.etaLabel, { color: colors.textMuted }]}>Arrivée estimée</ThemedText>
+                        <ThemedText style={[styles.etaTime, { color: colors.text }]}>
+                          {restantMin != null && restantMin > 0
+                            ? `~${restantMin} min`
+                            : arriveeLabel || 'Arrivée en cours'}
+                        </ThemedText>
                       </View>
                       <View style={{ alignItems: 'flex-end' }}>
-                        <ThemedText style={[styles.distanceLabel, { color: colors.textMuted }]}>Distance</ThemedText>
-                        <ThemedText style={[styles.distanceValue, { color: colors.primaryDeep }]}>2.4 km</ThemedText>
+                        <ThemedText style={[styles.distanceLabel, { color: colors.textMuted }]}>
+                          {zoneTierLabel ? 'Zone' : quartierLivraison ? 'Quartier' : 'Arrivée'}
+                        </ThemedText>
+                        <ThemedText style={[styles.distanceValue, { color: colors.primaryDeep }]} numberOfLines={1}>
+                          {zoneTierLabel || quartierLivraison || arriveeLabel || '—'}
+                        </ThemedText>
                       </View>
                     </View>
                     <View style={[styles.divider, { backgroundColor: colors.border }]} />
@@ -236,7 +282,9 @@ export default function OrderTrackingScreen() {
                     <View style={{ flex: 1 }}>
                       <ThemedText style={[styles.etaTime, { color: colors.text }]}>Préparation en cours</ThemedText>
                       <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 2 }]}>
-                        Votre livreur sera assigné prochainement.
+                        {eta?.totalMinutes != null
+                          ? `Arrivée estimée ${arriveeLabel || `dans ~${eta.totalMinutes} min`} · ${zoneLabel || 'livraison GoLivra'}`
+                          : 'Votre livreur sera assigné prochainement.'}
                       </ThemedText>
                     </View>
                   </View>
