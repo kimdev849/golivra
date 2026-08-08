@@ -62,7 +62,15 @@ export type VendorOrder = {
   lignes: VendorOrderLine[];
   livreur?: { nom: string; tel: string };
   livraison_statut?: string | null;
-  /** Délai d'acceptation (15 min après création). Présent si la commande est encore en attente. */
+  /**
+   * Nouveau parcours : statut du paiement client (en_attente / valide / echoue).
+   * La commande n'est « réellement confirmée » qu'une fois le paiement validé —
+   * la préparation ne démarre qu'à ce moment-là.
+   */
+  paiement_statut?: string | null;
+  /** Délai de paiement du client (5 min après acceptation) — effacé dès paiement. */
+  paiement_limite_at?: string | null;
+  /** Délai d'acceptation (5 min après création). Présent si la commande est encore en attente. */
   acceptation_limite_at?: string | null;
   created_at?: string;
   commande_timeline?: TimelineStep[];

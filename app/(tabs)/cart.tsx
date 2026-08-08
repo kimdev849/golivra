@@ -13,7 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Check, ChevronRight, Home, Info, Minus, PackageOpen, Plus, Smartphone, Sparkles, Trash2, Truck } from 'lucide-react-native';
+import { Check, ChevronRight, Home, Info, Minus, PackageOpen, Plus, Sparkles, Trash2, Truck } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 
 
@@ -41,7 +41,6 @@ import {
 import { fetchUserAddresses, type UserAddress } from '@/lib/addresses';
 import { addressLabel, deliveryAddressError, formatDeliveryAddressText, snapshotFromFields, type DeliveryAddressFields } from '@/lib/format-address';
 import { formatFcfa, formatHumanMinutes } from '@/lib/format';
-import { CLIENT_PAYMENT_METHODS, type ClientPaymentMethodId } from '@/lib/payment-methods';
 import { resolveRemoteImageUrl } from '@/lib/images';
 import {
   DEFAULT_PUBLIC_PRICING,
@@ -100,7 +99,9 @@ export default function CartScreen() {
   const [productById, setProductById] = useState<Record<string, ProductPublic>>({});
   const [enterpriseById, setEnterpriseById] = useState<Record<string, EnterprisePublic | null>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [methodePaiement, setMethodePaiement] = useState<ClientPaymentMethodId>('airtel_money');
+  // Paiement Mobile Money par défaut (choisi au moment du paiement, après
+  // acceptation du commerce — le parcours ne débite rien à la commande).
+  const methodePaiement = 'airtel_money' as const;
   const [promoInput, setPromoInput] = useState('');
   const [appliedPromo, setAppliedPromo] = useState<PromoValidation | null>(null);
   const [promoLoading, setPromoLoading] = useState(false);
@@ -370,49 +371,22 @@ export default function CartScreen() {
           })),
         },
       });
-      await apiFetch(`/api/orders/${created.id}/pay`, {
-        method: 'POST',
-        token,
-        jsonBody: {
-          provider: methodePaiement === 'mtn_money' ? 'mtn' : 'airtel',
-        },
-      });
-      // ⏱ Estimation réelle : préparation (commerce) + livraison (zone GoLivra).
-      const rows = cart.segments.map((s) => {
-        const ent = enterpriseById[s.enterpriseId];
-        const eta = etaEstimateForEnterprise(
-          ent ?? { type: s.enterpriseType ?? 'restaurant' },
-          address.quartier,
-          pricing ?? DEFAULT_PUBLIC_PRICING,
-        );
-        return {
-          enterpriseNom: s.enterpriseNom,
-          minutesEstimate: eta.totalMinutes ?? Math.max(eta.prepMinutes + 15, 30),
-          kind:
-            s.enterpriseType === 'boutique'
-              ? ('boutique' as const)
-              : s.enterpriseType === 'restaurant'
-                ? ('restaurant' as const)
-                : ('commerce' as const),
-        };
-      });
+      // Nouveau parcours : AUCUN paiement à la commande — le client paiera après
+      // acceptation du commerce (5 min pour accepter, 5 min ensuite pour payer).
       await saveCart(null);
       clearPromo();
       setAddress(emptyAddressForm());
       setSavedAddressId(null);
       await refreshMeta(null);
-      const summaryHref = {
-        pathname: '/order-deliveries-summary',
-        params: { data: encodeURIComponent(JSON.stringify(rows)) },
-      } as unknown as Href;
+      const trackingHref = `/order-tracking/${created.id}` as Href;
       showSuccess(
-        'Commande bien passée !',
+        'Commande envoyée !',
         segmentCount > 1
-          ? `Votre paiement est confirmé. ${segmentCount} livraisons sont en cours de préparation.`
-          : 'Votre paiement est confirmé. Le commerce prépare votre commande.',
+          ? `En attente de confirmation des ${segmentCount} commerces (5 min). Vous paierez après acceptation.`
+          : 'En attente de confirmation du commerce (5 min). Vous paierez après acceptation.',
         {
-          primaryLabel: 'Voir le suivi',
-          onPrimary: () => router.push(summaryHref),
+          primaryLabel: 'Suivre ma commande',
+          onPrimary: () => router.push(trackingHref),
         },
       );
     } catch (e) {
@@ -687,25 +661,12 @@ export default function CartScreen() {
 
               <View style={[styles.checkoutSection, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
                 <ThemedText type="defaultSemiBold" style={[styles.checkoutSectionTitle, { color: colors.primaryDeep }]}>
-                  Paiement Mobile Money
+                  Paiement après acceptation
                 </ThemedText>
                 <ThemedText style={[styles.payHint, { color: colors.textMuted }]}>
-                  Airtel Money ou MTN — paiement validé automatiquement en mode test.
+                  Aucun débit maintenant : le commerce a 5 min pour accepter votre commande, puis vous
+                  payez par Airtel Money ou MTN Mobile Money.
                 </ThemedText>
-                <View style={styles.payChoices}>
-                  {CLIENT_PAYMENT_METHODS.map((m) => {
-                    const on = methodePaiement === m.id;
-                    return (
-                      <Pressable
-                        key={m.id}
-                        style={[styles.payChoice, { backgroundColor: colors.surface, borderColor: colors.border }, on && { borderColor: colors.primary, backgroundColor: colors.primary }]}
-                        onPress={() => setMethodePaiement(m.id)}>
-                        <Smartphone size={22} color={on ? colors.onPrimary : colors.primary} strokeWidth={LUCIDE_STROKE} />
-                        <ThemedText style={[styles.payChoiceLabel, { color: colors.primaryDeep }, on && { color: colors.onPrimary }]}>{m.label}</ThemedText>
-                      </Pressable>
-                    );
-                  })}
-                </View>
               </View>
 
               <View style={styles.summary}>

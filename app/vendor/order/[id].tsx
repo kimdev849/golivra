@@ -108,6 +108,11 @@ export default function VendorOrderDetailScreen() {
   const showAccept = o.statut === 'en_attente';
   const showPrep = o.statut === 'a_preparer' || o.statut === 'en_preparation';
   const showDelivery = o.statut === 'prete' || o.statut === 'en_livraison';
+  // Nouveau parcours : le client paie APRÈS acceptation. Tant que le paiement
+  // n'est pas validé, la commande n'est pas réellement confirmée → pas de
+  // préparation possible.
+  const paid = o.paiement_statut === 'valide';
+  const waitingClientPayment = o.statut === 'a_preparer' && !paid;
 
   const runStatus = async (
     statut: string,
@@ -281,7 +286,26 @@ export default function VendorOrderDetailScreen() {
             </Pressable>
           </View>
         ) : null}
-        {showPrep ? (
+        {waitingClientPayment ? (
+          <View
+            style={{
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: colors.warning,
+              backgroundColor: colors.warningSoft,
+              padding: 14,
+              gap: 4,
+            }}>
+            <ThemedText style={{ color: colors.warning, fontWeight: '800', fontSize: 14 }}>
+              ⏳ En attente de paiement du client
+            </ThemedText>
+            <ThemedText style={{ color: colors.textMuted, fontSize: 13, lineHeight: 18 }}>
+              La commande est acceptée. La préparation démarrera dès la confirmation du paiement
+              (le client a 5 minutes pour payer).
+            </ThemedText>
+          </View>
+        ) : null}
+        {showPrep && paid ? (
           <Pressable
             style={[styles.primaryBtn, { backgroundColor: palette.primaryDeep }]}
             onPress={() => router.push(hrefVendorPreparation(o.id))}>

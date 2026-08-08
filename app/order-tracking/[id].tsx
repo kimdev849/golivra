@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { ArrowLeft, Bike, CheckCircle2, Clock, ExternalLink, MapPin, Package, PhoneCall, Sparkles, Star } from 'lucide-react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ArrowLeft, Bike, CheckCircle2, Clock, ExternalLink, MapPin, Package, PhoneCall, Smartphone, Sparkles, Star } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 
@@ -15,11 +15,23 @@ import { getSessionToken } from '@/lib/auth';
 import type { TimelineStep as _TimelineStep } from '@/lib/datetime';
 import { orderPollingIntervalMs } from '@/lib/order-status';
 import { orderRefundMessage, orderStatusLabel } from '@/lib/ux-copy';
+import { formatFcfa } from '@/lib/format';
 
 type LocalTimelineStep = {
   titre: string;
   date: string | null;
   type: 'fait' | 'encours' | 'afaire';
+};
+
+type SousCommandeDetail = {
+  id: string;
+  restaurant_id?: string;
+  boutique_id?: string;
+  statut: string;
+  commerce_nom?: string | null;
+  total?: number | null;
+  articles: { id: string; nom: string; quantite: number; prix_unitaire: number }[];
+  livraison_id?: string;
 };
 
 type OrderDetail = {
@@ -29,15 +41,10 @@ type OrderDetail = {
   total: number;
   adresse_livraison?: string;
   cree_le: string;
-  sousCommandes?: {
-    id: string;
-    restaurant_id?: string;
-    boutique_id?: string;
-    statut: string;
-    articles: { id: string; nom: string; quantite: number; prix_unitaire: number }[];
-    livraison_id?: string;
-  }[];
-  /** Estimation d'arrivée calculée par l'API (préparation + zone de livraison). */
+  sousCommandes?: SousCommandeDetail[];
+  /**
+   * Estimation d'arrivée calculée par l'API (préparation + zone de livraison).
+   */
   eta?: {
     prepMinutes: number;
     deliveryMinutes: number | null;
@@ -47,6 +54,16 @@ type OrderDetail = {
     totalMinutes: number | null;
     arriveeEstimeeAt: string | null;
   };
+  /**
+   * Nouveau parcours « paiement après acceptation » : statut du paiement,
+   * délai de paiement (5 min), montant réellement dû (segments acceptés),
+   * délai d'acceptation et motif d'annulation éventuel.
+   */
+  paiement_statut?: string | null;
+  paiement_limite_at?: string | null;
+  acceptation_limite_at?: string | null;
+  annulation_motif?: string | null;
+  total_a_payer?: number;
   livraison_id?: string | null;
   livraisons?: { id: string; statut: string; type_livraison?: string }[];
   livreur?: {
@@ -61,12 +78,6 @@ type OrderDetail = {
   };
 };
 
-function formatFcfa(value: number | null | undefined): string {
-  if (value == null) return '—';
-  return `${Number(value).toLocaleString('fr-FR')} FCFA`;
-}
-
-/** « vers 14h32 » à partir d'un ISO — repli silencieux si invalide. */
 function formatHeure(iso: string | null | undefined): string | null {
   if (!iso) return null;
   try {
@@ -78,12 +89,37 @@ function formatHeure(iso: string | null | undefined): string | null {
   }
 }
 
-/** Minutes restantes avant l'arrivée estimée (borné ≥ 0), ou null. */
-function remainingMinutes(arriveeEstimeeAt: string | null | undefined): number | null {
-  if (!arriveeEstimeeAt) return null;
-  const at = new Date(arriveeEstimeeAt).getTime();
+/** Minutes restantes avant une échéance (borné ≥ 0), ou null si indéterminée. */
+function remainingUntil(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const at = new Date(iso).getTime();
   if (!Number.isFinite(at)) return null;
   return Math.max(0, Math.ceil((at - Date.now()) / 60_000));
+}
+
+/** « ~3 min » / « moins d'une minute » / « expiré » depuis une échéance. */
+function countdownLabel(iso: string | null | undefined): string | null {
+  const mins = remainingUntil(iso);
+  if (mins == null) return null;
+  if (mins <= 0) return 'expiré';
+  if (mins === 1) return '~1 min restante';
+  return `~${mins} min restantes`;
+}
+
+const SC_STATUS_LABEL: Record<string, string> = {
+  en_attente: '⏳ En attente',
+  acceptee: '✅ Acceptée',
+  en_preparation: '👨‍🍳 En préparation',
+  prete: '📦 Prête',
+  collectee: '🛵 Récupérée',
+  livree: '✅ Livrée',
+  refusee: '❌ Refusée',
+  remboursee: '⏱️ Expirée',
+  annulee: '❌ Annulée',
+};
+
+function scStatusLabel(statut: string): string {
+  return SC_STATUS_LABEL[statut] ?? statut;
 }
 
 export default function OrderTrackingScreen() {
@@ -91,9 +127,12 @@ export default function OrderTrackingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
-  
+
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [payMethod, setPayMethod] = useState<'airtel' | 'mtn'>('airtel');
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -108,18 +147,17 @@ export default function OrderTrackingScreen() {
         if (!alive) return;
         setOrder(res);
         setLoading(false);
-        // Suivi en temps réel : on replanifie un refresh silencieux selon
-        // l'avancement (5 s pendant la livraison, 15 s en préparation, 30 s
-        // en attente) et on s'arrête dès que la commande est livrée/annulée.
         if (timer) clearTimeout(timer);
-        const interval = orderPollingIntervalMs(res.statut);
+        // Polling rapide (5 s) tant qu'une échéance est active (attente de
+        // confirmation ou délai de paiement), puis suivi temps réel standard.
+        const waitingResponse =
+          res.paiement_statut !== 'valide' &&
+          (res.statut === 'en_attente' || res.statut === 'acceptee' || res.statut === 'partiellement_acceptee');
+        const interval = waitingResponse ? 5_000 : orderPollingIntervalMs(res.statut);
         if (interval !== false) {
           timer = setTimeout(() => void fetchOrder(), interval);
         }
       } catch {
-        // Silencieux : on conserve l'état actuel, mais on replanifie quand même
-        // un refresh (15 s) pour reprendre le suivi après une erreur réseau
-        // transitoire au lieu de figer l'écran.
         if (alive) {
           setLoading(false);
           if (timer) clearTimeout(timer);
@@ -135,6 +173,52 @@ export default function OrderTrackingScreen() {
     };
   }, [id]);
 
+  const payNow = async () => {
+    if (paying || !id) return;
+    setPaying(true);
+    setPayError(null);
+    try {
+      const token = await getSessionToken();
+      if (!token) throw new Error('Session expirée');
+      await apiFetch(`/api/orders/${id}/pay`, {
+        method: 'POST',
+        token,
+        jsonBody: { provider: payMethod },
+      });
+      // Le webhook (ou le mode test) met à jour le paiement : le polling
+      // ci-dessus basculera l'écran en « confirmation » automatiquement.
+    } catch (e) {
+      setPayError(e instanceof Error ? e.message : 'Paiement impossible, réessayez.');
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  const cancelAll = () => {
+    Alert.alert(
+      'Annuler toute la commande',
+      'Les commerces qui ont accepté seront informés. Cette action est définitive.',
+      [
+        { text: 'Garder ma commande', style: 'cancel' },
+        {
+          text: 'Annuler la commande',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                const token = await getSessionToken();
+                if (!token) return;
+                await apiFetch(`/api/orders/${id}/cancel`, { method: 'POST', token });
+              } catch {
+                /* le polling resynchronisera l'état */
+              }
+            })();
+          },
+        },
+      ],
+    );
+  };
+
   if (loading) {
     return (
       <ThemedView style={styles.center} lightColor={colors.background} darkColor={colors.background}>
@@ -143,7 +227,6 @@ export default function OrderTrackingScreen() {
     );
   }
 
-  // Fallback si pas de données
   if (!order && !loading) {
     return (
       <ThemedView style={styles.center} lightColor={colors.background} darkColor={colors.background}>
@@ -170,10 +253,24 @@ export default function OrderTrackingScreen() {
 
   const allArticles = (order?.sousCommandes || []).flatMap((sc) => sc.articles || []);
 
+  // ── Nouveau parcours : attente de confirmation → paiement après acceptation ──
+  const paid = order?.paiement_statut === 'valide';
+  const waitingConfirmation = !paid && order?.statut === 'en_attente';
+  const readyToPay =
+    !paid &&
+    (order?.statut === 'acceptee' || order?.statut === 'partiellement_acceptee');
+  const scs = order?.sousCommandes || [];
+  const refusedScs = scs.filter((s) => s.statut === 'refusee' || s.statut === 'remboursee');
+  const confirmationCountdown = countdownLabel(order?.acceptation_limite_at);
+  const paymentCountdown = countdownLabel(order?.paiement_limite_at);
+  const paymentDeadlineExpired =
+    order?.paiement_limite_at != null && remainingUntil(order.paiement_limite_at) === 0;
+  const totalAPayer = order?.total_a_payer ?? 0;
+
   // ETA réelle calculée par l'API : préparation (commerce) + livraison (zone GoLivra).
   const eta = order?.eta;
   const arriveeLabel = formatHeure(eta?.arriveeEstimeeAt);
-  const restantMin = remainingMinutes(eta?.arriveeEstimeeAt);
+  const restantMin = remainingUntil(eta?.arriveeEstimeeAt);
   const zoneTierLabel = eta?.tierLabel || null;
   const quartierLivraison = eta?.quartierLivraison || null;
   const zoneLabel = zoneTierLabel || quartierLivraison || null;
@@ -191,7 +288,7 @@ export default function OrderTrackingScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 20 }]}>
-        
+
         {/* CARTE REMBOURSEMENT - commande expirée / annulée */}
         {isRefunded && (
           <View
@@ -205,10 +302,10 @@ export default function OrderTrackingScreen() {
                   <Clock size={26} color="#FFFFFF" strokeWidth={LUCIDE_STROKE} />
                 </View>
                 <ThemedText style={[styles.etaTime, { color: colors.text, textAlign: 'center' }]}>
-                  {orderStatusLabel(order?.statut)}
+                  {order?.annulation_motif ? 'Commande annulée' : orderStatusLabel(order?.statut)}
                 </ThemedText>
                 <ThemedText style={[styles.etaLabel, { color: colors.textMuted, textAlign: 'center', lineHeight: 20 }]}>
-                  {refundMessage}
+                  {order?.annulation_motif || refundMessage}
                 </ThemedText>
               </View>
             </View>
@@ -219,9 +316,6 @@ export default function OrderTrackingScreen() {
         {!isDelivered && !isRefunded && (
           <View style={[styles.mapPreviewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={[styles.staticMapContainer, { backgroundColor: colors.primarySoft }]}>
-              {/* Illustration personnalisée GoLivra — plus d'image externe.
-                  Halos + anneau d'icône + badges flottants, aux couleurs de la
-                  palette (fonctionne en clair ET en sombre). */}
               <View style={[styles.artHalo, styles.artHaloA, { backgroundColor: colors.accentSoft }]} />
               <View style={[styles.artHalo, styles.artHaloB, { backgroundColor: colors.surface }]} />
               <View style={[styles.artRing, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -246,7 +340,7 @@ export default function OrderTrackingScreen() {
               <View style={[styles.artDot, styles.artDotB, { backgroundColor: colors.primary }]} />
               <View style={[styles.artDot, styles.artDotC, { backgroundColor: colors.borderStrong }]} />
 
-              {/* Overlay Distance + Statut */}
+              {/* Overlay état : attente de confirmation / paiement / préparation / en livraison */}
               <View style={[styles.mapOverlay, { backgroundColor: colors.surface }]}>
                 {order?.statut === 'en_livraison' ? (
                   <>
@@ -274,13 +368,138 @@ export default function OrderTrackingScreen() {
                     <View style={[styles.divider, { backgroundColor: colors.border }]} />
                     <ThemedText style={[styles.statusHighlight, { color: colors.primary }]}>En route vers vous</ThemedText>
                   </>
+                ) : waitingConfirmation ? (
+                  <View style={styles.statusRow}>
+                    <View style={[styles.etaIconBox, { backgroundColor: colors.warningSoft }]}>
+                      <Clock size={24} color={colors.warning} strokeWidth={LUCIDE_STROKE} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <ThemedText style={[styles.etaTime, { color: colors.text }]}>En attente de confirmation</ThemedText>
+                      <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 2, lineHeight: 18 }]}>
+                        {scs.length > 1
+                          ? `Les ${scs.length} commerces ont 5 minutes pour confirmer votre commande.`
+                          : 'Le commerce a 5 minutes pour confirmer votre commande.'}
+                      </ThemedText>
+                      {confirmationCountdown ? (
+                        <ThemedText style={[styles.deadlineText, { color: colors.warning }]}>
+                          ⏱️ {confirmationCountdown} · réponse avant {formatHeure(order?.acceptation_limite_at)}
+                        </ThemedText>
+                      ) : null}
+                    </View>
+                  </View>
+                ) : readyToPay ? (
+                  <View style={{ gap: 10 }}>
+                    <View style={styles.statusRow}>
+                      <View style={[styles.etaIconBox, { backgroundColor: colors.successSoft }]}>
+                        <CheckCircle2 size={24} color={colors.success} strokeWidth={LUCIDE_STROKE} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <ThemedText style={[styles.etaTime, { color: colors.text }]}>
+                          Commande {scs.length > 1 && refusedScs.length > 0 ? 'partiellement ' : ''}acceptée
+                        </ThemedText>
+                        <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 2, lineHeight: 18 }]}>
+                          💳 Paiement requis — vous avez 5 min pour confirmer.
+                        </ThemedText>
+                        {paymentCountdown ? (
+                          <ThemedText style={[styles.deadlineText, { color: paymentDeadlineExpired ? colors.error : colors.warning }]}>
+                            ⏱️ {paymentCountdown}
+                          </ThemedText>
+                        ) : null}
+                      </View>
+                    </View>
+
+                    {/* Répartition par commerce : acceptés / refusés / expirés */}
+                    {scs.length > 1 ? (
+                      <View style={[styles.breakdownBox, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
+                        {scs.map((sc) => (
+                          <View key={sc.id} style={styles.scRow}>
+                            <ThemedText style={[styles.scName, { color: colors.text }]} numberOfLines={1}>
+                              {sc.commerce_nom || 'Commerce'}
+                            </ThemedText>
+                            <ThemedText
+                              style={[
+                                styles.scStatut,
+                                {
+                                  color: ['refusee', 'remboursee', 'annulee'].includes(sc.statut) ? colors.error : colors.primaryDeep,
+                                },
+                              ]}>
+                              {scStatusLabel(sc.statut)}
+                            </ThemedText>
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+                    {refusedScs.length > 0 ? (
+                      <ThemedText style={[styles.refusedHint, { color: colors.textMuted, lineHeight: 18 }]}>
+                        {refusedScs.length > 1
+                          ? `${refusedScs.length} commerces n'ont pas pu confirmer votre commande — ils ne seront pas facturés.`
+                          : "Un commerce n'a pas pu confirmer votre commande — il ne sera pas facturé."}
+                      </ThemedText>
+                    ) : null}
+
+                    <View style={[styles.payBox, { backgroundColor: colors.successSoft, borderColor: colors.success }]}>
+                      <ThemedText style={[styles.payTotal, { color: colors.primaryDeep }]}>
+                        Total à payer : {formatFcfa(totalAPayer)}
+                      </ThemedText>
+                      <View style={styles.payMethodRow}>
+                        {(
+                          [
+                            { id: 'airtel' as const, label: 'Airtel Money' },
+                            { id: 'mtn' as const, label: 'MTN MoMo' },
+                          ]
+                        ).map((m) => {
+                          const on = payMethod === m.id;
+                          return (
+                            <Pressable
+                              key={m.id}
+                              style={[
+                                styles.payMethodBtn,
+                                {
+                                  backgroundColor: on ? colors.primary : colors.surface,
+                                  borderColor: on ? colors.primary : colors.border,
+                                },
+                              ]}
+                              onPress={() => setPayMethod(m.id)}
+                              disabled={paying}>
+                              <Smartphone size={16} color={on ? colors.onPrimary : colors.primary} strokeWidth={LUCIDE_STROKE} />
+                              <ThemedText style={[styles.payMethodLabel, { color: on ? colors.onPrimary : colors.text }]}>
+                                {m.label}
+                              </ThemedText>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                      <Pressable
+                        style={[styles.payCta, { backgroundColor: colors.primary }]}
+                        onPress={() => void payNow()}
+                        disabled={paying || paymentDeadlineExpired}>
+                        {paying ? (
+                          <ActivityIndicator color={colors.onPrimary} size="small" />
+                        ) : (
+                          <ThemedText style={[styles.payCtaText, { color: colors.onPrimary }]}>
+                            {paymentDeadlineExpired ? 'Délai expiré' : `Payer ${formatFcfa(totalAPayer)}`}
+                          </ThemedText>
+                        )}
+                      </Pressable>
+                      {payError ? (
+                        <ThemedText style={[styles.payErr, { color: colors.error }]}>{payError}</ThemedText>
+                      ) : null}
+                    </View>
+                    <Pressable onPress={cancelAll} hitSlop={8} style={styles.cancelLink}>
+                      <ThemedText style={[styles.cancelLinkText, { color: colors.error }]}>
+                        Annuler toute la commande
+                      </ThemedText>
+                    </Pressable>
+                  </View>
                 ) : (
                   <View style={styles.statusRow}>
                     <View style={[styles.etaIconBox, { backgroundColor: colors.primarySoft }]}>
                       <Package size={24} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <ThemedText style={[styles.etaTime, { color: colors.text }]}>Préparation en cours</ThemedText>
+                      <ThemedText style={[styles.etaTime, { color: colors.text }]}>
+                        {paid ? 'Commande confirmée' : 'Préparation en cours'}
+                      </ThemedText>
                       <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 2 }]}>
                         {eta?.totalMinutes != null
                           ? `Arrivée estimée ${arriveeLabel || `dans ~${eta.totalMinutes} min`} · ${zoneLabel || 'livraison GoLivra'}`
@@ -303,7 +522,7 @@ export default function OrderTrackingScreen() {
             </View>
             <View style={{ alignItems: 'flex-end' }}>
               <ThemedText style={[styles.orderLabel, { color: colors.textMuted }]}>Total</ThemedText>
-              <ThemedText style={[styles.orderValue, { color: colors.primaryDeep, fontWeight: '700' }]}>{formatFcfa(order?.total)}</ThemedText>
+              <ThemedText style={[styles.orderValue, { color: colors.primaryDeep, fontWeight: '700' }]}>{formatFcfa(order?.total ?? 0)}</ThemedText>
             </View>
           </View>
           {isDelivered && (
@@ -408,22 +627,18 @@ const styles = StyleSheet.create({
   backBtn: { padding: 4 },
   headerTitle: { fontSize: 18, fontWeight: '800' },
   scroll: { padding: 16, gap: 16 },
-  
+
   mapPreviewCard: {
     borderRadius: 20,
     borderWidth: 1,
     overflow: 'hidden',
   },
-  // 270px : assez haut pour que l'illustration (halos + anneau + badges) reste
-  // visible au-dessus de l'overlay dans les DEUX états — « Préparation en cours »
-  // (overlay court) et « En livraison » (overlay ETA plus haut).
   staticMapContainer: {
     height: 270,
     width: '100%',
     justifyContent: 'flex-end',
     padding: 12,
   },
-  // Illustration personnalisée (halos + anneau + badges flottants).
   artHalo: { position: 'absolute', borderRadius: 999 },
   artHaloA: { width: 200, height: 200, top: -70, left: -50 },
   artHaloB: { width: 150, height: 150, bottom: -60, right: -40 },
@@ -499,7 +714,38 @@ const styles = StyleSheet.create({
   distanceValue: { fontSize: 16, fontWeight: '800' },
   divider: { height: 1, marginVertical: 12, opacity: 0.6 },
   statusHighlight: { fontSize: 16, fontWeight: '800', textAlign: 'center' },
-  
+  deadlineText: { fontSize: 13, fontWeight: '800', marginTop: 4 },
+
+  breakdownBox: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 4, gap: 2 },
+  scRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5 },
+  scName: { flex: 1, fontSize: 14, fontWeight: '700', paddingRight: 10 },
+  scStatut: { fontSize: 13, fontWeight: '800' },
+  refusedHint: { fontSize: 12, fontWeight: '600' },
+
+  payBox: { borderRadius: 12, borderWidth: 1, padding: 12, gap: 10 },
+  payTotal: { fontSize: 16, fontWeight: '900' },
+  payMethodRow: { flexDirection: 'row', gap: 8 },
+  payMethodBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  payMethodLabel: { fontSize: 13, fontWeight: '800' },
+  payCta: {
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  payCtaText: { fontWeight: '800', fontSize: 15 },
+  payErr: { fontSize: 12, fontWeight: '700' },
+  cancelLink: { alignSelf: 'center', paddingVertical: 4 },
+  cancelLinkText: { fontSize: 13, fontWeight: '800', textDecorationLine: 'underline' },
+
   courierCard: {
     borderRadius: 16,
     padding: 16,
@@ -560,7 +806,6 @@ const styles = StyleSheet.create({
   deliveryLinkTitle: { fontSize: 15, fontWeight: '800' },
   deliveryLinkSub: { fontSize: 12, marginTop: 2 },
 
-  // Nouveaux styles pour le détail de commande
   card: {
     borderRadius: 16,
     padding: 16,
