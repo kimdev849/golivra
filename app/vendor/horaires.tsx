@@ -1,6 +1,7 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useCallback, useEffect, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
+import * as Haptics from 'expo-haptics';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -11,10 +12,11 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, CheckCircle2, Clock, Info, Power, Sunrise } from 'lucide-react-native';
+import { Calendar, CheckCircle2, Clock, Info, Power, Sunrise, X } from 'lucide-react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { VendorScreenHeader } from '@/components/vendor-screen-header';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { getSessionToken } from '@/lib/auth';
@@ -24,9 +26,11 @@ import {
   saveEnterpriseHoraires,
   type EnterpriseHoraires,
 } from '@/lib/enterprise';
+import { computeOpenStatus } from '@/lib/horaires-status';
 import { useVendor } from '@/contexts/vendor-context';
 
 const DAY_NAMES = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+const DAY_SHORT = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 
 type DayState = {
   jour: number;
@@ -35,7 +39,7 @@ type DayState = {
   fermeture: Date;
 };
 
-type PickerTarget = { jour: number; field: 'ouverture' | 'fermeture'; value: Date } | null;
+type PickerTarget = { jour: number; field: 'ouverture' | 'fermeture'; value: Date };
 
 function dateFromHour(h: string | null | undefined): Date {
   const d = new Date(2000, 0, 1, 9, 0);
@@ -61,8 +65,40 @@ function defaultDays(): DayState[] {
   }));
 }
 
+function sameHours(a: DayState, b: DayState): boolean {
+  return (
+    hourFromDate(a.ouverture) === hourFromDate(b.ouverture) &&
+    hourFromDate(a.fermeture) === hourFromDate(b.fermeture)
+  );
+}
+
+/** Résumé humain et compact de la semaine (groupes de jours consécutifs). */
+function humanWeekSummary(days: DayState[]): string {
+  const open = days.filter((d) => d.ouvert);
+  if (open.length === 0) return 'Aucun jour d\u2019ouverture — vous ne recevrez aucune commande.';
+  if (open.length === 7 && open.every((d) => sameHours(d, open[0]))) {
+    return `Tous les jours · ${hourFromDate(open[0].ouverture)}\u2013${hourFromDate(open[0].fermeture)}`;
+  }
+  const groups: { days: number[]; hours: string }[] = [];
+  for (const d of open) {
+    const hours = `${hourFromDate(d.ouverture)}\u2013${hourFromDate(d.fermeture)}`;
+    const last = groups[groups.length - 1];
+    if (last && last.hours === hours && last.days[last.days.length - 1] === d.jour - 1) {
+      last.days.push(d.jour);
+    } else {
+      groups.push({ days: [d.jour], hours });
+    }
+  }
+  return groups
+    .map((g) => {
+      const names = g.days.map((j) => DAY_SHORT[j]);
+      const range = names.length > 1 ? `${names[0]}\u2013${names[names.length - 1]}` : names[0];
+      return `${range} · ${g.hours}`;
+    })
+    .join('  |  ');
+}
+
 export default function VendorHorairesScreen() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const { shop } = useVendor();
@@ -73,7 +109,8 @@ export default function VendorHorairesScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [picker, setPicker] = useState<PickerTarget>(null);
+  const [picker, setPicker] = useState<PickerTarget | null>(null);
+  const [pendingTime, setPendingTime] = useState<Date | null>(null);
   const [hasSavedHours, setHasSavedHours] = useState(false);
 
   useEffect(() => {
@@ -114,20 +151,78 @@ export default function VendorHorairesScreen() {
     setDays((prev) => prev.map((d) => (d.jour === jour ? { ...d, ...patch } : d)));
   }, []);
 
-  const applyPicker = useCallback(
-    (date: Date) => {
-      if (!picker) return;
-      updateDay(picker.jour, { [picker.field]: date });
-      setPicker(null);
-    },
-    [picker, updateDay],
-  );
+  const openPicker = useCallback((target: PickerTarget) => {
+    setPendingTime(target.value);
+    setPicker(target);
+  }, []);
+
+  const closePicker = useCallback(() => {
+    setPicker(null);
+    setPendingTime(null);
+  }, []);
+
+  const applyPicker = useCallback(() => {
+    if (!picker) return;
+    updateDay(picker.jour, { [picker.field]: pendingTime ?? picker.value });
+    setPicker(null);
+    setPendingTime(null);
+  }, [picker, pendingTime, updateDay]);
 
   const allOpen = () => setDays(defaultDays());
   const allClosed = () =>
-    setDays(DAY_NAMES.map((_, jour) => ({ jour, ouvert: false, ouverture: new Date(2000, 0, 1, 9, 0), fermeture: new Date(2000, 0, 1, 22, 0) })));
+    setDays(
+      DAY_NAMES.map((_, jour) => ({
+        jour,
+        ouvert: false,
+        ouverture: new Date(2000, 0, 1, 9, 0),
+        fermeture: new Date(2000, 0, 1, 22, 0),
+      })),
+    );
 
   const openCount = days.filter((d) => d.ouvert).length;
+
+  // Aperçu en direct : l'état recalculé à chaque édition, comme le verra le client.
+  const previewRows = useMemo<EnterpriseHoraires[]>(
+    () =>
+      days
+        .filter((d) => d.ouvert)
+        .map((d) => ({
+          jour: d.jour,
+          ouverture: hourFromDate(d.ouverture),
+          fermeture: hourFromDate(d.fermeture),
+        })),
+    [days],
+  );
+  // Aperçu en direct : recalculé à chaque rendu (aucun useMemo) pour que le
+  // statut reste exact même si l'heure change pendant que l'écran est ouvert.
+  const preview = computeOpenStatus(previewRows);
+  const summary = useMemo(() => humanWeekSummary(days), [days]);
+  const todayIdx = new Date().getDay();
+
+  const previewTone = previewRows.length === 0 ? colors.error : preview.open ? colors.success : colors.warning;
+  const previewSoft =
+    previewRows.length === 0 ? colors.errorSoft : preview.open ? colors.successSoft : colors.warningSoft;
+
+  let previewTitle: string;
+  let previewSub: string;
+  if (previewRows.length === 0) {
+    previewTitle = 'Fermé';
+    previewSub = 'Ouvrez au moins un jour pour recevoir des commandes.';
+  } else if (preview.open) {
+    previewTitle = 'Ouvert aujourd\u2019hui';
+    previewSub = preview.todayHours
+      ? `Vos clients peuvent commander · ${preview.todayHours}`
+      : 'Vos clients peuvent commander.';
+  } else if (preview.nextLabel.startsWith('aujourd')) {
+    previewTitle = 'Fermé pour le moment';
+    previewSub = `Rouvre ${preview.nextLabel}.`;
+  } else if (preview.nextLabel) {
+    previewTitle = 'Fermé aujourd\u2019hui';
+    previewSub = `Réouverture ${preview.nextLabel}.`;
+  } else {
+    previewTitle = 'Fermé';
+    previewSub = 'Aucune ouverture prévue cette semaine.';
+  }
 
   const save = async () => {
     if (!enterpriseId) {
@@ -150,7 +245,7 @@ export default function VendorHorairesScreen() {
       setHasSavedHours(rows.length > 0);
       showToast({ message: 'Horaires enregistrés.' });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Enregistrement impossible. Réessayez.");
+      setError(e instanceof Error ? e.message : 'Enregistrement impossible. Réessayez.');
     } finally {
       setSaving(false);
     }
@@ -158,28 +253,39 @@ export default function VendorHorairesScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <View
-        style={[
-          styles.header,
-          { paddingTop: Math.max(insets.top, 10), backgroundColor: colors.surface, borderBottomColor: colors.border },
-        ]}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
-          <ArrowLeft size={24} color={colors.text} strokeWidth={LUCIDE_STROKE} />
-        </Pressable>
-        <ThemedText style={[styles.headerTitle, { color: colors.text }]}>
-          Horaires d&apos;ouverture
-        </ThemedText>
-        <View style={{ width: 24 }} />
-      </View>
+      <VendorScreenHeader
+        title="Horaires d'ouverture"
+        subtitle="Disponibilité de votre commerce"
+        right={
+          <View style={[styles.statusPill, { backgroundColor: previewSoft }]}>
+            <View style={[styles.statusDot, { backgroundColor: previewTone }]} />
+            <ThemedText style={[styles.statusPillTxt, { color: previewTone }]}>
+              {previewRows.length === 0 ? 'Fermé' : preview.open ? 'Ouvert' : 'Fermé'}
+            </ThemedText>
+          </View>
+        }
+      />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
-        <View style={[styles.infoBanner, { backgroundColor: colors.primarySoft }]}>
-          <Info size={16} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+        contentContainerStyle={[styles.scroll, { paddingBottom: Math.max(insets.bottom, 12) + 168 }]}>
+        {/* Aperçu client en direct */}
+        <View style={[styles.previewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.previewIcon, { backgroundColor: previewSoft }]}>
+            <Clock size={22} color={previewTone} strokeWidth={LUCIDE_STROKE} />
+          </View>
+          <View style={styles.previewBody}>
+            <ThemedText style={[styles.previewTitle, { color: colors.text }]}>{previewTitle}</ThemedText>
+            <ThemedText style={[styles.previewSub, { color: colors.textMuted }]}>{previewSub}</ThemedText>
+          </View>
+        </View>
+
+        {/* Rappel bref */}
+        <View style={[styles.infoBanner, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
+          <Info size={15} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
           <ThemedText style={[styles.infoText, { color: colors.textSecondary }]}>
-            Vos clients ne peuvent commander que pendant ces horaires. Un commerce sans horaires
-            est considéré fermé : les commandes sont bloquées tant qu&apos;elles ne sont pas définies.
+            Vos clients ne peuvent commander que pendant ces horaires. Le changement s’applique
+            immédiatement.
           </ThemedText>
         </View>
 
@@ -191,16 +297,43 @@ export default function VendorHorairesScreen() {
           </View>
         ) : null}
 
+        {/* Actions rapides */}
         <View style={styles.quickRow}>
-          <Pressable style={[styles.quickBtn, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={allOpen}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.quickBtn,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+              pressed && styles.pressedDim,
+            ]}
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              allOpen();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Ouvrir tous les jours">
             <Sunrise size={16} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
             <ThemedText style={[styles.quickTxt, { color: colors.primary }]}>Tout ouvrir</ThemedText>
           </Pressable>
-          <Pressable style={[styles.quickBtn, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={allClosed}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.quickBtn,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+              pressed && styles.pressedDim,
+            ]}
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              allClosed();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Fermer tous les jours">
             <Power size={16} color={colors.error} strokeWidth={LUCIDE_STROKE} />
             <ThemedText style={[styles.quickTxt, { color: colors.error }]}>Tout fermer</ThemedText>
           </Pressable>
         </View>
+
+        <ThemedText style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+          Jours de la semaine
+        </ThemedText>
 
         {loading ? (
           <View style={styles.center}>
@@ -209,31 +342,45 @@ export default function VendorHorairesScreen() {
         ) : (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             {days.map((d, i) => {
-              const dayStyle = d.ouvert
-                ? { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong }
-                : { backgroundColor: colors.surfaceMuted, borderColor: colors.border };
+              const isToday = d.jour === todayIdx;
+              // Style des chips d'heure (uniquement rendues quand le jour est ouvert).
+              const dayStyle = { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong };
               return (
                 <View key={d.jour}>
                   {i > 0 ? <View style={[styles.divider, { backgroundColor: colors.border }]} /> : null}
                   <View style={styles.dayRow}>
                     <View style={{ flex: 1 }}>
-                      <ThemedText style={[styles.dayName, { color: d.ouvert ? colors.text : colors.textMuted }]}>
-                        {DAY_NAMES[d.jour]}
-                      </ThemedText>
+                      <View style={styles.dayNameRow}>
+                        <ThemedText
+                          style={[styles.dayName, { color: d.ouvert ? colors.text : colors.textMuted }]}>
+                          {DAY_NAMES[d.jour]}
+                        </ThemedText>
+                        {isToday ? (
+                          <View style={[styles.todayPill, { backgroundColor: colors.primarySoft }]}>
+                            <ThemedText style={[styles.todayPillTxt, { color: colors.primary }]}>
+                              Aujourd’hui
+                            </ThemedText>
+                          </View>
+                        ) : null}
+                      </View>
                       {d.ouvert ? (
                         <View style={styles.timeRow}>
                           <Pressable
                             style={[styles.timeChip, dayStyle]}
-                            onPress={() => setPicker({ jour: d.jour, field: 'ouverture', value: d.ouverture })}>
+                            onPress={() => openPicker({ jour: d.jour, field: 'ouverture', value: d.ouverture })}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${DAY_NAMES[d.jour]} — heure d'ouverture`}>
                             <Clock size={13} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
                             <ThemedText style={[styles.timeChipTxt, { color: colors.primary }]}>
                               {hourFromDate(d.ouverture)}
                             </ThemedText>
                           </Pressable>
-                          <ThemedText style={[styles.timeSep, { color: colors.textMuted }]}>→</ThemedText>
+                          <ThemedText style={[styles.timeSep, { color: colors.textMuted }]}>—</ThemedText>
                           <Pressable
                             style={[styles.timeChip, dayStyle]}
-                            onPress={() => setPicker({ jour: d.jour, field: 'fermeture', value: d.fermeture })}>
+                            onPress={() => openPicker({ jour: d.jour, field: 'fermeture', value: d.fermeture })}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${DAY_NAMES[d.jour]} — heure de fermeture`}>
                             <Clock size={13} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
                             <ThemedText style={[styles.timeChipTxt, { color: colors.primary }]}>
                               {hourFromDate(d.fermeture)}
@@ -249,6 +396,7 @@ export default function VendorHorairesScreen() {
                       onValueChange={(v) => updateDay(d.jour, { ouvert: v })}
                       trackColor={{ true: colors.primary, false: colors.borderStrong }}
                       thumbColor="#FFFFFF"
+                      ios_backgroundColor={colors.borderStrong}
                     />
                   </View>
                 </View>
@@ -257,14 +405,36 @@ export default function VendorHorairesScreen() {
           </View>
         )}
 
+        {/* Résumé de la semaine */}
+        <View style={[styles.summaryRow, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
+          <Calendar size={15} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          <ThemedText style={[styles.summaryTxt, { color: colors.textSecondary }]} numberOfLines={2}>
+            {summary}
+          </ThemedText>
+        </View>
+      </ScrollView>
+
+      {/* Barre d'enregistrement fixe */}
+      <View
+        style={[
+          styles.footer,
+          {
+            paddingBottom: Math.max(insets.bottom, 12),
+            backgroundColor: colors.surface,
+            borderTopColor: colors.border,
+          },
+        ]}>
         {error ? (
-          <View style={[styles.errorBox, { borderColor: colors.error }]}>
+          <View style={[styles.errorBox, { borderColor: colors.error, backgroundColor: colors.errorSoft }]}>
             <ThemedText style={[styles.errorText, { color: colors.error }]}>{error}</ThemedText>
           </View>
         ) : null}
-
         <Pressable
-          style={[styles.saveBtn, { backgroundColor: saving ? colors.borderStrong : colors.primary }]}
+          style={({ pressed }) => [
+            styles.saveBtn,
+            { backgroundColor: saving || loading ? colors.borderStrong : colors.primary },
+            pressed && styles.pressedDim,
+          ]}
           disabled={saving || loading}
           onPress={() => void save()}>
           {saving ? (
@@ -273,39 +443,61 @@ export default function VendorHorairesScreen() {
             <>
               <CheckCircle2 size={20} color="#FFFFFF" strokeWidth={LUCIDE_STROKE} />
               <ThemedText style={styles.saveText}>
-                Enregistrer {openCount > 0 ? `(${openCount} jour${openCount > 1 ? 's' : ''} ouvert${openCount > 1 ? 's' : ''})` : ''}
+                {loading
+                  ? 'Chargement…'
+                  : openCount > 0
+                    ? `Enregistrer · ${openCount} jour${openCount > 1 ? 's' : ''}`
+                    : 'Enregistrer'}
               </ThemedText>
             </>
           )}
         </Pressable>
-      </ScrollView>
+      </View>
 
       {/* Sélecteur d'heure (bottom sheet) */}
-      <Modal visible={picker !== null} transparent animationType="fade" onRequestClose={() => setPicker(null)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setPicker(null)} />
-        <View style={[styles.sheet, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+      <Modal visible={picker !== null} transparent animationType="fade" onRequestClose={closePicker}>
+        <Pressable style={styles.modalBackdrop} onPress={closePicker} />
+        <View
+          style={[
+            styles.sheet,
+            { backgroundColor: colors.surfaceElevated, borderTopColor: colors.border },
+          ]}>
           <View style={[styles.sheetHandle, { backgroundColor: colors.borderStrong }]} />
           <ThemedText style={[styles.sheetTitle, { color: colors.text }]}>
-            {picker ? `${DAY_NAMES[picker.jour]} — ${picker.field === 'ouverture' ? 'Ouverture' : 'Fermeture'}` : ''}
+            {picker
+              ? `${DAY_NAMES[picker.jour]} · ${picker.field === 'ouverture' ? 'Ouverture' : 'Fermeture'}`
+              : ''}
           </ThemedText>
           {picker ? (
             <DateTimePicker
-              value={picker.value}
+              value={pendingTime ?? picker.value}
               mode="time"
               is24Hour
               display="spinner"
               accentColor={colors.primary}
               onChange={(event, date) => {
-                if (event.type === 'set' && date) applyPicker(date);
-                else if (event.type === 'dismissed') setPicker(null);
+                if (event.type === 'set' && date) setPendingTime(date);
+                else if (event.type === 'dismissed') closePicker();
               }}
             />
           ) : null}
-          <Pressable
-            style={[styles.sheetDone, { backgroundColor: colors.primary }]}
-            onPress={() => picker && applyPicker(picker.value)}>
-            <ThemedText style={styles.sheetDoneText}>Valider</ThemedText>
-          </Pressable>
+          <View style={styles.sheetActions}>
+            <Pressable
+              style={[styles.sheetCancel, { borderColor: colors.border }]}
+              onPress={closePicker}
+              accessibilityRole="button"
+              accessibilityLabel="Annuler">
+              <X size={17} color={colors.textSecondary} strokeWidth={LUCIDE_STROKE} />
+              <ThemedText style={[styles.sheetCancelTxt, { color: colors.textSecondary }]}>Annuler</ThemedText>
+            </Pressable>
+            <Pressable
+              style={[styles.sheetDone, { backgroundColor: colors.primary }]}
+              onPress={() => applyPicker()}
+              accessibilityRole="button"
+              accessibilityLabel="Valider l'heure">
+              <ThemedText style={styles.sheetDoneText}>Valider</ThemedText>
+            </Pressable>
+          </View>
         </View>
       </Modal>
     </ThemedView>
@@ -314,21 +506,54 @@ export default function VendorHorairesScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  header: {
+  scroll: { padding: 16, gap: 12 },
+  pressedDim: { opacity: 0.82 },
+
+  /* Pastille de statut du header */
+  statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
   },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: '800' },
-  scroll: { padding: 16, gap: 14 },
-  infoBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderRadius: 14 },
-  infoText: { flex: 1, fontSize: 13, lineHeight: 19, fontWeight: '600' },
-  warnBanner: { padding: 14, borderRadius: 14, borderWidth: 1 },
-  warnText: { fontSize: 13, fontWeight: '800', lineHeight: 19 },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  statusPillTxt: { fontSize: 12.5, fontWeight: '800' },
+
+  /* Carte d'aperçu client */
+  previewCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+  },
+  previewIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewBody: { flex: 1, gap: 3 },
+  previewTitle: { fontSize: 17, fontWeight: '800', letterSpacing: -0.2 },
+  previewSub: { fontSize: 13, fontWeight: '600', lineHeight: 18 },
+
+  infoBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  infoText: { flex: 1, fontSize: 12.5, lineHeight: 18, fontWeight: '600' },
+
+  warnBanner: { padding: 12, borderRadius: 14, borderWidth: 1 },
+  warnText: { fontSize: 12.5, fontWeight: '800', lineHeight: 18 },
+
   quickRow: { flexDirection: 'row', gap: 10 },
   quickBtn: {
     flex: 1,
@@ -341,6 +566,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   quickTxt: { fontSize: 14, fontWeight: '800' },
+
+  sectionLabel: { fontSize: 12.5, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 2 },
+
   center: { paddingVertical: 40, alignItems: 'center' },
   card: { borderRadius: 18, borderWidth: 1, overflow: 'hidden' },
   dayRow: {
@@ -350,7 +578,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 13,
   },
-  dayName: { fontSize: 16, fontWeight: '800', marginBottom: 6 },
+  dayNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  dayName: { fontSize: 16, fontWeight: '800' },
+  todayPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
+  todayPillTxt: { fontSize: 10.5, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.3 },
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   timeChip: {
     flexDirection: 'row',
@@ -365,8 +596,30 @@ const styles = StyleSheet.create({
   timeSep: { fontSize: 14, fontWeight: '700' },
   closedTxt: { fontSize: 14, fontWeight: '600', fontStyle: 'italic' },
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 16 },
-  errorBox: { borderRadius: 12, borderWidth: 1, padding: 12, backgroundColor: 'rgba(220,38,38,0.06)' },
-  errorText: { fontSize: 13, fontWeight: '600', lineHeight: 18 },
+
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    padding: 13,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  summaryTxt: { flex: 1, fontSize: 12.5, fontWeight: '600', lineHeight: 17 },
+
+  /* Barre d'enregistrement fixe */
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 10,
+  },
+  errorBox: { borderRadius: 12, borderWidth: 1, padding: 11 },
+  errorText: { fontSize: 12.5, fontWeight: '700', lineHeight: 17 },
   saveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -374,20 +627,38 @@ const styles = StyleSheet.create({
     gap: 8,
     borderRadius: 16,
     paddingVertical: 16,
-    marginTop: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 4,
   },
   saveText: { color: '#FFFFFF', fontWeight: '900', fontSize: 16 },
+
+  /* Bottom sheet */
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
   sheet: {
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     paddingHorizontal: 18,
     paddingTop: 10,
-    paddingBottom: 28,
+    paddingBottom: 24,
     borderTopWidth: 1,
   },
   sheetHandle: { width: 44, height: 5, borderRadius: 3, alignSelf: 'center', marginBottom: 12 },
   sheetTitle: { fontSize: 16, fontWeight: '800', textAlign: 'center', marginBottom: 4 },
-  sheetDone: { alignItems: 'center', paddingVertical: 14, borderRadius: 14, marginTop: 6 },
+  sheetActions: { flexDirection: 'row', gap: 10, marginTop: 6 },
+  sheetCancel: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  sheetCancelTxt: { fontWeight: '800', fontSize: 15 },
+  sheetDone: { flex: 1.6, alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 14 },
   sheetDoneText: { color: '#FFFFFF', fontWeight: '900', fontSize: 15 },
 });
