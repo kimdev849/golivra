@@ -13,7 +13,7 @@ import {
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { ArrowRight, Eye, EyeOff, Lock, LogIn, Moon, ShieldCheck, Smartphone, Star, Sun, UserPlus, Zap } from 'lucide-react-native';
+import { ArrowRight, Eye, EyeOff, Lock, LogIn, Moon, Radar, ShieldCheck, Smartphone, Sun, UserPlus, Zap } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   Easing,
@@ -240,8 +240,10 @@ export default function AuthScreen() {
               </View>
               <View
                 style={[styles.trustChip, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Star size={13} color="#F5A524" fill="#F5A524" strokeWidth={2} />
-                <ThemedText style={[styles.trustTxt, { color: colors.textSecondary }]}>4.8/5</ThemedText>
+                <Radar size={13} color={colors.primary} strokeWidth={2.4} />
+                <ThemedText style={[styles.trustTxt, { color: colors.textSecondary }]}>
+                  Suivi en temps réel
+                </ThemedText>
               </View>
             </View>
           </Animated.View>
