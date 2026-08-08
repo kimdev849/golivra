@@ -241,6 +241,23 @@ export default function OrderTrackingScreen() {
   const isDelivered = order?.statut === 'livree';
   const refundMessage = orderRefundMessage(order?.statut);
   const isRefunded = refundMessage !== null;
+
+  // Message d'annulation côté client : si le motif vient d'un paiement non
+  // effectué (délai expiré / refus de payer), on affiche un message humain
+  // au client — jamais le motif technique destiné au commerce.
+  const annulationMotif = order?.annulation_motif ? String(order.annulation_motif) : null;
+  const unpaidCancel =
+    order?.statut === 'annulee' && !!annulationMotif && annulationMotif.toLowerCase().includes('paiement');
+  const refundTitle = unpaidCancel
+    ? 'Paiement non effectué'
+    : annulationMotif && !unpaidCancel
+      ? 'Commande annulée'
+      : orderStatusLabel(order?.statut);
+  const refundBody = unpaidCancel
+    ? "Vous n'avez pas confirmé le paiement dans les 5 minutes. Votre commande a été annulée — vous pouvez en passer une nouvelle quand vous le souhaitez."
+    : annulationMotif && !unpaidCancel
+      ? annulationMotif
+      : refundMessage;
   const rawSteps = order?.timeline?.livraisons?.[0]?.timeline || order?.timeline?.commande || [];
   const steps: _TimelineStep[] = rawSteps.map((s, i) => ({
     key: `step-${i}`,
@@ -302,10 +319,10 @@ export default function OrderTrackingScreen() {
                   <Clock size={26} color="#FFFFFF" strokeWidth={LUCIDE_STROKE} />
                 </View>
                 <ThemedText style={[styles.etaTime, { color: colors.text, textAlign: 'center' }]}>
-                  {order?.annulation_motif ? 'Commande annulée' : orderStatusLabel(order?.statut)}
+                  {refundTitle}
                 </ThemedText>
                 <ThemedText style={[styles.etaLabel, { color: colors.textMuted, textAlign: 'center', lineHeight: 20 }]}>
-                  {order?.annulation_motif || refundMessage}
+                  {refundBody}
                 </ThemedText>
               </View>
             </View>
@@ -388,109 +405,54 @@ export default function OrderTrackingScreen() {
                     </View>
                   </View>
                 ) : readyToPay ? (
-                  <View style={{ gap: 10 }}>
+                  <>
                     <View style={styles.statusRow}>
                       <View style={[styles.etaIconBox, { backgroundColor: colors.successSoft }]}>
                         <CheckCircle2 size={24} color={colors.success} strokeWidth={LUCIDE_STROKE} />
                       </View>
-                      <View style={{ flex: 1 }}>
-                        <ThemedText style={[styles.etaTime, { color: colors.text }]}>
-                          Commande {scs.length > 1 && refusedScs.length > 0 ? 'partiellement ' : ''}acceptée
+                    <View style={{ flex: 1 }}>
+                      <ThemedText style={[styles.etaTime, { color: colors.text }]}>
+                        Commande {scs.length > 1 && refusedScs.length > 0 ? 'partiellement ' : ''}acceptée
+                      </ThemedText>
+                      <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 2, lineHeight: 18 }]}>
+                        💳 Paiement requis — 5 min pour confirmer.
+                      </ThemedText>
+                      {paymentCountdown ? (
+                        <ThemedText style={[styles.deadlineText, { color: paymentDeadlineExpired ? colors.error : colors.warning }]}>
+                          ⏱️ {paymentCountdown}
                         </ThemedText>
-                        <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 2, lineHeight: 18 }]}>
-                          💳 Paiement requis — vous avez 5 min pour confirmer.
-                        </ThemedText>
-                        {paymentCountdown ? (
-                          <ThemedText style={[styles.deadlineText, { color: paymentDeadlineExpired ? colors.error : colors.warning }]}>
-                            ⏱️ {paymentCountdown}
-                          </ThemedText>
-                        ) : null}
-                      </View>
+                      ) : null}
                     </View>
+                  </View>
 
-                    {/* Répartition par commerce : acceptés / refusés / expirés */}
-                    {scs.length > 1 ? (
-                      <View style={[styles.breakdownBox, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
-                        {scs.map((sc) => (
-                          <View key={sc.id} style={styles.scRow}>
-                            <ThemedText style={[styles.scName, { color: colors.text }]} numberOfLines={1}>
-                              {sc.commerce_nom || 'Commerce'}
-                            </ThemedText>
-                            <ThemedText
-                              style={[
-                                styles.scStatut,
-                                {
-                                  color: ['refusee', 'remboursee', 'annulee'].includes(sc.statut) ? colors.error : colors.primaryDeep,
-                                },
-                              ]}>
-                              {scStatusLabel(sc.statut)}
-                            </ThemedText>
-                          </View>
-                        ))}
-                      </View>
-                    ) : null}
-                    {refusedScs.length > 0 ? (
+                  {/* Répartition par commerce : acceptés / refusés / expirés */}
+                  {scs.length > 1 ? (
+                    <View style={[styles.breakdownBox, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
+                      {scs.map((sc) => (
+                        <View key={sc.id} style={styles.scRow}>
+                          <ThemedText style={[styles.scName, { color: colors.text }]} numberOfLines={1}>
+                            {sc.commerce_nom || 'Commerce'}
+                          </ThemedText>
+                          <ThemedText
+                            style={[
+                              styles.scStatut,
+                              {
+                                color: ['refusee', 'remboursee', 'annulee'].includes(sc.statut) ? colors.error : colors.primaryDeep,
+                              },
+                            ]}>
+                            {scStatusLabel(sc.statut)}
+                          </ThemedText>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}                    {refusedScs.length > 0 ? (
                       <ThemedText style={[styles.refusedHint, { color: colors.textMuted, lineHeight: 18 }]}>
                         {refusedScs.length > 1
                           ? `${refusedScs.length} commerces n'ont pas pu confirmer votre commande — ils ne seront pas facturés.`
                           : "Un commerce n'a pas pu confirmer votre commande — il ne sera pas facturé."}
                       </ThemedText>
                     ) : null}
-
-                    <View style={[styles.payBox, { backgroundColor: colors.successSoft, borderColor: colors.success }]}>
-                      <ThemedText style={[styles.payTotal, { color: colors.primaryDeep }]}>
-                        Total à payer : {formatFcfa(totalAPayer)}
-                      </ThemedText>
-                      <View style={styles.payMethodRow}>
-                        {(
-                          [
-                            { id: 'airtel' as const, label: 'Airtel Money' },
-                            { id: 'mtn' as const, label: 'MTN MoMo' },
-                          ]
-                        ).map((m) => {
-                          const on = payMethod === m.id;
-                          return (
-                            <Pressable
-                              key={m.id}
-                              style={[
-                                styles.payMethodBtn,
-                                {
-                                  backgroundColor: on ? colors.primary : colors.surface,
-                                  borderColor: on ? colors.primary : colors.border,
-                                },
-                              ]}
-                              onPress={() => setPayMethod(m.id)}
-                              disabled={paying}>
-                              <Smartphone size={16} color={on ? colors.onPrimary : colors.primary} strokeWidth={LUCIDE_STROKE} />
-                              <ThemedText style={[styles.payMethodLabel, { color: on ? colors.onPrimary : colors.text }]}>
-                                {m.label}
-                              </ThemedText>
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                      <Pressable
-                        style={[styles.payCta, { backgroundColor: colors.primary }]}
-                        onPress={() => void payNow()}
-                        disabled={paying || paymentDeadlineExpired}>
-                        {paying ? (
-                          <ActivityIndicator color={colors.onPrimary} size="small" />
-                        ) : (
-                          <ThemedText style={[styles.payCtaText, { color: colors.onPrimary }]}>
-                            {paymentDeadlineExpired ? 'Délai expiré' : `Payer ${formatFcfa(totalAPayer)}`}
-                          </ThemedText>
-                        )}
-                      </Pressable>
-                      {payError ? (
-                        <ThemedText style={[styles.payErr, { color: colors.error }]}>{payError}</ThemedText>
-                      ) : null}
-                    </View>
-                    <Pressable onPress={cancelAll} hitSlop={8} style={styles.cancelLink}>
-                      <ThemedText style={[styles.cancelLinkText, { color: colors.error }]}>
-                        Annuler toute la commande
-                      </ThemedText>
-                    </Pressable>
-                  </View>
+                  </>
                 ) : (
                   <View style={styles.statusRow}>
                     <View style={[styles.etaIconBox, { backgroundColor: colors.primarySoft }]}>
@@ -510,6 +472,96 @@ export default function OrderTrackingScreen() {
                 )}
               </View>
             </View>
+          </View>
+        )}
+
+        {/* CARTE PAIEMENT - dédiée, aérée, avec compte à rebours */}
+        {readyToPay && (
+          <View style={[styles.payCard, { backgroundColor: colors.surface, borderColor: colors.success }]}>
+            <View style={styles.payCardHead}>
+              <View style={[styles.payIcon, { backgroundColor: colors.successSoft }]}>
+                <Smartphone size={22} color={colors.success} strokeWidth={LUCIDE_STROKE} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={[styles.payCardTitle, { color: colors.text }]}>
+                  Confirmer le paiement
+                </ThemedText>
+                <ThemedText style={[styles.payCardSub, { color: colors.textMuted }]}>
+                  {formatFcfa(totalAPayer)} — demande envoyée sur votre téléphone
+                </ThemedText>
+              </View>
+            </View>
+
+            <View style={[styles.payDeadlineBanner, { backgroundColor: colors.warningSoft }]}>
+              <Clock size={16} color={colors.warning} strokeWidth={2.4} />
+              <ThemedText
+                style={[
+                  styles.payDeadlineText,
+                  { color: paymentDeadlineExpired ? colors.error : colors.warning },
+                ]}>
+                {paymentDeadlineExpired
+                  ? 'Délai expiré — la commande va être annulée.'
+                  : paymentCountdown
+                    ? `${paymentCountdown} pour valider la transaction`
+                    : '5 minutes pour valider la transaction'}
+              </ThemedText>
+            </View>
+
+            <ThemedText style={[styles.payHint, { color: colors.textMuted }]}>
+              Ouvrez votre compte Mobile Money et validez la demande{' '}
+              {payMethod === 'airtel' ? 'Airtel Money' : 'MTN MoMo'} avec votre code PIN. L'argent
+              partira automatiquement.
+            </ThemedText>
+
+            <View style={styles.payMethodRow}>
+              {(
+                [
+                  { id: 'airtel' as const, label: 'Airtel Money' },
+                  { id: 'mtn' as const, label: 'MTN MoMo' },
+                ]
+              ).map((m) => {
+                const on = payMethod === m.id;
+                return (
+                  <Pressable
+                    key={m.id}
+                    style={[
+                      styles.payMethodBtn,
+                      {
+                        backgroundColor: on ? colors.primary : colors.surface,
+                        borderColor: on ? colors.primary : colors.border,
+                      },
+                    ]}
+                    onPress={() => setPayMethod(m.id)}
+                    disabled={paying}>
+                    <Smartphone size={16} color={on ? colors.onPrimary : colors.primary} strokeWidth={LUCIDE_STROKE} />
+                    <ThemedText style={[styles.payMethodLabel, { color: on ? colors.onPrimary : colors.text }]}>
+                      {m.label}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Pressable
+              style={[styles.payCta, { backgroundColor: colors.primary }]}
+              onPress={() => void payNow()}
+              disabled={paying || paymentDeadlineExpired}>
+              {paying ? (
+                <ActivityIndicator color={colors.onPrimary} size="small" />
+              ) : (
+                <ThemedText style={[styles.payCtaText, { color: colors.onPrimary }]}>
+                  {paymentDeadlineExpired ? 'Délai expiré' : `Payer ${formatFcfa(totalAPayer)}`}
+                </ThemedText>
+              )}
+            </Pressable>
+            {payError ? (
+              <ThemedText style={[styles.payErr, { color: colors.error }]}>{payError}</ThemedText>
+            ) : null}
+            <Pressable onPress={cancelAll} hitSlop={8} style={styles.cancelLink}>
+              <ThemedText style={[styles.cancelLinkText, { color: colors.error }]}>
+                Annuler toute la commande
+              </ThemedText>
+            </Pressable>
           </View>
         )}
 
@@ -722,8 +774,31 @@ const styles = StyleSheet.create({
   scStatut: { fontSize: 13, fontWeight: '800' },
   refusedHint: { fontSize: 12, fontWeight: '600' },
 
-  payBox: { borderRadius: 12, borderWidth: 1, padding: 12, gap: 10 },
-  payTotal: { fontSize: 16, fontWeight: '900' },
+  payCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 18,
+    gap: 14,
+  },
+  payCardHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  payIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  payCardTitle: { fontSize: 17, fontWeight: '900' },
+  payCardSub: { fontSize: 13, marginTop: 2, fontWeight: '600' },
+  payDeadlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+  },
+  payDeadlineText: { fontSize: 13, fontWeight: '800', flex: 1 },
+  payHint: { fontSize: 13, fontWeight: '500', lineHeight: 19 },
   payMethodRow: { flexDirection: 'row', gap: 8 },
   payMethodBtn: {
     flex: 1,

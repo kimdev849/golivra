@@ -16,6 +16,12 @@ function livraisonIdFromData(data: AppNotification['data']): string | null {
   return typeof id === 'string' ? id : null;
 }
 
+function commandeIdFromData(data: AppNotification['data']): string | null {
+  if (!data || typeof data !== 'object') return null;
+  const id = (data as { commande_id?: unknown }).commande_id;
+  return typeof id === 'string' ? id : null;
+}
+
 /** Navigation après ouverture d'une notification in-app. */
 export function navigateFromNotification(router: Router, n: AppNotification): void {
   const action = actionFromData(n.data);
@@ -37,6 +43,18 @@ export function navigateFromNotification(router: Router, n: AppNotification): vo
 
   if (action === 'vendor_orders') {
     router.push(VENDOR_HREF.ordersTab);
+    return;
+  }
+
+  // Accès direct au suivi de commande (paiement requis, délai expiré…) :
+  // plus besoin de passer par la liste des commandes.
+  if (action === 'open_order_tracking') {
+    const cId = commandeIdFromData(n.data);
+    if (cId) {
+      router.push(`/order-tracking/${cId}`);
+      return;
+    }
+    router.navigate('/(tabs)/explore');
     return;
   }
 
