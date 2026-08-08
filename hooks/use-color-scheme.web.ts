@@ -13,16 +13,18 @@ export function useColorScheme() {
     setHasHydrated(true);
   }, []);
 
+  // TOUS les hooks doivent être appelés inconditionnellement, AVANT tout
+  // retour — sinon le nombre de hooks change entre le premier rendu et les
+  // mises à jour, et React plante (areHookInputsEqual / undefined.length).
+  const ctx = useAppThemeOptional();
+  const colorScheme = useRNColorScheme();
+
   // La préférence explicite de l'utilisateur (clair / sombre / système) prime
   // sur le schéma du téléphone — sans quoi le mode choisi dans les réglages
   // ne s'applique jamais sur le web.
-  const ctx = useAppThemeOptional();
-
   if (hasHydrated && ctx) {
     return ctx.colorScheme;
   }
-
-  const colorScheme = useRNColorScheme();
 
   if (hasHydrated) {
     return colorScheme === 'dark' ? 'dark' : 'light';
