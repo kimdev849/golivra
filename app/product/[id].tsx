@@ -35,6 +35,7 @@ import { LUCIDE_STROKE } from '@/constants/icons';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useCurrentTime } from '@/hooks/use-current-time';
+import { MAX_CONTENT_WIDTH, useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { computeLiveStatus } from '@/lib/horaires-status';
 import {
   fetchEnterpriseById,
@@ -88,6 +89,7 @@ export default function ProductDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
+  const { contentWidth } = useResponsiveLayout();
   const { showError, FeedbackOverlay } = useActionFeedback();
   const params = useLocalSearchParams<{ id: string; kind?: string }>();
   const cart = useCart((s) => s.cart);
@@ -307,6 +309,7 @@ export default function ProductDetailScreen() {
   return (
     <ThemedView style={[styles.screen, { backgroundColor: colors.background }]}>
       <ScrollView
+        style={{ maxWidth: contentWidth, alignSelf: 'center', width: '100%' }}
         contentContainerStyle={{ paddingBottom: DETAIL_SCREEN_PADDING_BOTTOM + insets.bottom + 96 }}
         showsVerticalScrollIndicator={false}>
         {/* HERO IMAGE */}
@@ -584,6 +587,7 @@ export default function ProductDetailScreen() {
             borderTopColor: colors.border,
           },
         ]}>
+        <View style={[styles.footerInner, { maxWidth: contentWidth }]}>
         {cartLine ? (
           <>
             {/* Contrôles de quantité — le produit est déjà au panier */}
@@ -654,6 +658,7 @@ export default function ProductDetailScreen() {
             </ThemedText>
           </Pressable>
         )}
+        </View>
       </View>
 
       {/* gallery modal plein écran (swipe + zoom) */}
@@ -672,7 +677,9 @@ export default function ProductDetailScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   heroWrap: { position: 'relative' },
-  heroImg: { width: '100%', aspectRatio: 1, backgroundColor: '#eee' },
+  // Hero compact (4:3, hauteur max 340) : l'image prend la place d'un beau
+  // bandeau, pas quasiment tout l'écran comme le carré pleine largeur.
+  heroImg: { width: '100%', aspectRatio: 4 / 3, maxHeight: 340, backgroundColor: '#eee' },
   heroEmpty: { alignItems: 'center', justifyContent: 'center' },
   heroTop: {
     position: 'absolute',
@@ -809,11 +816,15 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  footerInner: {
+    width: '100%',
+    alignSelf: 'center',
     flexDirection: 'row',
     gap: 10,
     paddingHorizontal: 16,
-    paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
   },
   qtyGroup: {
     flexDirection: 'row',
@@ -846,9 +857,11 @@ const styles = StyleSheet.create({
 
 function ProductDetailSkeleton({ colors }: { colors: ReturnType<typeof useAppColors> }) {
   return (
-    <ScrollView showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={{ maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', width: '100%' }}
+      showsVerticalScrollIndicator={false}>
       {/* Hero image skeleton */}
-      <Skeleton width="100%" height={360} borderRadius={0} />
+      <Skeleton width="100%" height={340} borderRadius={0} />
       {/* Thumbnails */}
       <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10 }}>
         {[1, 2, 3].map((i) => (
