@@ -177,11 +177,11 @@ export function VendorDeliveryPanel({ embedded }: { embedded?: boolean }) {
 
         <>
 
-          <ThemedText style={[styles.sectionTitle, { color: colors.textSecondary }]}>Livraisons externes</ThemedText>
+          <ThemedText style={[styles.sectionTitle, { color: colors.textSecondary }]}>Livraisons</ThemedText>
 
           {externalDeliveries.map((d) => (
 
-            <ExternalDeliveryCard key={d.id} d={d} palette={palette} colors={colors} />
+            <ExternalDeliveryCard key={d.id} d={d} palette={palette} colors={colors} router={router} />
 
           ))}
 
@@ -279,11 +279,21 @@ export function VendorDeliveryPanel({ embedded }: { embedded?: boolean }) {
 
 
 
-function ExternalDeliveryCard({ d, palette, colors }: { d: VendorExternalDelivery; palette: VendorPalette; colors: ReturnType<typeof useAppColors> }) {
+function ExternalDeliveryCard({ d, palette, colors, router }: { d: VendorExternalDelivery; palette: VendorPalette; colors: ReturnType<typeof useAppColors>; router: ReturnType<typeof useRouter> }) {
+
+  const delivered = d.statut === 'livree';
 
   return (
 
-    <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+    <Pressable
+
+      style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}
+
+      onPress={() => router.push({ pathname: '/vendor/delivery/[id]', params: { id: d.id } })}
+
+      accessibilityRole="button"
+
+      accessibilityLabel="Suivre la livraison">
 
       <View style={styles.cardTop}>
 
@@ -293,9 +303,13 @@ function ExternalDeliveryCard({ d, palette, colors }: { d: VendorExternalDeliver
 
         </ThemedText>
 
-        <View style={[styles.modePill, { backgroundColor: colors.successSoft }]}>
+        <View style={[styles.modePill, { backgroundColor: delivered ? colors.successSoft : colors.primarySoft }]}>
 
-          <ThemedText style={[styles.modeTxt, { color: colors.success }]}>Votre livreur</ThemedText>
+          <ThemedText style={[styles.modeTxt, { color: delivered ? colors.success : colors.primary }]}>
+
+            {delivered ? 'Livrée ✓' : 'Votre livreur'}
+
+          </ThemedText>
 
         </View>
 
@@ -317,7 +331,19 @@ function ExternalDeliveryCard({ d, palette, colors }: { d: VendorExternalDeliver
 
       {d.note ? <ThemedText style={[styles.note, { color: colors.textSecondary }]}>Colis : {d.note}</ThemedText> : null}
 
-      <ThemedText style={[styles.trackValue, { color: colors.text }]}>{livraisonStatutLabel(d.statut)}</ThemedText>
+      {delivered ? (
+
+        <ThemedText style={[styles.deliveredMsg, { color: colors.success }]}>
+
+          🎉 Colis bien arrivé chez {d.client_nom}. Merci !
+
+        </ThemedText>
+
+      ) : (
+
+        <ThemedText style={[styles.trackValue, { color: colors.text }]}>{livraisonStatutLabel(d.statut)}</ThemedText>
+
+      )}
 
       {d.livreur ? (
 
@@ -339,7 +365,17 @@ function ExternalDeliveryCard({ d, palette, colors }: { d: VendorExternalDeliver
 
       ) : null}
 
-    </View>
+      <View style={styles.linkBtn}>
+
+        <ThemedText style={[styles.linkTxt, { color: palette.primary }]}>
+
+          {delivered ? 'Voir le récapitulatif' : 'Suivre la livraison →'}
+
+        </ThemedText>
+
+      </View>
+
+    </Pressable>
 
   );
 
@@ -521,6 +557,8 @@ const styles = StyleSheet.create({
   trackLabel: { fontSize: 11, fontWeight: '600' },
 
   trackValue: { fontSize: 14, fontWeight: '700', marginTop: 6 },
+
+  deliveredMsg: { fontSize: 14, fontWeight: '700', marginTop: 6, lineHeight: 20 },
 
   livreurRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
 

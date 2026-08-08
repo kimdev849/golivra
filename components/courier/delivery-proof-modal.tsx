@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Camera, CheckCircle2, RefreshCw, ShieldCheck, User, UserX, X } from 'lucide-react-native';
+import { Camera, CheckCircle2, RefreshCw, ShieldCheck, X } from 'lucide-react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import {
@@ -36,11 +36,11 @@ type DeliveryProofModalProps = {
 
 /**
  * Preuve de livraison universelle (cas 1 : client GoLivra / cas 2 : livraison externe).
+ * La preuve photo (caméra uniquement) + GPS + horodatage font foi — le livreur
+ * ne peut pas mentir : sa position est enregistrée à la prise de la photo.
  *
  *  - Photo OBLIGATOIRE, prise depuis l'appareil (jamais la galerie) ;
- *  - heure + position GPS + course ajoutés automatiquement ;
- *  - si le client est présent : la photo de la commande remise fait foi ;
- *  - si le client est absent : la photo devant le lieu de livraison fait foi.
+ *  - heure + position GPS + course ajoutés automatiquement.
  *
  * La livraison n'est marquée « livrée » qu'avec la preuve : c'est elle qui
  * débloque l'escrow (settleDeliveryFeesOnComplete) côté serveur.
@@ -53,7 +53,6 @@ export function DeliveryProofModal({
 }: DeliveryProofModalProps) {
   const insets = useSafeAreaInsets();
   const palette = useCourierPalette();
-  const [clientPresent, setClientPresent] = useState(true);
   const [photo, setPhoto] = useState<VendorImageAsset | null>(null);
   const [takenAt, setTakenAt] = useState<string | null>(null);
   const [position, setPosition] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -114,7 +113,6 @@ export function DeliveryProofModal({
         gpsLat: position?.latitude,
         gpsLng: position?.longitude,
         takenAt: takenAt ?? undefined,
-        clientPresent,
       });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onDone(updated);
@@ -125,7 +123,7 @@ export function DeliveryProofModal({
     } finally {
       setSubmitting(false);
     }
-  }, [photo, submitting, deliveryId, position, takenAt, clientPresent, onDone]);
+  }, [photo, submitting, deliveryId, position, takenAt, onDone]);
 
   const canSubmit = photo !== null && !submitting;
 
@@ -165,44 +163,6 @@ export function DeliveryProofModal({
               course sont ajoutées automatiquement.
             </ThemedText>
           </View>
-
-          {/* ── Client présent / absent ── */}
-          <ThemedText style={[styles.sectionLabel, { color: palette.muted }]}>
-            Le client est-il présent ?
-          </ThemedText>
-          <View style={styles.segmentRow}>
-            <Pressable
-              style={[
-                styles.segment,
-                { borderColor: clientPresent ? palette.primary : palette.border },
-                clientPresent && { backgroundColor: palette.primarySoft },
-              ]}
-              onPress={() => setClientPresent(true)}>
-              <User size={16} color={clientPresent ? palette.primary : palette.muted} strokeWidth={LUCIDE_STROKE} />
-              <ThemedText
-                style={[styles.segmentText, { color: clientPresent ? palette.primary : palette.textSecondary }]}>
-                Client présent
-              </ThemedText>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.segment,
-                { borderColor: !clientPresent ? palette.primary : palette.border },
-                !clientPresent && { backgroundColor: palette.primarySoft },
-              ]}
-              onPress={() => setClientPresent(false)}>
-              <UserX size={16} color={!clientPresent ? palette.primary : palette.muted} strokeWidth={LUCIDE_STROKE} />
-              <ThemedText
-                style={[styles.segmentText, { color: !clientPresent ? palette.primary : palette.textSecondary }]}>
-                Client absent
-              </ThemedText>
-            </Pressable>
-          </View>
-          <ThemedText style={[styles.segmentHint, { color: palette.muted }]}>
-            {clientPresent
-              ? 'Photo de la commande remise en main propre au client.'
-              : 'Photo du colis / sac devant le lieu de livraison (point de dépôt).'}
-          </ThemedText>
 
           {/* ── Photo de preuve ── */}
           <ThemedText style={[styles.sectionLabel, { color: palette.muted }]}>
@@ -331,19 +291,6 @@ const styles = StyleSheet.create({
   },
   infoText: { flex: 1, fontSize: 13, lineHeight: 19, fontWeight: '600' },
   sectionLabel: { fontSize: 13, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 6 },
-  segmentRow: { flexDirection: 'row', gap: 10 },
-  segment: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 13,
-    borderRadius: 14,
-    borderWidth: 1.5,
-  },
-  segmentText: { fontSize: 14, fontWeight: '800' },
-  segmentHint: { fontSize: 12.5, lineHeight: 18, marginBottom: 4 },
   cameraBtn: {
     alignItems: 'center',
     justifyContent: 'center',

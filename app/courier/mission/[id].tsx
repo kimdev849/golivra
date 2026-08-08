@@ -99,7 +99,7 @@ export default function CourierMissionDetailScreen() {
     setProofOpen(false);
     setMission(updated);
     void refreshMissions();
-    showSuccess('Livraison terminée !', 'Preuve envoyée. Bonne course, merci.');
+    showSuccess('Livraison réussie 🎉', 'Merci pour votre travail ! Le colis est bien arrivé chez le client.');
   };
 
   return (
@@ -178,9 +178,6 @@ export default function CourierMissionDetailScreen() {
             <ThemedText style={[styles.blockText, { color: palette.textSecondary }]}>{mission.adresse_livraison || '—'}</ThemedText>
             {mission.note ? (
               <ThemedText style={[styles.hint, { color: palette.muted }]}>Note : {mission.note}</ThemedText>
-            ) : null}
-            {mission.montant_total != null ? (
-              <ThemedText style={[styles.hint, { color: palette.muted }]}>Montant à encaisser : {mission.montant_total} FCFA</ThemedText>
             ) : null}
           </View>
 

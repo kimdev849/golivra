@@ -244,6 +244,11 @@ export type VendorExternalDelivery = {
   note?: string | null;
   establishment_nom?: string;
   montant_livraison?: number | null;
+  montant_total?: number | null;
+  /** Paiement Mobile Money du commerce (en_attente / valide / echoue). */
+  paiement_statut?: string | null;
+  methode_paiement?: string | null;
+  paye_at?: string | null;
   livreur?: { nom: string; tel: string };
   created_at: string;
   attribuee_at?: string | null;
@@ -258,6 +263,29 @@ export type CreateExternalDeliveryBody = {
   adresse: DeliveryAddressFields;
   note?: string;
   methodePaiement?: 'airtel_money' | 'mtn_money';
+  /** Téléphone du commerce qui paie les frais (Mobile Money). */
+  telephonePaiement?: string;
+};
+
+export type ExternalDeliveryPayment = {
+  depositId: string;
+  simulation: boolean;
+  statut: 'valide' | 'en_attente' | 'echoue' | string;
+  montant_fcfa: number;
+  methode?: string | null;
+};
+
+export type CreateExternalDeliveryResult = {
+  livraison: VendorExternalDelivery;
+  paiement: ExternalDeliveryPayment;
+};
+
+export type VendorDeliveryPaymentStatus = {
+  livraison_id: string;
+  statut: string;
+  methode?: string | null;
+  montant_fcfa?: number | null;
+  paye_at?: string | null;
 };
 
 export async function fetchVendorExternalDeliveries(token: string): Promise<VendorExternalDelivery[]> {
@@ -271,11 +299,97 @@ export async function fetchVendorExternalDeliveries(token: string): Promise<Vend
 export async function createVendorExternalDelivery(
   token: string,
   body: CreateExternalDeliveryBody,
-): Promise<VendorExternalDelivery> {
-  return apiFetch<VendorExternalDelivery>('/api/delivery/vendor/externe', {
+): Promise<CreateExternalDeliveryResult> {
+  return apiFetch<CreateExternalDeliveryResult>('/api/delivery/vendor/externe', {
     method: 'POST',
     token,
     jsonBody: body,
+  });
+}
+
+/** Suit le paiement Mobile Money d'une livraison externe (live mode). */
+export async function fetchVendorDeliveryPaymentStatus(
+  token: string,
+  deliveryId: string,
+): Promise<VendorDeliveryPaymentStatus> {
+  return apiFetch<VendorDeliveryPaymentStatus>(`/api/delivery/vendor/externe/${deliveryId}/payment-status`, {
+    method: 'GET',
+    token,
+  });
+}
+
+export type VendorDeliveryTimelineStep = {
+  titre: string;
+  date: string | null;
+  type: 'fait' | 'encours' | 'afaire';
+  key: string;
+};
+
+export type VendorDeliveryDetail = {
+  livraison: {
+    id: string;
+    statut: string;
+    type_livraison: 'externe' | 'commande';
+    created_at: string;
+    attribuee_at?: string | null;
+    collectee_at?: string | null;
+    livree_at?: string | null;
+    annulee_at?: string | null;
+    montant_total?: number | null;
+    frais_livraison?: number | null;
+    note?: string | null;
+    adresse_livraison: string;
+    adresse_retrait: string;
+    client_nom?: string | null;
+    client_telephone?: string | null;
+    proof_photo_url?: string | null;
+    proof?: {
+      photoUrl: string | null;
+      gpsLat?: number | null;
+      gpsLng?: number | null;
+      takenAt?: string | null;
+      clientPresent?: boolean | null;
+    } | null;
+    paiement_statut?: string | null;
+    methode_paiement?: string | null;
+  };
+  livreur?: {
+    id: string;
+    nom: string;
+    telephone?: string | null;
+    image_url?: string | null;
+    type_vehicule?: string | null;
+    note_moyenne?: number | null;
+    nb_livraisons_reussies?: number;
+    position_actuelle?: {
+      latitude: number;
+      longitude: number;
+      at?: string | null;
+    } | null;
+  } | null;
+  commerce?: {
+    id: string;
+    type?: string | null;
+    nom?: string | null;
+    telephone?: string | null;
+    adresse?: string | null;
+    image_url?: string | null;
+  } | null;
+  commande?: unknown;
+  articles?: { id: string; nom: string; quantite: number; prix_unitaire?: number | null }[];
+  paiement?: { id: string; statut: string; methode?: string | null; montant?: number | null; paye_at?: string | null } | null;
+  distance_km?: number | null;
+  timeline: VendorDeliveryTimelineStep[];
+};
+
+/** Détail complet d'une livraison (traçabilité A→Z) — visible par le commerce. */
+export async function fetchVendorDeliveryDetails(
+  token: string,
+  deliveryId: string,
+): Promise<VendorDeliveryDetail> {
+  return apiFetch<VendorDeliveryDetail>(`/api/delivery/${deliveryId}/details`, {
+    method: 'GET',
+    token,
   });
 }
 

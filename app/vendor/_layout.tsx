@@ -23,6 +23,7 @@ export default function VendorRootLayout() {
         <Stack.Screen name="stock/[id]" />
         <Stack.Screen name="statistics" />
         <Stack.Screen name="delivery" />
+        <Stack.Screen name="delivery/[id]" />
         <Stack.Screen name="create-external-delivery" />
         <Stack.Screen name="wallet" />
         <Stack.Screen name="catalog" />
