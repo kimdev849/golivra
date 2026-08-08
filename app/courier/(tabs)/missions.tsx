@@ -85,7 +85,7 @@ export default function CourierMissionsScreen() {
         {done.length === 0 ? (
           <View style={[styles.emptyBox, { backgroundColor: palette.card, borderColor: palette.border }]}>
             <ThemedText style={[styles.empty, { color: palette.muted }]}>
-              Pas encore d'historique.
+              Pas encore d’historique.
             </ThemedText>
           </View>
         ) : (

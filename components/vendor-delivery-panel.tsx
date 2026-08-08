@@ -224,7 +224,7 @@ export function VendorDeliveryPanel({ embedded }: { embedded?: boolean }) {
 
           <ThemedText style={[styles.emptyHint, { color: colors.textMuted }]}>
 
-            Préparez une commande, indiquez qu'elle est prête et nous nous occupons du reste.
+            Préparez une commande, indiquez qu’elle est prête et nous nous occupons du reste.
 
           </ThemedText>
 
@@ -246,7 +246,7 @@ export function VendorDeliveryPanel({ embedded }: { embedded?: boolean }) {
 
       </Pressable>
       <ThemedText style={[styles.createHelp, { color: colors.textMuted }]}>
-        Besoin d'organiser une livraison vous-même ? Créez-la ici.
+        Besoin d’organiser une livraison vous-même ? Créez-la ici.
       </ThemedText>
 
 

@@ -400,7 +400,7 @@ export default function OrderTrackingScreen() {
 
               <Pressable style={[styles.refundCta, { backgroundColor: colors.primary }]} onPress={goHome}>
                 <ThemedText style={[styles.refundCtaText, { color: colors.onPrimary }]}>
-                  Retourner à l'accueil
+                  Retourner à l’accueil
                 </ThemedText>
               </Pressable>
             </View>
@@ -495,7 +495,7 @@ export default function OrderTrackingScreen() {
                     </View>
 
                     <ThemedText style={[styles.reassureText, { color: colors.textMuted }]}>
-                      Pas d'inquiétude, vous ne serez débité qu'après l'acceptation de votre commande.
+                      Pas d’inquiétude, vous ne serez débité qu’après l’acceptation de votre commande.
                     </ThemedText>
                   </>
                 ) : readyToPay ? (
@@ -605,7 +605,7 @@ export default function OrderTrackingScreen() {
 
             <ThemedText style={[styles.payHint, { color: colors.textMuted }]}>
               Ouvrez votre compte Mobile Money et validez la demande{' '}
-              {payMethod === 'airtel' ? 'Airtel Money' : 'MTN MoMo'} avec votre code PIN. L'argent
+              {payMethod === 'airtel' ? 'Airtel Money' : 'MTN MoMo'} avec votre code PIN. L’argent
               partira automatiquement.
             </ThemedText>
 
