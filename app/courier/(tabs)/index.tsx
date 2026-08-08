@@ -17,8 +17,8 @@ import {
   Target,
   CheckCircle2,
   Navigation,
-  Bike,
 } from 'lucide-react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -94,9 +94,11 @@ export default function CourierHomeScreen() {
         {/* ── En-tête : logo + Bonjour + cloche ── */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <View style={[styles.logoBadge, { backgroundColor: palette.primary }]}>
-              <Bike size={20} color="#FFFFFF" strokeWidth={2.4} />
-            </View>
+            <Image
+              source={require('@/assets/images/logo.png')}
+              style={styles.logo}
+              contentFit="contain"
+            />
             <View style={{ flex: 1 }}>
               <ThemedText style={[styles.greeting, { color: palette.muted }]}>Bonjour,</ThemedText>
               <ThemedText style={[styles.name, { color: palette.text }]} numberOfLines={1}>
@@ -276,13 +278,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 6,
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  logoBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  logo: {
+    width: 108,
+    height: 36,
   },
   greeting: { fontSize: 13, fontWeight: '500' },
   name: { fontSize: 20, fontWeight: '800', letterSpacing: -0.2, marginTop: 1 },

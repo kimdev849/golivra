@@ -18,6 +18,7 @@ export default function CourierRootLayout() {
         }}>
         <Stack.Screen name="(tabs)" options={stackTabRootOptions()} />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="account" />
         <Stack.Screen name="notifications" />
         <Stack.Screen name="mission/[id]" />
       </Stack>

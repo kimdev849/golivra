@@ -22,7 +22,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState } from 'react';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemeModePicker } from '@/components/theme-mode-picker';
 import { COURIER_TAB_BAR_PADDING_BOTTOM } from '@/constants/courier-layout';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useCourier } from '@/contexts/courier-context';
@@ -208,7 +207,7 @@ export default function CourierProfileScreen() {
                 { borderColor: palette.primary, backgroundColor: palette.primarySoft },
                 pressed && styles.editBtnPressed,
               ]}
-              onPress={() => router.push('/courier/settings')}>
+              onPress={() => router.push('/courier/account')}>
               <Settings size={13} color={palette.primaryDeep} strokeWidth={2.4} />
               <Text style={[styles.editBtnText, { color: palette.primaryDeep }]}>Modifier le profil</Text>
             </Pressable>
@@ -268,15 +267,15 @@ export default function CourierProfileScreen() {
             palette={palette}
           />
           <MenuRow
-            Icon={Shield}
-            title="Véhicule & plaque"
+            Icon={Settings}
+            title="Paramètres"
             onPress={() => router.push('/courier/settings')}
             palette={palette}
           />
           <MenuRow
             Icon={Lock}
             title="Sécurité"
-            onPress={() => router.push('/courier/settings')}
+            onPress={() => router.push('/courier/account')}
             palette={palette}
           />
           <MenuRow
@@ -284,15 +283,6 @@ export default function CourierProfileScreen() {
             title="Centre d'aide"
             onPress={() => router.push('/help-center')}
             palette={palette}
-          />
-        </View>
-
-        {/* ── Apparence (mode clair / sombre) ── */}
-        <View style={styles.themeWrap}>
-          <ThemeModePicker
-            palette={palette}
-            title="Apparence"
-            hint="Clair, sombre ou selon les réglages du téléphone."
           />
         </View>
 
@@ -417,7 +407,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   menuTitle: { flex: 1, fontSize: 15, fontWeight: '600' },
-
-  // ── Thème ──
-  themeWrap: { marginTop: 2 },
 });
