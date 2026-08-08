@@ -132,7 +132,7 @@ export default function MyAddressesScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ padding: 18, paddingBottom: insets.bottom + 24 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
         {loading ? (

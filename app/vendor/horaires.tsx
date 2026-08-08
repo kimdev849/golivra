@@ -506,7 +506,7 @@ export default function VendorHorairesScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  scroll: { padding: 16, gap: 12 },
+  scroll: { padding: 18, gap: 12 },
   pressedDim: { opacity: 0.82 },
 
   /* Pastille de statut du header */

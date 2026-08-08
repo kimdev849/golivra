@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7,
   },
   screen: { flex: 1 },
-  scroll: { paddingHorizontal: 20, paddingTop: 8 },
+  scroll: { paddingHorizontal: 18, paddingTop: 8 },
   hero: {
     flexDirection: 'row',
     alignItems: 'center',

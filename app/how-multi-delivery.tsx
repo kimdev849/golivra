@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   topBar: { paddingHorizontal: 16, paddingBottom: 8 },
   back: { fontSize: 16, fontWeight: '700' },
-  scroll: { paddingHorizontal: 20 },
+  scroll: { paddingHorizontal: 16 },
   title: { fontSize: 24, fontWeight: '800', marginBottom: 12 },
   lead: { fontSize: 15, lineHeight: 22, marginBottom: 20 },
   exampleTitle: { fontSize: 15, marginBottom: 10, marginTop: 4 },

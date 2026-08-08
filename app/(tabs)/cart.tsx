@@ -785,7 +785,7 @@ export default function CartScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  scroll: { paddingHorizontal: 20 },
+  scroll: { paddingHorizontal: 16 },
   title: { fontSize: 26, fontWeight: '800', marginBottom: 20 },
   titleRow: {
     flexDirection: 'row',

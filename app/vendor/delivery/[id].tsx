@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
   errTxt: { fontWeight: '700', textAlign: 'center' },
   retryBtn: { paddingHorizontal: 22, paddingVertical: 12, borderRadius: 12 },
   retryTxt: { color: '#FFF', fontWeight: '800' },
-  scroll: { padding: 16, gap: 12 },
+  scroll: { padding: 18, gap: 12 },
 
   hero: {
     flexDirection: 'row',

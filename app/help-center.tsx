@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '800' },
   headerSpacer: { width: 44 },
-  scroll: { paddingHorizontal: 20, paddingTop: 16 },
+  scroll: { paddingHorizontal: 16, paddingTop: 16 },
   intro: { fontSize: 15, lineHeight: 22, marginBottom: 18 },
   contactCard: {
     borderRadius: 16,

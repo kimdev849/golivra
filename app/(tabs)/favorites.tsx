@@ -365,8 +365,8 @@ function StateCard({ title, body, ctaLabel, onCta, icon, colors }: StateCardProp
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  head: { paddingHorizontal: 20, marginBottom: 14, gap: 8 },
-  title: { fontSize: 28, fontWeight: '800' },
+  head: { paddingHorizontal: 16, marginBottom: 14, gap: 8 },
+  title: { fontSize: 26, fontWeight: '800' },
   subtitle: { fontSize: 15, lineHeight: 22, opacity: 0.92 },
   tabsWrap: {
     flexDirection: 'row',
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   tabTxt: { fontSize: 14, fontWeight: '700' },
-  list: { paddingHorizontal: 20, flexGrow: 1, gap: 14 },
+  list: { paddingHorizontal: 16, flexGrow: 1, gap: 14 },
   center: { paddingVertical: 48, alignItems: 'center', gap: 12 },
   muted: { fontSize: 15 },
   card: {

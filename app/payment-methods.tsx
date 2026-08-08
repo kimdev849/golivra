@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, borderWidth: 1 },
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '800' },
   headerSpacer: { width: 44 },
-  scroll: { paddingHorizontal: 20, paddingTop: 16 },
+  scroll: { paddingHorizontal: 16, paddingTop: 16 },
   intro: { fontSize: 14, lineHeight: 21, marginBottom: 18 },
   card: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14, borderRadius: 16, borderWidth: 1, marginBottom: 12 },
   rowIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },

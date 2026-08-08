@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   muted: { fontSize: 14 },
-  scroll: { paddingHorizontal: 22 },
+  scroll: { paddingHorizontal: 16 },
   successBadge: {
     width: 64,
     height: 64,

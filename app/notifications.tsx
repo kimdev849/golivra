@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
   headerSpacer: { width: 72 },
   markAllBtn: { paddingHorizontal: 8, paddingVertical: 6 },
   markAllText: { fontWeight: '800', fontSize: 13 },
-  scroll: { paddingHorizontal: 20, paddingTop: 16 },
+  scroll: { paddingHorizontal: 16, paddingTop: 16 },
   intro: { fontSize: 13.5, lineHeight: 20, opacity: 0.92, marginBottom: 14 },
   loader: { marginTop: 32, alignItems: 'center', gap: 12 },
   muted: { fontSize: 14 },

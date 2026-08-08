@@ -359,7 +359,7 @@ export default function SettingsScreen() {
 
 function makeLocalStyles(c: AppPalette) {
   return StyleSheet.create({
-    scroll: { paddingHorizontal: 20, paddingTop: 16 },
+    scroll: { paddingHorizontal: 16, paddingTop: 16 },
     saving: { marginBottom: 12 },
     sectionLabel: {
       fontSize: 11,

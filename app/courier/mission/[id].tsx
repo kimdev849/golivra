@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   },
   topTitle: { fontWeight: '900', fontSize: 17 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  scroll: { padding: 18, gap: 14 },
+  scroll: { padding: 16, gap: 14 },
   hero: {
     borderRadius: 20,
     padding: 18,

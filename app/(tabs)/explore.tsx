@@ -576,7 +576,7 @@ const stepStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  scroll: { paddingHorizontal: 20 },
+  scroll: { paddingHorizontal: 16 },
   pendingReviewsBanner: {
     borderRadius: 16,
     borderWidth: 1,

@@ -86,7 +86,7 @@ export function createEnterpriseDetailStyles(c: AppPalette) {
     },
     ratingBadgeValue: { color: '#FFFFFF', fontWeight: '900', fontSize: 13 },
     ratingBadgeCount: { color: 'rgba(255,255,255,0.85)', fontWeight: '700', fontSize: 11 },
-    block: { paddingHorizontal: 20, paddingTop: 18, gap: 10 },
+    block: { paddingHorizontal: 16, paddingTop: 18, gap: 10 },
     name: { fontSize: 26, fontWeight: '800', color: c.text },
     // Pastille de statut compacte (Ouvert / Fermé / Plus de commandes).
     statusRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: -4 },
