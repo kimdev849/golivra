@@ -120,6 +120,8 @@ export type VendorStats = {
   revenus7j: number;
   revenusTrend: string;
   commandes: number;
+  /** Commandes réellement payées sur la période (le reste n'a rien rapporté). */
+  commandesPayees: number;
   commandesTrend: string;
   produitsVendus: number;
   produitsTrend: string;
@@ -243,6 +245,7 @@ export function computeVendorStats(
     revenus7j,
     revenusTrend: recent.length > 0 ? `${recent.length} cmd. (${periodLabel})` : `— (${periodLabel})`,
     commandes: recent.length,
+    commandesPayees: validRecent.length,
     commandesTrend: `${orders.length} total`,
     produitsVendus,
     produitsTrend: `${products.filter((p) => p.enLigne).length} en ligne`,

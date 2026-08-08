@@ -13,6 +13,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { LucideIcon } from 'lucide-react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { VendorScreenHeader } from '@/components/vendor-screen-header';
 import { ThemedText } from '@/components/themed-text';
@@ -29,11 +30,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { AppPalette } from '@/constants/app-palette';
 import type { VendorPalette } from '@/lib/vendor-theme';
 
+/** Périodes de la fenêtre d'analyse — libellés humains et explicites. */
 const PERIODS = [
-  { days: 7, label: '7j' },
-  { days: 30, label: '30j' },
-  { days: 90, label: '90j' },
+  { days: 7, label: '7 derniers jours' },
+  { days: 30, label: '30 derniers jours' },
+  { days: 90, label: '90 derniers jours' },
 ] as const;
+
+const SEG_PAD = 4;
 
 type DailyRevenue = { date: string; amount: number; label: string };
 
@@ -60,6 +64,78 @@ function SectionTitle({ title, colors }: { title: string; colors: AppPalette }) 
       <ThemedText type="defaultSemiBold" style={[styles.sectionTitle, { color: colors.text }]}>
         {title}
       </ThemedText>
+    </View>
+  );
+}
+
+/**
+ * Sélecteur de période : une pastille coulisse en douceur sur la période
+ * active. Libellés explicites (« 30 derniers jours ») plutôt que « 30j ».
+ */
+function PeriodSelector({
+  period,
+  onChange,
+  colors,
+  palette,
+}: {
+  period: number;
+  onChange: (days: number) => void;
+  colors: AppPalette;
+  palette: VendorPalette;
+}) {
+  const [width, setWidth] = useState(0);
+  const pillX = useSharedValue(0);
+  const activeIdx = Math.max(
+    0,
+    PERIODS.findIndex((p) => p.days === period),
+  );
+
+  useEffect(() => {
+    if (width <= 0) return;
+    const inner = (width - SEG_PAD * 2) / PERIODS.length;
+    pillX.value = withSpring(SEG_PAD + activeIdx * inner, {
+      damping: 20,
+      stiffness: 280,
+      mass: 0.6,
+    });
+  }, [activeIdx, width, pillX]);
+
+  const pillStyle = useAnimatedStyle(() => ({
+    width: width > 0 ? (width - SEG_PAD * 2) / PERIODS.length : 0,
+    transform: [{ translateX: pillX.value }],
+  }));
+
+  return (
+    <View
+      style={[
+        styles.segmented,
+        { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
+      ]}
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+      <Animated.View style={[styles.segmentPill, { backgroundColor: palette.primary }, pillStyle]} />
+      {PERIODS.map((p) => {
+        const active = p.days === period;
+        return (
+          <Pressable
+            key={p.days}
+            style={styles.segment}
+            onPress={() => onChange(p.days)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}>
+            <ThemedText
+              style={[
+                styles.segmentTxt,
+                { color: active ? '#FFFFFF' : colors.textSecondary },
+                active && styles.segmentTxtActive,
+              ]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.9}>
+              {p.label}
+            </ThemedText>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -188,33 +264,19 @@ export default function VendorStatisticsScreen() {
   const bars = useMemo(() => bucketRevenues(stats.dailyRevenues), [stats.dailyRevenues]);
   const maxAmount = Math.max(...bars.map((b) => b.amount), 1);
   const hasSales = bars.some((b) => b.amount > 0);
-  const periodLabel = periodDays === 7 ? '7 jours' : periodDays === 30 ? '30 jours' : '90 jours';
 
   return (
     <ThemedView style={styles.screen}>
-      <VendorScreenHeader title="TABLEAU DE BORD" />
+      <VendorScreenHeader
+        title="Statistiques"
+        subtitle="L’activité de votre commerce"
+      />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ padding: 18, paddingBottom: insets.bottom + 40 }}>
         {/* Sélecteur de période */}
-        <View style={[styles.segmented, { backgroundColor: colors.surfaceMuted }]}>
-          {PERIODS.map((p) => {
-            const active = periodDays === p.days;
-            return (
-              <Pressable
-                key={p.days}
-                style={[styles.segment, active && { backgroundColor: palette.primary }]}
-                onPress={() => setPeriodDays(p.days)}>
-                <ThemedText
-                  type="defaultSemiBold"
-                  style={[styles.segmentTxt, { color: active ? colors.onPrimary : colors.textSecondary }]}>
-                  {p.label}
-                </ThemedText>
-              </Pressable>
-            );
-          })}
-        </View>
+        <PeriodSelector period={periodDays} onChange={setPeriodDays} colors={colors} palette={palette} />
 
         {/* Carte revenus */}
         <LinearGradient
@@ -226,13 +288,13 @@ export default function VendorStatisticsScreen() {
             <View style={styles.heroIcon}>
               <TrendingUp size={20} color="#FFFFFF" strokeWidth={LUCIDE_STROKE} />
             </View>
-            <ThemedText style={styles.heroLabel}>{`Chiffre d'affaires (${periodLabel})`}</ThemedText>
+            <ThemedText style={styles.heroLabel}>Chiffre d’affaires</ThemedText>
           </View>
           <ThemedText style={styles.heroValue}>{formatFcfa(stats.revenus7j)}</ThemedText>
           <View style={styles.heroFooter}>
             <ThemedText style={styles.heroTrend}>
-              {stats.commandes > 0
-                ? `${stats.commandes} commande${stats.commandes > 1 ? 's' : ''} • panier moyen ${formatFcfa(stats.averageOrderValue)}`
+              {stats.commandesPayees > 0
+                ? `${stats.commandesPayees} commande${stats.commandesPayees > 1 ? 's' : ''} payée${stats.commandesPayees > 1 ? 's' : ''} · panier moyen ${formatFcfa(stats.averageOrderValue)}`
                 : 'Aucune commande sur cette période'}
             </ThemedText>
           </View>
@@ -242,8 +304,8 @@ export default function VendorStatisticsScreen() {
         {/* KPIs */}
         <View style={styles.kpiRow}>
           <KpiCard
-            label="Commandes"
-            value={stats.commandes}
+            label="Commandes payées"
+            value={stats.commandesPayees}
             colors={colors}
             palette={palette}
             icon={ShoppingBag}
@@ -259,7 +321,10 @@ export default function VendorStatisticsScreen() {
 
         {/* Graphique */}
         <View style={[styles.chartCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <SectionTitle title="Performance quotidienne" colors={colors} />
+          <SectionTitle
+            title={periodDays === 7 ? 'Ventes jour par jour' : 'Ventes sur la période'}
+            colors={colors}
+          />
           {hasSales ? (
             <View style={styles.barsRow}>
               {bars.map((day) => {
@@ -290,10 +355,10 @@ export default function VendorStatisticsScreen() {
 
         {/* Stock */}
         <View style={[styles.inventoryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <SectionTitle title="Gestion de stock" colors={colors} />
+          <SectionTitle title="Votre stock" colors={colors} />
           <View style={styles.inventoryRow}>
             <InventoryItem
-              label="Rupture"
+              label="En rupture"
               count={stats.inventorySummary.outOfStock}
               color={colors.error}
               icon={AlertTriangle}
@@ -305,7 +370,7 @@ export default function VendorStatisticsScreen() {
               icon={Info}
             />
             <InventoryItem
-              label="Total articles"
+              label="Total produits"
               count={stats.inventorySummary.total}
               color={palette.primary}
               icon={Package}
@@ -315,7 +380,7 @@ export default function VendorStatisticsScreen() {
 
         {/* Top produits */}
         <View style={{ marginBottom: 24 }}>
-          <SectionTitle title="Top produits (ventes)" colors={colors} />
+          <SectionTitle title="Vos meilleures ventes" colors={colors} />
           <View style={[styles.listCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             {stats.topProduits.length === 0 ? (
               <View style={styles.emptyBox}>
@@ -350,7 +415,7 @@ export default function VendorStatisticsScreen() {
         </View>
 
         {/* Engagement */}
-        <SectionTitle title="Engagement client" colors={colors} />
+        <SectionTitle title="Votre audience" colors={colors} />
         {engagementLoading ? (
           <View style={{ gap: 12 }}>
             <Skeleton width="100%" height={80} borderRadius={16} />
@@ -367,7 +432,7 @@ export default function VendorStatisticsScreen() {
             <View style={styles.engGrid}>
               <EngagementCard
                 icon={Eye}
-                label="Vues boutique"
+                label="Visites de la page"
                 value={stats.engagement?.totalVues ?? 0}
                 colors={colors}
                 palette={palette}
@@ -381,7 +446,7 @@ export default function VendorStatisticsScreen() {
               />
               <EngagementCard
                 icon={ShoppingBag}
-                label="Conversions"
+                label="Achats"
                 value={stats.engagement?.totalVentes ?? 0}
                 colors={colors}
                 palette={palette}
@@ -433,12 +498,22 @@ const styles = StyleSheet.create({
   segmented: {
     flexDirection: 'row',
     borderRadius: 14,
-    padding: 4,
-    gap: 4,
+    padding: SEG_PAD,
     marginBottom: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+    position: 'relative',
   },
-  segment: { flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center' },
-  segmentTxt: { fontSize: 13 },
+  segmentPill: {
+    position: 'absolute',
+    top: SEG_PAD,
+    bottom: SEG_PAD,
+    left: 0,
+    borderRadius: 10,
+  },
+  segment: { flex: 1, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
+  segmentTxt: { fontSize: 12, fontWeight: '600' },
+  segmentTxtActive: { fontWeight: '800' },
 
   // Carte revenus
   heroCard: {
