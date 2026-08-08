@@ -363,14 +363,6 @@ export default function DeliveryDetailScreen() {
                   </ThemedText>
                 </View>
               </View>
-              {livreur.telephone ? (
-                <Pressable
-                  style={[styles.iconBtn, { backgroundColor: colors.successSoft }]}
-                  onPress={() => callNumber(livreur.telephone)}
-                  hitSlop={8}>
-                  <PhoneCall size={20} color={colors.success} strokeWidth={LUCIDE_STROKE} />
-                </Pressable>
-              ) : null}
             </View>
           </View>
         ) : (
@@ -593,13 +585,6 @@ const styles = StyleSheet.create({
   courierName: { fontSize: 16, fontWeight: '800' },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   courierMeta: { fontSize: 13, fontWeight: '600' },
-  iconBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   body: { fontSize: 15, fontWeight: '700' },
   bodyMuted: { fontSize: 14, fontWeight: '500', lineHeight: 20 },
   phoneRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
