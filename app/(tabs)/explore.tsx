@@ -26,12 +26,15 @@ import type { TimelineStep } from '@/lib/datetime';
 import { fetchPendingReviews, type PendingReview } from '@/lib/reviews';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppColors } from '@/hooks/use-app-colors';
-import { orderStatusLabel as statutLabel } from '@/lib/ux-copy';
+import { orderCancelledChip, orderStatusLabel as statutLabel } from '@/lib/ux-copy';
 
 type OrderRow = {
   id: string;
   entreprise_id: string | null;
   statut: string | null;
+  annulation_motif?: string | null;
+  sous_statuts?: string[] | null;
+  commerce_type?: 'restaurant' | 'boutique' | null;
   prix_total?: number | string | null;
   adresse_livraison?: string | null;
   cree_le?: string | null;
@@ -199,6 +202,12 @@ function OrdersScreenInner({
     }
 
     if (filter === 'annulees') {
+      // Chaque commande annulée explique SA raison, en mots simples.
+      const chip = orderCancelledChip(o.statut, o.annulation_motif, o.commerce_type, o.sous_statuts);
+      const chipColor =
+        chip.tone === 'warn' ? colors.warning : chip.tone === 'error' ? colors.error : colors.textMuted;
+      const chipBg =
+        chip.tone === 'warn' ? colors.warningSoft : chip.tone === 'error' ? colors.errorSoft : colors.surfaceMuted;
       return (
         <Pressable
           key={o.id}
@@ -213,11 +222,19 @@ function OrdersScreenInner({
             <ThemedText type="defaultSemiBold" style={[styles.orderId, { color: colors.text }]}>
               #{refStr}
             </ThemedText>
+            {priceOk ? (
+              <ThemedText type="defaultSemiBold" style={[styles.priceStrong, { color: colors.text }]}>
+                {formatFcfa(prixNum)}
+              </ThemedText>
+            ) : null}
           </View>
           <ThemedText type="defaultSemiBold" style={[styles.merchantTitle, { color: colors.text }]}>
             {merchant}
           </ThemedText>
-          <ThemedText style={[styles.statusCancel, { color: colors.textMuted }]}>Annulée</ThemedText>
+          <View style={[styles.cancelChip, { backgroundColor: chipBg }]}>
+            <ThemedText style={[styles.cancelChipText, { color: chipColor }]}>{chip.label}</ThemedText>
+          </View>
+          <ThemedText style={[styles.cancelDetail, { color: colors.textMuted }]}>{chip.detail}</ThemedText>
           {orderCreatedLabel(o) ? (
             <ThemedText style={[styles.dateMuted, { color: colors.textMuted }]}>
               Commandée le {orderCreatedLabel(o)}
@@ -632,11 +649,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 4,
   },
-  statusCancel: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 6,
+  cancelChip: {
+    alignSelf: 'flex-start',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginBottom: 4,
   },
+  cancelChipText: { fontSize: 13, fontWeight: '800' },
+  cancelDetail: { fontSize: 13, marginBottom: 8, lineHeight: 18 },
   deliveryRow: {
     flexDirection: 'row',
     alignItems: 'center',

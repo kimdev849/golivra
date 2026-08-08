@@ -74,6 +74,223 @@ export function orderRefundMessage(statut: string | null | undefined): string | 
   return null;
 }
 
+/** Type de commerce affiché au client (parle comme une personne). */
+export type CommerceKind = 'boutique' | 'restaurant' | 'commerce';
+
+/** Les mots du commerce selon son type : « la boutique » / « le restaurant ». */
+export function commerceKindWords(kind: CommerceKind | null | undefined): {
+  word: string;
+  Who: string;
+  il: string;
+  de: string;
+} {
+  const isBoutique = kind === 'boutique';
+  const isResto = kind === 'restaurant';
+  return {
+    word: isBoutique ? 'la boutique' : isResto ? 'le restaurant' : 'le commerce',
+    Who: isBoutique ? 'La boutique' : isResto ? 'Le restaurant' : 'Le commerce',
+    il: isBoutique ? 'elle' : 'il',
+    de: isBoutique ? 'de la boutique' : isResto ? 'du restaurant' : 'du commerce',
+  };
+}
+
+/**
+ * Raison d'une commande annulée, en langage simple (jamais technique).
+ * no_response : le commerce n'a pas répondu à temps.
+ * refused     : le commerce a refusé la commande.
+ * unpaid      : acceptée mais le paiement n'a pas été fait.
+ * client_cancel : le client a annulé lui-même.
+ */
+export type OrderCancellationReason =
+  | 'no_response'
+  | 'refused'
+  | 'unpaid'
+  | 'client_cancel'
+  | 'unknown';
+
+export function orderCancellationReason(
+  statut: string | null | undefined,
+  annulationMotif: string | null | undefined,
+  sousStatuts?: string[] | null,
+): OrderCancellationReason {
+  const k = normalizeStatutKey(statut);
+  const motif = String(annulationMotif || '').toLowerCase();
+  if (k === 'remboursee' || k === 'expiree') return 'no_response';
+  if (k === 'refusee') return 'refused';
+  if (k === 'annulee') {
+    if ((sousStatuts || []).includes('refusee')) return 'refused';
+    if (motif.includes('paiement')) return 'unpaid';
+    if (motif.includes('client')) return 'client_cancel';
+    return 'unknown';
+  }
+  return 'unknown';
+}
+
+/** Étiquette courte + détail pour la liste « Mes commandes ». */
+export function orderCancelledChip(
+  statut: string | null | undefined,
+  annulationMotif: string | null | undefined,
+  kind: CommerceKind | null | undefined,
+  sousStatuts?: string[] | null,
+): { label: string; detail: string; tone: 'warn' | 'error' | 'neutral' } {
+  const reason = orderCancellationReason(statut, annulationMotif, sousStatuts);
+  const isResto = kind === 'restaurant';
+  switch (reason) {
+    case 'no_response':
+      return {
+        label: isResto ? 'Pas de réponse du restaurant' : 'Pas de réponse de la boutique',
+        detail: "Nous n'avons pas reçu de réponse à temps.",
+        tone: 'warn',
+      };
+    case 'refused':
+      return {
+        label: isResto ? 'Commande refusée par le restaurant' : 'Commande refusée',
+        detail: isResto
+          ? 'Le restaurant ne pouvait pas préparer cette commande.'
+          : 'La boutique ne pouvait pas préparer cette commande.',
+        tone: 'error',
+      };
+    case 'unpaid':
+      return {
+        label: 'Paiement non effectué',
+        detail: "La commande avait été acceptée, mais le paiement n'a pas été finalisé.",
+        tone: 'error',
+      };
+    case 'client_cancel':
+      return {
+        label: 'Commande annulée',
+        detail: 'Vous avez annulé cette commande.',
+        tone: 'neutral',
+      };
+    default:
+      return {
+        label: 'Commande annulée',
+        detail: 'Cette commande a été annulée.',
+        tone: 'neutral',
+      };
+  }
+}
+
+export type OrderStoryStep = { emoji: string; title: string; detail: string };
+
+export type OrderCancelledInfo = {
+  title: string;
+  intro: string | null;
+  body: string;
+  note: string | null;
+  steps: OrderStoryStep[];
+};
+
+/**
+ * Toute l'histoire d'une commande annulée, racontée dans l'ordre et en mots
+ * simples — même quelqu'un qui n'est pas à l'aise avec les applis comprend.
+ * Renvoie null si la commande n'est pas annulée / remboursée / refusée.
+ */
+export function orderCancelledInfo({
+  statut,
+  annulationMotif,
+  kind,
+  sousStatuts,
+  refusalReason,
+}: {
+  statut: string | null | undefined;
+  annulationMotif: string | null | undefined;
+  kind: CommerceKind | null | undefined;
+  sousStatuts?: string[] | null;
+  refusalReason?: string | null;
+}): OrderCancelledInfo | null {
+  const { Who, de, word } = commerceKindWords(kind);
+  const key = normalizeStatutKey(statut);
+  const isCancel =
+    key === 'annulee' || key === 'refusee' || key === 'remboursee' || key === 'expiree';
+  if (!isCancel) return null;
+  const reason = orderCancellationReason(statut, annulationMotif, sousStatuts);
+  if (reason === 'unknown') {
+    // Annulée sans raison précise (ex. le commerce a annulé côté vendeur) :
+    // message simple quand même — jamais « en préparation ».
+    return {
+      title: 'Commande annulée',
+      intro: null,
+      body: 'Cette commande a été annulée.',
+      note: 'Vous pouvez essayer une autre boutique.',
+      steps: [
+        { emoji: '🛍️', title: 'Vous avez envoyé votre commande', detail: `${Who} a reçu votre demande.` },
+        { emoji: '❌', title: 'Commande annulée', detail: 'Cette commande a été annulée.' },
+      ],
+    };
+  }
+
+  if (reason === 'no_response') {
+    return {
+      title: 'Commande non confirmée',
+      intro: `Nous sommes désolés 😔\nNous avons attendu la réponse ${de} pendant 5 minutes, mais nous n'avons pas reçu de réponse.`,
+      body: "Votre commande a donc été annulée automatiquement. Vous n'avez rien payé.",
+      note: 'Vous pouvez essayer une autre boutique.',
+      steps: [
+        { emoji: '🛍️', title: 'Vous avez envoyé votre commande', detail: `${Who} a reçu votre demande.` },
+        { emoji: '⏳', title: 'Nous avons attendu sa réponse', detail: `${Who} avait 5 minutes pour confirmer votre commande.` },
+        {
+          emoji: '❌',
+          title: `${Who} n'a pas répondu`,
+          detail: "Nous n'avons malheureusement pas reçu de réponse dans le délai prévu. Votre commande est donc annulée.",
+        },
+        { emoji: '💰', title: "Vous n'avez rien payé", detail: "Aucun montant n'a été débité." },
+      ],
+    };
+  }
+
+  if (reason === 'refused') {
+    const { il } = commerceKindWords(kind);
+    return {
+      title: `${Who} ne peut pas préparer cette commande`,
+      intro: `${Who} nous a informés qu'${il} ne pouvait pas préparer votre commande cette fois-ci.`,
+      body: "Vous n'avez rien payé, votre commande est donc simplement annulée.",
+      note: refusalReason ? `${Who} nous précise :\n« ${refusalReason} »` : null,
+      steps: [
+        { emoji: '🛍️', title: 'Vous avez envoyé votre commande', detail: `${Who} a reçu votre demande.` },
+        { emoji: '⏳', title: 'Nous avons attendu sa réponse', detail: `${Who} avait 5 minutes pour confirmer votre commande.` },
+        {
+          emoji: '❌',
+          title: `${Who} a refusé la commande`,
+          detail: `${Who} ne pouvait pas préparer cette commande cette fois-ci.`,
+        },
+        { emoji: '💰', title: "Vous n'avez rien payé", detail: "Aucun montant n'a été débité." },
+      ],
+    };
+  }
+
+  if (reason === 'unpaid') {
+    return {
+      title: "Votre commande n'a pas été finalisée",
+      intro: `Bonne nouvelle, ${word} avait bien accepté votre commande 😊`,
+      body: "Cependant, le paiement n'a pas été effectué dans le délai prévu. La commande a donc été annulée. Aucun montant n'a été débité.",
+      note: null,
+      steps: [
+        { emoji: '🛍️', title: 'Vous avez envoyé votre commande', detail: `${Who} a reçu votre demande.` },
+        { emoji: '✅', title: `${Who} a accepté votre commande`, detail: 'Bonne nouvelle, votre commande a bien été acceptée.' },
+        { emoji: '💳', title: "Le paiement n'a pas été finalisé", detail: 'Le délai pour payer a été dépassé.' },
+        { emoji: '💰', title: "Vous n'avez rien payé", detail: "Aucun montant n'a été débité." },
+      ],
+    };
+  }
+
+  // client_cancel
+  return {
+    title: 'Vous avez annulé votre commande',
+    intro: null,
+    body: 'Votre commande a bien été annulée. Aucun paiement ne sera effectué pour cette commande.',
+    note: null,
+    steps: [
+      { emoji: '🛍️', title: 'Vous avez envoyé votre commande', detail: `${Who} a reçu votre demande.` },
+      {
+        emoji: '❌',
+        title: 'Vous avez annulé votre commande',
+        detail: 'Aucun paiement ne sera effectué pour cette commande.',
+      },
+    ],
+  };
+}
+
 /** Statut commande côté vendeur. */
 export function vendorOrderStatusLabel(statut: string | null | undefined): string {
   const key = normalizeStatutKey(statut) as string;

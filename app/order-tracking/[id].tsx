@@ -14,7 +14,7 @@ import { apiFetch } from '@/lib/api';
 import { getSessionToken } from '@/lib/auth';
 import type { TimelineStep as _TimelineStep } from '@/lib/datetime';
 import { orderPollingIntervalMs } from '@/lib/order-status';
-import { orderRefundMessage, orderStatusLabel } from '@/lib/ux-copy';
+import { orderCancelledInfo, commerceKindWords, type CommerceKind } from '@/lib/ux-copy';
 import { formatFcfa } from '@/lib/format';
 
 type LocalTimelineStep = {
@@ -28,6 +28,7 @@ type SousCommandeDetail = {
   restaurant_id?: string;
   boutique_id?: string;
   statut: string;
+  raison_refus?: string | null;
   commerce_nom?: string | null;
   total?: number | null;
   articles: { id: string; nom: string; quantite: number; prix_unitaire: number }[];
@@ -262,40 +263,39 @@ export default function OrderTrackingScreen() {
   }
 
   const isDelivered = order?.statut === 'livree';
-  const refundMessage = orderRefundMessage(order?.statut);
-  const isRefunded = refundMessage !== null;
 
   const scs = order?.sousCommandes || [];
   const refusedScs = scs.filter((s) => s.statut === 'refusee' || s.statut === 'remboursee');
   const acceptedScs = scs.filter((s) => !['refusee', 'remboursee', 'annulee'].includes(s.statut));
   const acceptedNames = acceptedScs.map((s) => s.commerce_nom).filter((n): n is string => !!n);
   const allCommerceNames = scs.map((s) => s.commerce_nom).filter((n): n is string => !!n);
-  const commerceLabel = allCommerceNames.length > 0 ? allCommerceNames.join(', ') : 'la boutique';
+  // Type de commerce : on parle de « la boutique » ou « le restaurant ».
+  const commerceKind: CommerceKind = (() => {
+    const hasResto = scs.some((s) => !!s.restaurant_id);
+    const hasBoutique = scs.some((s) => !!s.boutique_id);
+    if (hasResto && !hasBoutique) return 'restaurant';
+    if (hasBoutique && !hasResto) return 'boutique';
+    return 'commerce';
+  })();
+  const { Who: commerceWho, de: commerceDe, word: commerceWord } = commerceKindWords(commerceKind);
+  const commerceLabel = allCommerceNames.length > 0 ? allCommerceNames.join(', ') : commerceWord;
   const acceptedLabel =
     acceptedNames.length > 1
       ? `${acceptedNames.slice(0, -1).join(', ')} et ${acceptedNames[acceptedNames.length - 1]} ont accepté votre commande.`
       : `${acceptedNames[0] || 'La boutique'} a accepté votre commande.`;
 
-  // Message d'annulation côté client : humain, jamais le motif technique
-  // destiné au commerce (paiement non effectué / boutique pas répondu…).
+  // Histoire de la commande annulée, racontée en mots simples (null si la
+  // commande n'est pas annulée / refusée / remboursée).
   const annulationMotif = order?.annulation_motif ? String(order.annulation_motif) : null;
-  const unpaidCancel =
-    order?.statut === 'annulee' && !!annulationMotif && annulationMotif.toLowerCase().includes('paiement');
-  const acceptanceTimeout = order?.statut === 'remboursee' || order?.statut === 'expiree';
-  const refundTitle = unpaidCancel
-    ? 'Paiement non effectué'
-    : acceptanceTimeout
-      ? "La boutique n'a pas pu confirmer votre commande"
-      : annulationMotif && !unpaidCancel
-        ? 'Commande annulée'
-        : orderStatusLabel(order?.statut);
-  const refundBody = unpaidCancel
-    ? "Vous n'avez pas confirmé le paiement dans les 5 minutes. Votre commande a été annulée — vous pouvez en passer une nouvelle quand vous le souhaitez."
-    : acceptanceTimeout
-      ? `Nous sommes désolés, ${commerceLabel} n'a pas répondu à temps. Votre commande a donc été annulée et aucun paiement n'a été effectué.`
-      : annulationMotif && !unpaidCancel
-        ? annulationMotif
-        : refundMessage;
+  const refusedSc = scs.find((s) => s.statut === 'refusee');
+  const cancelInfo = orderCancelledInfo({
+    statut: order?.statut,
+    annulationMotif,
+    kind: commerceKind,
+    sousStatuts: scs.map((s) => s.statut),
+    refusalReason: refusedSc?.raison_refus ?? null,
+  });
+  const isRefunded = cancelInfo !== null;
 
   const rawSteps = order?.timeline?.livraisons?.[0]?.timeline || order?.timeline?.commande || [];
   const steps: _TimelineStep[] = rawSteps.map((s, i) => ({
@@ -326,11 +326,11 @@ export default function OrderTrackingScreen() {
     acceptRemaining == null
       ? null
       : acceptRemaining > 180
-        ? 'Nous attendons la confirmation de la boutique.'
+        ? `Nous attendons la confirmation ${commerceDe}.`
         : acceptRemaining > 60
-          ? 'La boutique vérifie encore votre commande. Merci de patienter 😊'
+          ? `${commerceWho} vérifie encore votre commande. Merci de patienter 😊`
           : acceptRemaining > 0
-            ? "Plus qu'une minute ! Nous attendons encore la réponse de la boutique."
+            ? `Plus qu'une minute ! Nous attendons encore la réponse ${commerceDe}.`
             : null;
   const totalAPayer = order?.total_a_payer ?? 0;
 
@@ -356,8 +356,8 @@ export default function OrderTrackingScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 20 }]}>
 
-        {/* CARTE REMBOURSEMENT - commande expirée / annulée */}
-        {isRefunded && (
+        {/* CARTE REMBOURSEMENT - commande expirée / annulée (message humain) */}
+        {isRefunded && cancelInfo && (
           <View
             style={[
               styles.mapPreviewCard,
@@ -368,19 +368,41 @@ export default function OrderTrackingScreen() {
                 <Clock size={26} color="#FFFFFF" strokeWidth={LUCIDE_STROKE} />
               </View>
               <ThemedText style={[styles.etaTime, { color: colors.text, textAlign: 'center' }]}>
-                {refundTitle}
+                {cancelInfo.title}
               </ThemedText>
+              {cancelInfo.intro ? (
+                <ThemedText style={[styles.refundBody, { color: colors.text, textAlign: 'center' }]}>
+                  {cancelInfo.intro}
+                </ThemedText>
+              ) : null}
               <ThemedText style={[styles.refundBody, { color: colors.textMuted, textAlign: 'center' }]}>
-                {refundBody}
+                {cancelInfo.body}
               </ThemedText>
+
+              {/* Toute l'histoire, dans l'ordre */}
+              <View style={[styles.storyBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                {cancelInfo.steps.map((s, i) => (
+                  <View key={i} style={styles.storyRow}>
+                    <ThemedText style={[styles.storyEmoji, { color: colors.text }]}>{s.emoji}</ThemedText>
+                    <View style={{ flex: 1 }}>
+                      <ThemedText style={[styles.storyTitle, { color: colors.text }]}>{s.title}</ThemedText>
+                      <ThemedText style={[styles.storyDetail, { color: colors.textMuted }]}>{s.detail}</ThemedText>
+                    </View>
+                  </View>
+                ))}
+              </View>
+
+              {cancelInfo.note ? (
+                <ThemedText style={[styles.refundHint, { color: colors.textMuted, textAlign: 'center' }]}>
+                  {cancelInfo.note}
+                </ThemedText>
+              ) : null}
+
               <Pressable style={[styles.refundCta, { backgroundColor: colors.primary }]} onPress={goHome}>
                 <ThemedText style={[styles.refundCtaText, { color: colors.onPrimary }]}>
                   Retourner à l'accueil
                 </ThemedText>
               </Pressable>
-              <ThemedText style={[styles.refundHint, { color: colors.textMuted }]}>
-                Vous pouvez essayer une autre boutique.
-              </ThemedText>
             </View>
           </View>
         )}
@@ -453,7 +475,7 @@ export default function OrderTrackingScreen() {
                           Nous avons envoyé votre commande à {commerceLabel}.
                         </ThemedText>
                         <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 2, lineHeight: 18 }]}>
-                          La boutique est en train de vérifier votre commande.
+                          {commerceWho} est en train de vérifier votre commande.
                         </ThemedText>
                       </View>
                     </View>
@@ -463,7 +485,7 @@ export default function OrderTrackingScreen() {
                         {acceptCountdown ?? '05:00'}
                       </ThemedText>
                       <ThemedText style={[styles.countdownLabel, { color: colors.textMuted }]}>
-                        En attente de confirmation de la boutique
+                        En attente de confirmation {commerceDe}
                       </ThemedText>
                       {acceptanceMsg ? (
                         <ThemedText style={[styles.countdownMsg, { color: colors.text }]}>
@@ -870,6 +892,18 @@ const styles = StyleSheet.create({
   },
   refundCtaText: { fontWeight: '800', fontSize: 15 },
   refundHint: { fontSize: 13, fontWeight: '600' },
+
+  storyBox: {
+    width: '100%',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    gap: 12,
+  },
+  storyRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  storyEmoji: { fontSize: 18, width: 28, textAlign: 'center' },
+  storyTitle: { fontSize: 14, fontWeight: '800' },
+  storyDetail: { fontSize: 13, marginTop: 1, lineHeight: 18 },
 
   breakdownBox: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 4, gap: 2 },
   scRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5 },
