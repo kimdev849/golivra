@@ -199,7 +199,7 @@ export default function VendorMoreTabScreen() {
           )}
         </View>
 
-        <AppLogoutButton clearCart={false} />
+        <AppLogoutButton clearCart={false} variant="plain" />
       </ScrollView>
     </ThemedView>
   );

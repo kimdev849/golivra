@@ -9,7 +9,7 @@ import { useActionFeedback } from '@/hooks/use-action-feedback';
 
 type Props = {
   clearCart?: boolean;
-  variant?: 'filled' | 'ghost' | 'link';
+  variant?: 'filled' | 'ghost' | 'link' | 'plain';
 };
 
 export function AppLogoutButton({ clearCart, variant = 'link' }: Props) {
@@ -19,6 +19,7 @@ export function AppLogoutButton({ clearCart, variant = 'link' }: Props) {
 
   const filled = variant === 'filled';
   const link = variant === 'link';
+  const plain = variant === 'plain';
 
   const onConfirm = () => {
     showConfirm({
@@ -31,6 +32,30 @@ export function AppLogoutButton({ clearCart, variant = 'link' }: Props) {
       onPrimary: () => void performLogout(),
     });
   };
+
+  if (plain) {
+    return (
+      <>
+        <Pressable
+          onPress={onConfirm}
+          disabled={loggingOut}
+          hitSlop={12}
+          style={({ pressed }) => [styles.plain, pressed && !loggingOut && styles.linkPressed, loggingOut && styles.disabled]}>
+          {loggingOut ? (
+            <View style={styles.plainRow}>
+              <ActivityIndicator size="small" color={colors.error} />
+              <ThemedText style={[styles.plainLabel, { color: colors.error }]}>Déconnexion…</ThemedText>
+            </View>
+          ) : (
+            <ThemedText style={[styles.plainLabel, { color: colors.error }]}>
+              Se déconnecter
+            </ThemedText>
+          )}
+        </Pressable>
+        <FeedbackOverlay />
+      </>
+    );
+  }
 
   return (
     <>
@@ -99,6 +124,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     textDecorationLine: 'underline',
+  },
+  plain: {
+    alignSelf: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  plainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  plainLabel: {
+    fontSize: 15,
+    fontWeight: '700',
   },
   disabled: {
     opacity: 0.65,

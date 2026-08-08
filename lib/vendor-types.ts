@@ -147,8 +147,8 @@ export type VendorEngagementInput = {
   total_ventes?: number;
   taux_conversion_pct?: number;
   taux_achat_pct?: number;
-  top_vus?: { id?: string; produit_id?: string; nom?: string; vues?: number }[];
-  top_cliques?: { id?: string; produit_id?: string; nom?: string; clics?: number }[];
+  top_vus?: { id?: string; produit_id?: string; nom?: string; vues?: number; nb_vues?: number }[];
+  top_cliques?: { id?: string; produit_id?: string; nom?: string; clics?: number; nb_clics?: number }[];
 };
 
 export function countsFromOrders(orders: VendorOrder[]) {
@@ -261,12 +261,12 @@ export function computeVendorStats(
       topVus: (engagement.top_vus ?? []).map((t) => ({
         id: t.id ?? t.produit_id ?? '',
         nom: t.nom ?? 'Article inconnu',
-        vues: t.vues ?? 0,
+        vues: t.vues ?? t.nb_vues ?? 0,
       })),
       topCliques: (engagement.top_cliques ?? []).map((t) => ({
         id: t.id ?? t.produit_id ?? '',
         nom: t.nom ?? 'Article inconnu',
-        clics: t.clics ?? 0,
+        clics: t.clics ?? t.nb_clics ?? 0,
       })),
     };
   }
