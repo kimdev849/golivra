@@ -1,7 +1,8 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { Camera, ChevronRight, Clock } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -27,10 +28,13 @@ import { useAppColors } from '@/hooks/use-app-colors';
 import { useVendorHoraires } from '@/hooks/use-vendor-horaires';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
 import { getSessionToken } from '@/lib/auth';
+import { invalidateEnterprisesCache } from '@/lib/client-data';
 import { patchEnterprise } from '@/lib/enterprise';
 import { deliveryAddressError, quartierForForm } from '@/lib/format-address';
 import { resolveRemoteImageUrl } from '@/lib/images';
+import { DEFAULT_PREP_MINUTES, PREP_MINUTE_CHOICES } from '@/lib/pricing';
 import { uploadImageBase64 } from '@/lib/uploads';
+import { showToast } from '@/lib/app-toast';
 import { validateCommerceName, validateDescription, validatePhone } from '@/lib/form-validation';
 
 const emptyAddr = (): DeliveryAddressFormValue => ({
@@ -48,6 +52,7 @@ export default function VendorShopInfoScreen() {
   const colors = useAppColors();
   const { showSuccess, showError, FeedbackOverlay } = useActionFeedback();
   const { shop, refresh } = useVendor();
+  const queryClient = useQueryClient();
   const { commerceType, palette } = useVendorTheme();
   const horaires = useVendorHoraires(shop?.id);
 
@@ -61,10 +66,18 @@ export default function VendorShopInfoScreen() {
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
+  const [prepMinutes, setPrepMinutes] = useState(shop?.delaiPreparationMin ?? DEFAULT_PREP_MINUTES);
+  const [prepSaving, setPrepSaving] = useState(false);
+  // Ne pré-remplit le formulaire qu'UNE FOIS par boutique : si l'objet `shop`
+  // est recréé pendant l'édition (refresh silencieux), on ne doit pas écraser
+  // les modifications en cours (sélection du temps de préparation, champs…).
+  const syncedForRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!shop) return;
+    if (!shop || syncedForRef.current === shop.id) return;
+    syncedForRef.current = shop.id;
     const ligne1 = shop.adresse || '';
+    setPrepMinutes(shop.delaiPreparationMin);
     setNom(shop.nom || '');
     setDescription(shop.description || '');
     setTelephone(shop.telephone || '');
@@ -84,6 +97,55 @@ export default function VendorShopInfoScreen() {
     if (!asset) return;
     setLogoUri(asset.uri);
     setLogoDataUrl(asset.dataUrl);
+  };
+
+  /**
+   * Sauvegarde IMMÉDIATE du temps de préparation dès qu'un chip est tapé —
+   * pas besoin d'appuyer sur « Enregistrer ». Le changement persiste même si
+   * le vendeur quitte l'écran juste après, et les clients le voient aussitôt.
+   */
+  const savePrepMinutes = async (minutes: number) => {
+    if (!shop?.id || prepSaving) return;
+    // On compare à la sélection locale : pas de PATCH ni de toast redondant
+    // quand on re-tape le chip déjà sélectionné (avant que le refresh serveur arrive).
+    if (minutes === prepMinutes) return;
+    const isRestaurant = commerceType === 'restaurant';
+    const previous = prepMinutes;
+    setPrepMinutes(minutes);
+    setPrepSaving(true);
+    try {
+      const token = await getSessionToken();
+      if (!token) throw new Error('Session expirée');
+      // Envoie les deux conventions de nommage : l'API actuelle lit
+      // `delaiPreparationMin`, certaines versions antérieures pouvaient
+      // attendre le nom de colonne en snake_case. Le serveur ignore les
+      // champs inconnus, donc l'envoi des deux est sans risque.
+      const saved = await patchEnterprise(token, shop.id, {
+        delaiPreparationMin: minutes,
+        ...(isRestaurant ? { delai_preparation_min: minutes } : { delai_livraison_min: minutes }),
+      });
+      // Vérifie que la valeur a VRAIMENT été persistée : si l'API répond OK
+      // mais renvoie encore l'ancienne valeur (version serveur qui ignore le
+      // champ), on le signale au lieu d'afficher un succès trompeur.
+      // Le type se lit dans la RÉPONSE serveur (jamais en retard ni trompeur).
+      const persisted =
+        saved.type === 'restaurant' ? saved.delai_preparation_min : saved.delai_livraison_min;
+      if (persisted === undefined || Number(persisted) !== minutes) {
+        throw new Error(
+          "Le serveur n'a pas enregistré le nouveau temps de préparation. Vérifiez que l'API est à jour, puis réessayez.",
+        );
+      }
+      invalidateEnterprisesCache();
+      queryClient.invalidateQueries({ queryKey: ['enterprise'] });
+      queryClient.invalidateQueries({ queryKey: ['enterprises'] });
+      void refresh();
+      showToast({ message: 'Temps de préparation enregistré ✓', variant: 'success', duration: 1800 });
+    } catch (e) {
+      setPrepMinutes(previous);
+      showError('Enregistrement impossible', e instanceof Error ? e.message : undefined);
+    } finally {
+      setPrepSaving(false);
+    }
   };
 
   const save = async () => {
@@ -150,9 +212,18 @@ export default function VendorShopInfoScreen() {
         adresse: address.ligne1.trim(),
         adresseQuartier: address.quartier.trim(),
         adresseVille: address.ville || 'Brazzaville',
+        delaiPreparationMin: prepMinutes,
+        ...(isRestaurant ? { delai_preparation_min: prepMinutes } : { delai_livraison_min: prepMinutes }),
         ...(imageUrl ? { imageUrl } : logoDataUrl ? { imageDataUrl: logoDataUrl } : {}),
       });
       setLogoDataUrl(null);
+      // ⚡ Propager immédiatement la modification aux vues client du même
+      // appareil : sans ça, le cache (React Query + request-cache, jusqu'à 2-3
+      // min) afficherait l'ancien temps de préparation sur la fiche commerce,
+      // l'accueil et le panier. Les autres appareils rafraîchissent par TTL.
+      invalidateEnterprisesCache();
+      queryClient.invalidateQueries({ queryKey: ['enterprise'] });
+      queryClient.invalidateQueries({ queryKey: ['enterprises'] });
       router.back();
       void refresh();
       showSuccess('Enregistré !', 'Les informations du commerce ont été mises à jour.');
@@ -282,6 +353,53 @@ export default function VendorShopInfoScreen() {
           <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
         </Pressable>
 
+        {/* ── Temps de préparation (géré par le commerce) ── */}
+        <ThemedText style={[styles.sectionHead, { color: colors.textSecondary }]}>
+          Temps de préparation
+        </ThemedText>
+        <View style={[styles.prepCard, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}>
+          <ThemedText style={[styles.prepSub, { color: colors.textMuted }]}>
+            {commerceType === 'restaurant'
+              ? 'Le temps nécessaire pour cuisiner et emballer votre commande.'
+              : 'Le temps nécessaire pour préparer le sac, vérifier les articles et emballer.'}
+          </ThemedText>
+          <View style={styles.prepChips}>
+            {PREP_MINUTE_CHOICES.map((m) => {
+              const on = prepMinutes === m;
+              return (
+                <Pressable
+                  key={m}
+                  style={[
+                    styles.prepChip,
+                    {
+                      borderColor: on ? palette.primary : colors.border,
+                      backgroundColor: on ? palette.primary : colors.surface,
+                    },
+                  ]}
+                  onPress={() => void savePrepMinutes(m)}
+                  disabled={prepSaving}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: on, disabled: prepSaving }}
+                  accessibilityLabel={`${m} minutes`}>
+                  <ThemedText
+                    style={[
+                      styles.prepChipTxt,
+                      { color: on ? colors.onPrimary : colors.text },
+                    ]}>
+                    {m} min
+                  </ThemedText>
+                </Pressable>
+              );
+            })}
+          </View>
+          <View style={styles.prepHintRow}>
+            <ThemedText style={[styles.prepHint, { color: colors.textMuted }]}>
+              Vos clients verront : « Votre commande sera prête dans environ {prepMinutes} min », puis la livraison par un livreur GoLivra.
+            </ThemedText>
+            {prepSaving ? <ActivityIndicator size="small" color={palette.primary} /> : null}
+          </View>
+        </View>
+
         <View style={[styles.deliveryCard, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}>
           <ThemedText type="defaultSemiBold" style={[styles.deliveryTitle, { color: colors.text }]}>
             Réseau GoLivra
@@ -366,6 +484,28 @@ const styles = StyleSheet.create({
   },
   deliveryTitle: { fontSize: 15, marginBottom: 6 },
   deliverySub: { fontSize: 12, lineHeight: 17 },
+  prepCard: {
+    marginTop: 4,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+  },
+  prepSub: { fontSize: 12, lineHeight: 17, marginBottom: 12 },
+  prepChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  prepChip: {
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    borderWidth: 1.5,
+  },
+  prepHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 12,
+  },
+  prepChipTxt: { fontWeight: '800', fontSize: 13 },
+  prepHint: { fontSize: 11.5, lineHeight: 16, marginTop: 12, opacity: 0.85 },
   save: {
     marginTop: 28,
     borderRadius: 12,

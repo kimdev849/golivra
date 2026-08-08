@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { getSessionToken } from '@/lib/auth';
 import { fetchMyEnterprises, type EnterpriseCreated } from '@/lib/enterprise';
 import { resolveRemoteImageUrl } from '@/lib/images';
+import { enterprisePrepMinutes } from '@/lib/pricing';
 import { fetchVendorOrders, fetchVendorProducts } from '@/lib/vendor-api';
 import type { VendorCommerceType } from '@/lib/vendor-theme';
 import type { VendorOrder, VendorProduct, VendorShop } from '@/lib/vendor-types';
@@ -39,6 +40,7 @@ function mapEnterpriseToShop(e: EnterpriseCreated): VendorShop {
     longitude: e.longitude ?? null,
     statut_moderation: e.statut_moderation ?? null,
     livraison_propre: e.livraison_propre === true,
+    delaiPreparationMin: enterprisePrepMinutes(e),
   };
 }
 

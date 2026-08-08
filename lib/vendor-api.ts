@@ -165,23 +165,13 @@ export async function fetchMyEnterpriseStats(
 }
 
 export async function fetchArticleCategories(token: string, enterpriseId: string): Promise<ArticleCategory[]> {
+  // Les catégories sont GLOBALES (gérées par GoLivra). Le backend résout
+  // automatiquement la liste selon le type d'établissement.
   const data = await apiFetch<ArticleCategory[]>(`/api/products/enterprise/${enterpriseId}/categories`, {
     method: 'GET',
     token,
   });
   return Array.isArray(data) ? data : [];
-}
-
-export async function createArticleCategory(
-  token: string,
-  enterpriseId: string,
-  body: { nom: string; description?: string },
-): Promise<ArticleCategory> {
-  return apiFetch<ArticleCategory>(`/api/products/enterprise/${enterpriseId}/categories`, {
-    method: 'POST',
-    token,
-    jsonBody: body,
-  });
 }
 
 type ApiVendorOrder = VendorOrder;

@@ -35,11 +35,11 @@ export default function HowMultiDeliveryScreen() {
           Exemple
         </ThemedText>
         <View style={[styles.exampleBox, { borderColor: colors.border, backgroundColor: colors.primarySoft }]}>
-          <Row icon={<UtensilsCrossed size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />} text="Restaurant A → ~30 min" />
+          <Row icon={<UtensilsCrossed size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />} text="Restaurant A → ~25 min" />
           <View style={[styles.div, { backgroundColor: colors.border }]} />
-          <Row icon={<Store size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />} text="Boutique B → ~45 min" />
+          <Row icon={<Store size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />} text="Boutique B → ~35 min" />
           <View style={[styles.div, { backgroundColor: colors.border }]} />
-          <Row icon={<Package size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />} text="Autre commerce → ~60 min" />
+          <Row icon={<Package size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />} text="Autre commerce → ~45 min" />
         </View>
 
         <ThemedText style={[styles.note, { color: colors.textMuted }]}>

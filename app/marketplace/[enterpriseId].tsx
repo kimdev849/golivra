@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import {
   ArrowLeft,
   Building2,
+  ChevronDown,
   Clock,
   Heart,
   Images,
@@ -16,6 +17,7 @@ import {
   ShoppingCart,
   Star,
   Store,
+  Truck,
   UtensilsCrossed,
 } from 'lucide-react-native';
 import { Image } from 'expo-image';
@@ -34,6 +36,8 @@ import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { useCurrentTime } from '@/hooks/use-current-time';
 import { useDeliveryEstimate } from '@/hooks/use-delivery-estimate';
 import { computeLiveStatus } from '@/lib/horaires-status';
+import { enterprisePrepMinutes } from '@/lib/pricing';
+import { formatHumanMinutes } from '@/lib/format';
 import type { EnterprisePublic, ProductPublic } from '@/lib/catalog';
 import {
   fetchEnterpriseById,
@@ -71,6 +75,7 @@ export default function EnterpriseDetailScreen() {
   const [isFavorited, setIsFavorited] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [galleryState, setGalleryState] = useState<{ images: string[]; index: number } | null>(null);
+  const [etaDetailOpen, setEtaDetailOpen] = useState(false);
 
   const { data: enterprise, isLoading: loadingEnt, error: entError } = useQuery<EnterprisePublic>({
     queryKey: ['enterprise', id],
@@ -132,12 +137,13 @@ export default function EnterpriseDetailScreen() {
 
   const hero = resolveRemoteImageUrl(enterprise?.image_url, IMG_HERO);
   const isRestaurant = enterprise?.type === 'restaurant';
-  const prepMin = enterprise?.delai_preparation_min ?? 25;
+  // 🏪 Temps de PRÉPARATION : fixé par le commerce (delai_preparation_min pour
+  // les restaurants, delai_livraison_min pour les boutiques — préparation du colis).
+  const prepMin = enterprisePrepMinutes(enterprise);
   // ⚡ Temps de livraison DYNAMIQUE : géré par GoLivra selon la ZONE du client
-  // (proche ~30 min · moyenne ~45 min · éloignée ~60 min). Repli sur le délai
+  // (proche ~25 min · moyenne ~35 min · éloignée ~45 min). Repli sur le délai
   // du commerce si la zone n'est pas déterminable.
   const { minutes: deliveryMin } = useDeliveryEstimate();
-  const shipMin = deliveryMin ?? enterprise?.delai_livraison_min ?? 48;
   // ⚡ Statut ouvert/fermé RECALCULÉ EN DIRECT côté client.
   // Le serveur calcule est_ouvert_maintenant / peut_commander_maintenant à
   // l'instant de la requête, puis le cache client le fige (jusqu'à plusieurs
@@ -355,17 +361,72 @@ export default function EnterpriseDetailScreen() {
               <ThemedText style={styles.infoText}>{enterprise.telephone}</ThemedText>
             </View>
           ) : null}
-          <View style={styles.infoRow}>
-            <Clock size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-            <ThemedText style={styles.infoText}>
-              Préparation ~{prepMin} min · Livraison ~{shipMin} min
-            </ThemedText>
+          {/* 🚚 Livraison prévue — l'essentiel d'abord, le détail se plie */}
+          <View
+            style={[
+              styles.etaCard,
+              { borderColor: colors.border, backgroundColor: colors.surfaceMuted },
+            ]}>
+            {deliveryMin != null ? (
+              <>
+                <View style={styles.etaHeadRow}>
+                  <Truck size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+                  <ThemedText type="defaultSemiBold" style={styles.etaHeadline}>
+                    Livraison prévue dans environ {formatHumanMinutes(prepMin + deliveryMin)}
+                  </ThemedText>
+                </View>
+                <ThemedText style={styles.etaBody}>
+                  {isRestaurant
+                    ? 'Le restaurant prépare votre commande en premier, puis un livreur vient vous la remettre directement.'
+                    : 'La boutique prépare votre commande en premier, puis un livreur vient vous la remettre directement.'}
+                </ThemedText>
+                <Pressable
+                  style={styles.etaToggle}
+                  onPress={() => setEtaDetailOpen((v) => !v)}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: etaDetailOpen }}>
+                  <ThemedText style={[styles.etaToggleTxt, { color: colors.primary }]}>
+                    {etaDetailOpen ? 'Masquer le détail du délai' : 'Voir le détail du délai'}
+                  </ThemedText>
+                  <ChevronDown
+                    size={15}
+                    color={colors.primary}
+                    strokeWidth={LUCIDE_STROKE}
+                    style={etaDetailOpen ? { transform: [{ rotate: '180deg' }] } : undefined}
+                  />
+                </Pressable>
+                {etaDetailOpen ? (
+                  <View style={styles.etaDetail}>
+                    <View style={styles.infoRow}>
+                      <ThemedText style={styles.etaEmoji}>🍳</ThemedText>
+                      <ThemedText style={styles.etaText}>
+                        Préparation : environ {prepMin} min
+                      </ThemedText>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <ThemedText style={styles.etaEmoji}>🛵</ThemedText>
+                      <ThemedText style={styles.etaText}>
+                        Livraison : environ {deliveryMin} min
+                      </ThemedText>
+                    </View>
+                  </View>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <View style={styles.etaHeadRow}>
+                  <Clock size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+                  <ThemedText type="defaultSemiBold" style={styles.etaHeadline}>
+                    Votre commande sera prête dans environ {prepMin} min
+                  </ThemedText>
+                </View>
+                <ThemedText style={styles.etaBody}>
+                  Un livreur vient ensuite vous la remettre directement, selon votre adresse.
+                </ThemedText>
+              </>
+            )}
           </View>
-          {deliveryMin != null ? (
-            <ThemedText style={styles.deliveryHint}>
-              Livraison estimée selon votre zone — le temps de préparation est fixé par {commerceRef}.
-            </ThemedText>
-          ) : null}
         </View>
 
         {/* Statut d'ouverture (horaires) */}

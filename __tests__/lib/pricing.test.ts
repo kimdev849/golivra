@@ -3,6 +3,8 @@ import {
   deliveryFeeForQuartier,
   deliveryMinutesForQuartier,
   displayDeliveryFeeFcfa,
+  enterprisePrepMinutes,
+  etaEstimateForEnterprise,
   type PublicPricing,
 } from '@/lib/pricing';
 
@@ -65,16 +67,16 @@ describe('pricing lib', () => {
   };
 
   describe('deliveryMinutesForQuartier', () => {
-    test('proche zone -> 30 min', () => {
-      expect(deliveryMinutesForQuartier('Bacongo', threeZonePricing)).toBe(30);
+    test('proche zone -> 25 min', () => {
+      expect(deliveryMinutesForQuartier('Bacongo', threeZonePricing)).toBe(25);
     });
 
-    test('moyenne zone -> 45 min', () => {
-      expect(deliveryMinutesForQuartier('Moungali', threeZonePricing)).toBe(45);
+    test('moyenne zone -> 35 min', () => {
+      expect(deliveryMinutesForQuartier('Moungali', threeZonePricing)).toBe(35);
     });
 
-    test('éloignée zone -> 60 min', () => {
-      expect(deliveryMinutesForQuartier('Talangaï', threeZonePricing)).toBe(60);
+    test('éloignée zone -> 45 min', () => {
+      expect(deliveryMinutesForQuartier('Talangaï', threeZonePricing)).toBe(45);
     });
 
     test('quartier inconnu -> null', () => {
@@ -89,7 +91,7 @@ describe('pricing lib', () => {
   describe('deliveryEstimateForQuartier', () => {
     test('estimation complète zone proche', () => {
       expect(deliveryEstimateForQuartier('Bacongo', threeZonePricing)).toEqual({
-        minutes: 30,
+        minutes: 25,
         tier: 'proche',
         tierLabel: 'Zone proche',
       });
@@ -97,7 +99,7 @@ describe('pricing lib', () => {
 
     test('estimation complète zone moyenne', () => {
       expect(deliveryEstimateForQuartier('Moungali', threeZonePricing)).toEqual({
-        minutes: 45,
+        minutes: 35,
         tier: 'moyenne',
         tierLabel: 'Zone moyenne',
       });
@@ -107,6 +109,82 @@ describe('pricing lib', () => {
       expect(deliveryEstimateForQuartier('Inconnu', threeZonePricing)).toEqual({
         minutes: null,
         tier: null,
+        tierLabel: null,
+      });
+    });
+  });
+
+  describe('enterprisePrepMinutes', () => {
+    test('restaurant -> delai_preparation_min', () => {
+      expect(enterprisePrepMinutes({ type: 'restaurant', delai_preparation_min: 25 })).toBe(25);
+    });
+
+    test('restaurant sans délai -> défaut 20', () => {
+      expect(enterprisePrepMinutes({ type: 'restaurant' })).toBe(20);
+    });
+
+    test('boutique -> delai_livraison_min (préparation du colis)', () => {
+      expect(enterprisePrepMinutes({ type: 'boutique', delai_livraison_min: 45 })).toBe(45);
+    });
+
+    test('boutique sans délai -> défaut 30', () => {
+      expect(enterprisePrepMinutes({ type: 'boutique' })).toBe(30);
+    });
+
+    test('null / inconnu -> défaut restaurant 20', () => {
+      expect(enterprisePrepMinutes(null)).toBe(20);
+      expect(enterprisePrepMinutes(undefined)).toBe(20);
+    });
+
+    test('bornage 5-180 min', () => {
+      expect(enterprisePrepMinutes({ type: 'restaurant', delai_preparation_min: 500 })).toBe(180);
+      expect(enterprisePrepMinutes({ type: 'restaurant', delai_preparation_min: 2 })).toBe(5);
+      expect(enterprisePrepMinutes({ type: 'restaurant', delai_preparation_min: 0 })).toBe(20);
+    });
+  });
+
+  describe('etaEstimateForEnterprise', () => {
+    test('restaurant + zone proche -> préparation + livraison + arrivée', () => {
+      expect(
+        etaEstimateForEnterprise(
+          { type: 'restaurant', delai_preparation_min: 25 },
+          'Bacongo',
+          threeZonePricing,
+        ),
+      ).toEqual({
+        prepMinutes: 25,
+        deliveryMinutes: 25,
+        totalMinutes: 50,
+        tierLabel: 'Zone proche',
+      });
+    });
+
+    test('quartier inconnu -> livraison indéterminée', () => {
+      expect(
+        etaEstimateForEnterprise(
+          { type: 'boutique', delai_livraison_min: 40 },
+          'Inconnu',
+          threeZonePricing,
+        ),
+      ).toEqual({
+        prepMinutes: 40,
+        deliveryMinutes: null,
+        totalMinutes: null,
+        tierLabel: null,
+      });
+    });
+
+    test('sans config zones -> livraison indéterminée', () => {
+      expect(
+        etaEstimateForEnterprise(
+          { type: 'restaurant', delai_preparation_min: 20 },
+          'Bacongo',
+          { ...threeZonePricing, zones: null },
+        ),
+      ).toEqual({
+        prepMinutes: 20,
+        deliveryMinutes: null,
+        totalMinutes: null,
         tierLabel: null,
       });
     });

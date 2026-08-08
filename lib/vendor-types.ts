@@ -19,6 +19,8 @@ export type VendorShop = {
   statut_moderation?: string | null;
   /** Si true : livraison par le commerce (pas de livreur GoLivra sur les nouvelles commandes). */
   livraison_propre?: boolean;
+  /** Temps de préparation (min) affiché au client : restaurant → delai_preparation_min, boutique → delai_livraison_min. */
+  delaiPreparationMin: number;
 };
 
 export type VendorOrderStatus =

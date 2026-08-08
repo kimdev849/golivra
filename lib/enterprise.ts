@@ -106,6 +106,11 @@ export type EnterprisePatchBody = {
   imageUrl?: string | null;
   /** Secours si l’upload Storage échoue (enregistrement direct en base). */
   imageDataUrl?: string | null;
+  /** Temps de préparation (min) — restaurant → delai_preparation_min, boutique → delai_livraison_min. */
+  delaiPreparationMin?: number;
+  /** Variantes snake_case du nom de colonne (rétrocompatibilité : certaines versions d'API ne lisaient que ces noms). */
+  delai_preparation_min?: number;
+  delai_livraison_min?: number;
 };
 
 export async function patchEnterprise(

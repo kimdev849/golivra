@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -13,11 +12,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
-  CircleDollarSign,
   Image as ImageIcon,
   Info,
+  List,
   Settings2,
-  ToggleLeft,
+  type LucideIcon,
 } from 'lucide-react-native';
 
 import { CategoryPicker } from '@/components/category-picker';
@@ -28,6 +27,7 @@ import {
   VendorPhotoGalleryField,
   type VendorImageAsset,
 } from '@/components/vendor-form-shared';
+import { VendorCollapsibleSection } from '@/components/vendor-collapsible-section';
 import { VendorFormFooter } from '@/components/vendor-form-footer';
 import { ThemedText } from '@/components/themed-text';
 import { InlineFormError } from '@/components/inline-form-error';
@@ -42,15 +42,14 @@ import {
   DEFAULT_MENU_ITEM_FORM,
   type MenuItemFormValues,
 } from '@/lib/vendor-menu-item-types';
+import { UNITE_CHOICES } from '@/lib/vendor-product-types';
 import {
-  createArticleCategory,
   createVendorProduct,
   fetchArticleCategories,
   updateVendorProduct,
 } from '@/lib/vendor-api';
 import type { ArticleCategory } from '@/lib/vendor-product-types';
 import type { VendorProduct } from '@/lib/vendor-types';
-import { validateCommerceName } from '@/lib/form-validation';
 import {
   firstListingError,
   validateMenuItemStep,
@@ -62,6 +61,12 @@ const DESC_MAX = 500;
 
 /** Nombre d'étapes de validation existantes — utilisées pour valider tout le formulaire d'un coup. */
 const VALIDATION_STEPS = 6;
+
+/**
+ * Champs logés dans la section repliable « Informations supplémentaires » :
+ * s'il y a une erreur de validation dessus, on ouvre la section automatiquement.
+ */
+const EXTRA_FIELD_KEYS = new Set(['options', 'stock', 'tagsText']);
 
 type Props = {
   enterpriseId: string;
@@ -92,6 +97,24 @@ function SectionTitle({
   );
 }
 
+/** Petit sous-titre à l'intérieur de la section repliable (groupe de champs). */
+function SubLabel({
+  colors,
+  Icon,
+  children,
+}: {
+  colors: ReturnType<typeof useAppColors>;
+  Icon: LucideIcon;
+  children: string;
+}) {
+  return (
+    <View style={styles.subLabelRow}>
+      <Icon size={14} color={colors.textSecondary} strokeWidth={2.2} />
+      <ThemedText style={[styles.subLabel, { color: colors.textSecondary }]}>{children}</ThemedText>
+    </View>
+  );
+}
+
 export function VendorMenuItemFormWizard({
   enterpriseId,
   palette,
@@ -104,36 +127,46 @@ export function VendorMenuItemFormWizard({
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const { showError, FeedbackOverlay } = useActionFeedback();
+  const scrollRef = useRef<ScrollView>(null);
+  const [extraSectionY, setExtraSectionY] = useState(0);
   const [values, setValues] = useState<MenuItemFormValues>(initialValues ?? DEFAULT_MENU_ITEM_FORM);
   const [categories, setCategories] = useState<ArticleCategory[]>([]);
   const [catLoading, setCatLoading] = useState(true);
+  const [catError, setCatError] = useState<string | null>(null);
   const [catPickerOpen, setCatPickerOpen] = useState(false);
-  const [newCatOpen, setNewCatOpen] = useState(false);
-  const [newCatName, setNewCatName] = useState('');
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<ListingFieldErrors>({});
+  const [extraOpen, setExtraOpen] = useState(false);
 
   const patch = (p: Partial<MenuItemFormValues>) => setValues((v) => ({ ...v, ...p }));
   const clearFieldError = (field: string) =>
     setErrors((s) => ({ ...s, [field]: null }));
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const token = await getSessionToken();
-        if (!token) return;
-        const list = await fetchArticleCategories(token, enterpriseId);
-        if (alive) setCategories(list);
-      } catch {
-        if (alive) setCategories([]);
-      } finally {
-        if (alive) setCatLoading(false);
+  const loadCategories = async () => {
+    setCatLoading(true);
+    setCatError(null);
+    try {
+      const token = await getSessionToken();
+      if (!token) {
+        setCatError('Session expirée. Reconnectez-vous.');
+        return;
       }
-    })();
-    return () => {
-      alive = false;
-    };
+      const list = await fetchArticleCategories(token, enterpriseId);
+      setCategories(list);
+      if (list.length === 0) {
+        setCatError('Aucune catégorie reçue. La migration des catégories GoLivra est-elle appliquée ?');
+      }
+    } catch (e) {
+      setCategories([]);
+      setCatError(e instanceof Error ? e.message : 'Erreur réseau.');
+    } finally {
+      setCatLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadCategories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enterpriseId]);
 
   const selectedCategory = categories.find((c) => c.id === values.categorieId) ?? null;
@@ -215,6 +248,14 @@ export function VendorMenuItemFormWizard({
     }
     const first = firstListingError(merged);
     setErrors(merged);
+    // Si une erreur est cachée dans « Informations supplémentaires », on déplie
+    // et on défile jusqu'à la section pour qu'elle soit visible.
+    if (Object.keys(merged).some((k) => EXTRA_FIELD_KEYS.has(k) && merged[k])) {
+      setExtraOpen(true);
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({ y: Math.max(0, extraSectionY - 16), animated: true });
+      });
+    }
     if (first) {
       showToast({ message: first, variant: 'error', duration: 3200 });
       return false;
@@ -253,26 +294,6 @@ export function VendorMenuItemFormWizard({
     }
   };
 
-  const createCategory = async () => {
-    const e = validateCommerceName(newCatName);
-    if (!e.ok) {
-      showToast({ message: e.message, variant: 'error', duration: 2500 });
-      return;
-    }
-    try {
-      const token = await getSessionToken();
-      if (!token) throw new Error('Session expirée.');
-      const created = await createArticleCategory(token, enterpriseId, { nom: newCatName.trim() });
-      setCategories((prev) => [...prev, created]);
-      patch({ categorieId: created.id });
-      setNewCatOpen(false);
-      setNewCatName('');
-      showToast({ message: 'Catégorie créée ✓', variant: 'success' });
-    } catch (e) {
-      showError('Catégorie non créée', e instanceof Error ? e.message : undefined);
-    }
-  };
-
   return (
     <View style={styles.root}>
       <FeedbackOverlay />
@@ -281,6 +302,7 @@ export function VendorMenuItemFormWizard({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: insets.bottom + 100 }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
@@ -298,8 +320,8 @@ export function VendorMenuItemFormWizard({
             mainRequired
           />
 
-          {/* INFOS */}
-          <SectionTitle accent={palette.primary} Icon={Info}>Infos</SectionTitle>
+          {/* INFORMATIONS PRINCIPALES */}
+          <SectionTitle accent={palette.primary} Icon={Info}>Informations principales</SectionTitle>
           <ThemedText style={[styles.label, { color: colors.text }]}>Nom du plat *</ThemedText>
           <TextInput
             style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
@@ -312,6 +334,39 @@ export function VendorMenuItemFormWizard({
             placeholderTextColor={colors.placeholder}
           />
           <InlineFormError message={errors.nom} colors={colors} />
+          <ThemedText style={[styles.label, { color: colors.text }]}>Prix normal (FCFA) *</ThemedText>
+          <TextInput
+            style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
+            value={values.prix}
+            onChangeText={(t) => {
+              patch({ prix: t });
+              clearFieldError('prix');
+            }}
+            keyboardType="numeric"
+            placeholder="2500"
+            placeholderTextColor={colors.placeholder}
+          />
+          <InlineFormError message={errors.prix} colors={colors} />
+          <ThemedText style={[styles.label, { color: colors.text }]}>Catégorie du plat</ThemedText>
+          <Pressable
+            style={[styles.selectCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
+            onPress={() => setCatPickerOpen(true)}
+            disabled={catLoading}>
+            <ThemedText style={[styles.selectTxt, { color: colors.text }]}>
+              {catLoading ? 'Chargement…' : selectedCategory?.nom ?? 'Choisir une catégorie'}
+            </ThemedText>
+          </Pressable>
+          {catError && !catLoading ? (
+            <Pressable onPress={() => void loadCategories()}>
+              <ThemedText style={[styles.hintTxt, { color: colors.error }]}>
+                Catégories indisponibles — appuyez pour réessayer.
+              </ThemedText>
+            </Pressable>
+          ) : (
+            <ThemedText style={[styles.hintTxt, { color: colors.textMuted }]}>
+              Les catégories sont définies par GoLivra — vous choisissez simplement celle qui correspond à votre plat.
+            </ThemedText>
+          )}
           <ThemedText style={[styles.label, { color: colors.text }]}>Description</ThemedText>
           <TextInput
             style={[styles.input, styles.area, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
@@ -326,34 +381,6 @@ export function VendorMenuItemFormWizard({
             placeholderTextColor={colors.placeholder}
           />
           <InlineFormError message={errors.description} colors={colors} />
-          <ThemedText style={[styles.label, { color: colors.text }]}>Catégorie du menu</ThemedText>
-          <Pressable
-            style={[styles.selectCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
-            onPress={() => setCatPickerOpen(true)}
-            disabled={catLoading}>
-            <ThemedText style={[styles.selectTxt, { color: colors.text }]}>
-              {catLoading ? 'Chargement…' : selectedCategory?.nom ?? 'Choisir ou créer une catégorie'}
-            </ThemedText>
-          </Pressable>
-          <Pressable onPress={() => setNewCatOpen(true)}>
-            <ThemedText style={[styles.linkTxt, { color: palette.primary }]}>+ Nouvelle catégorie</ThemedText>
-          </Pressable>
-
-          {/* PRIX */}
-          <SectionTitle accent={palette.primary} Icon={CircleDollarSign}>Prix</SectionTitle>
-          <ThemedText style={[styles.label, { color: colors.text }]}>Prix normal (FCFA) *</ThemedText>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
-            value={values.prix}
-            onChangeText={(t) => {
-              patch({ prix: t });
-              clearFieldError('prix');
-            }}
-            keyboardType="numeric"
-            placeholder="2500"
-            placeholderTextColor={colors.placeholder}
-          />
-          <InlineFormError message={errors.prix} colors={colors} />
           <ThemedText style={[styles.label, { color: colors.text }]}>Prix promo (FCFA)</ThemedText>
           <TextInput
             style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
@@ -398,23 +425,6 @@ export function VendorMenuItemFormWizard({
               <InlineFormError message={errors.promoFinAt} colors={colors} />
             </>
           ) : null}
-
-          {/* OPTIONS */}
-          <SectionTitle accent={palette.primary} Icon={Settings2}>Options</SectionTitle>
-          <InlineFormError message={errors.options} colors={colors} />
-          <OptionGroupsEditor
-            groups={values.optionGroups}
-            onChange={(optionGroups) => {
-              patch({ optionGroups });
-              clearFieldError('options');
-            }}
-            accent={palette.primary}
-            groupLabel="options"
-            colors={colors}
-          />
-
-          {/* DISPONIBILITÉ */}
-          <SectionTitle accent={palette.primary} Icon={ToggleLeft}>Disponibilité</SectionTitle>
           <View style={styles.switchRow}>
             <ThemedText style={[styles.labelInline, { color: colors.text }]}>Plat disponible</ThemedText>
             <Switch
@@ -424,84 +434,100 @@ export function VendorMenuItemFormWizard({
               thumbColor={values.estDisponible ? palette.primary : colors.surfaceMuted}
             />
           </View>
-          <View style={styles.switchRow}>
-            <ThemedText style={[styles.labelInline, { color: colors.text }]}>Mettre en vedette</ThemedText>
-            <Switch
-              value={values.enVedette}
-              onValueChange={(v) => patch({ enVedette: v })}
-              trackColor={{ false: colors.borderStrong, true: colors.success }}
-              thumbColor={values.enVedette ? palette.primary : colors.surfaceMuted}
+
+          {/* INFORMATIONS SUPPLÉMENTAIRES */}
+          <View onLayout={(e) => setExtraSectionY(e.nativeEvent.layout.y)}>
+          <VendorCollapsibleSection
+            title="Informations supplémentaires"
+            accent={palette.primary}
+            colors={colors}
+            Icon={Settings2}
+            open={extraOpen}
+            onToggle={() => setExtraOpen((v) => !v)}>
+            <SubLabel colors={colors} Icon={List}>Variantes</SubLabel>
+            <InlineFormError message={errors.options} colors={colors} />
+            <OptionGroupsEditor
+              groups={values.optionGroups}
+              onChange={(optionGroups) => {
+                patch({ optionGroups });
+                clearFieldError('options');
+              }}
+              accent={palette.primary}
+              colors={colors}
             />
-          </View>
-          <View style={styles.switchRow}>
-            <ThemedText style={[styles.labelInline, { color: colors.text }]}>Limiter la quantité</ThemedText>
-            <Switch
-              value={values.limiterQuantite}
-              onValueChange={(v) => patch({ limiterQuantite: v, stock: v ? values.stock : '' })}
-              trackColor={{ false: colors.borderStrong, true: colors.success }}
-              thumbColor={values.limiterQuantite ? palette.primary : colors.surfaceMuted}
-            />
-          </View>
-          {values.limiterQuantite ? (
-            <>
-              <ThemedText style={[styles.label, { color: colors.text }]}>
-                Quantité disponible (optionnel — ex. plat du jour)
-              </ThemedText>
-              <TextInput
-                style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
-                value={values.stock}
-                onChangeText={(t) => {
-                  patch({ stock: t });
-                  clearFieldError('stock');
-                }}
-                keyboardType="numeric"
-                placeholder="20"
-                placeholderTextColor={colors.placeholder}
-              />
-              <InlineFormError message={errors.stock} colors={colors} />
-            </>
-          ) : (
-            <ThemedText style={[styles.stockHint, { color: colors.textMuted }]}>
-              Sans limite de stock.
-            </ThemedText>
-          )}
-          <ThemedText style={[styles.label, { color: colors.text }]}>Tags</ThemedText>
-          <TextInput
-            style={[styles.input, styles.area, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
-            value={values.tagsText}
-            onChangeText={(t) => {
-              patch({ tagsText: t });
-              clearFieldError('tagsText');
-            }}
-            multiline
-            placeholder="épicé, populaire…"
-            placeholderTextColor={colors.placeholder}
-          />
-          <InlineFormError message={errors.tagsText} colors={colors} />
-          <ThemedText style={[styles.label, { color: colors.text }]}>Allergènes</ThemedText>
-          <View style={styles.chipRow}>
-            {ALLERGENE_CHOICES.map((a) => {
-              const on = values.allergenes.includes(a);
-              return (
-                <Pressable
-                  key={a}
-                  style={[
-                    styles.chip,
-                    { borderColor: colors.border, backgroundColor: colors.surface },
-                    on && { backgroundColor: palette.primary, borderColor: palette.primary },
-                  ]}
-                  onPress={() => toggleAllergene(a)}>
-                  <ThemedText
+            <ThemedText style={[styles.label, { color: colors.text }]}>Unité de vente</ThemedText>
+            <View style={styles.chipRow}>
+              {UNITE_CHOICES.map((u) => {
+                const on = values.unite === u;
+                return (
+                  <Pressable
+                    key={u}
                     style={[
-                      styles.chipTxt,
-                      on && styles.chipTxtOn,
-                      { color: on ? colors.onPrimary : colors.text },
-                    ]}>
-                    {a}
-                  </ThemedText>
-                </Pressable>
-              );
-            })}
+                      styles.chip,
+                      { borderColor: colors.border, backgroundColor: colors.surface },
+                      on && { backgroundColor: palette.primary, borderColor: palette.primary },
+                    ]}
+                    onPress={() => patch({ unite: u })}>
+                    <ThemedText
+                      style={[
+                        styles.chipTxt,
+                        on && styles.chipTxtOn,
+                        { color: on ? colors.onPrimary : colors.text },
+                      ]}>
+                      {u}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <ThemedText style={[styles.label, { color: colors.text }]}>Tags</ThemedText>
+            <TextInput
+              style={[styles.input, styles.area, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
+              value={values.tagsText}
+              onChangeText={(t) => {
+                patch({ tagsText: t });
+                clearFieldError('tagsText');
+              }}
+              multiline
+              placeholder="épicé, populaire…"
+              placeholderTextColor={colors.placeholder}
+            />
+            <InlineFormError message={errors.tagsText} colors={colors} />
+            <ThemedText style={[styles.label, { color: colors.text }]}>Allergènes</ThemedText>
+            <View style={styles.chipRow}>
+              {ALLERGENE_CHOICES.map((a) => {
+                const on = values.allergenes.includes(a);
+                return (
+                  <Pressable
+                    key={a}
+                    style={[
+                      styles.chip,
+                      { borderColor: colors.border, backgroundColor: colors.surface },
+                      on && { backgroundColor: palette.primary, borderColor: palette.primary },
+                    ]}
+                    onPress={() => toggleAllergene(a)}>
+                    <ThemedText
+                      style={[
+                        styles.chipTxt,
+                        on && styles.chipTxtOn,
+                        { color: on ? colors.onPrimary : colors.text },
+                      ]}>
+                      {a}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <View style={styles.switchRow}>
+              <ThemedText style={[styles.labelInline, { color: colors.text }]}>Mettre en vedette</ThemedText>
+              <Switch
+                value={values.enVedette}
+                onValueChange={(v) => patch({ enVedette: v })}
+                trackColor={{ false: colors.borderStrong, true: colors.success }}
+                thumbColor={values.enVedette ? palette.primary : colors.surfaceMuted}
+              />
+            </View>
+          </VendorCollapsibleSection>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -522,34 +548,15 @@ export function VendorMenuItemFormWizard({
 
       <CategoryPicker
         visible={catPickerOpen}
-        title="Catégorie du menu"
+        title="Catégorie du plat"
         categories={categories.map((c) => ({ id: c.id, nom: c.nom, description: c.description ?? undefined }))}
         selectedId={values.categorieId}
         onSelect={(c) => patch({ categorieId: c.id })}
         onClose={() => setCatPickerOpen(false)}
+        loading={catLoading}
+        error={catError}
+        onRetry={() => void loadCategories()}
       />
-
-      <Modal visible={newCatOpen} transparent animationType="fade">
-        <Pressable style={styles.modalBg} onPress={() => setNewCatOpen(false)}>
-          <Pressable style={[styles.modalCard, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
-            <ThemedText type="defaultSemiBold" style={[styles.modalTitle, { color: colors.text }]}>
-              Nouvelle catégorie
-            </ThemedText>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
-              value={newCatName}
-              onChangeText={setNewCatName}
-              placeholder="Ex. Plats principaux"
-              placeholderTextColor={colors.placeholder}
-            />
-            <Pressable
-              style={[styles.footerNext, { backgroundColor: palette.primary, marginTop: 12 }]}
-              onPress={() => void createCategory()}>
-              <ThemedText style={styles.footerNextTxt}>Créer</ThemedText>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </View>
   );
 }
@@ -571,6 +578,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sectionTitle: { fontSize: 16, fontWeight: '800', letterSpacing: 0.2 },
+  subLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 16,
+    marginBottom: 2,
+  },
+  subLabel: { fontSize: 13, fontWeight: '800' },
   label: { fontSize: 13, fontWeight: '700', marginBottom: 6, marginTop: 10, opacity: 0.92 },
   labelInline: { fontSize: 14, fontWeight: '700' },
   input: {
@@ -587,8 +602,9 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   selectTxt: { fontSize: 15 },
-  linkTxt: { fontWeight: '700', fontSize: 13, marginTop: 8 },
+  hintTxt: { fontSize: 12, marginTop: 8, lineHeight: 17, opacity: 0.8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -603,26 +619,4 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 14,
   },
-  stockHint: { fontSize: 13, lineHeight: 18, marginTop: 8 },
-  footerNext: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: 14,
-    paddingVertical: 15,
-  },
-  footerNextTxt: { fontWeight: '800', fontSize: 15 },
-  modalBg: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  modalCard: {
-    borderRadius: 16,
-    padding: 18,
-  },
-  modalTitle: { marginBottom: 12, fontSize: 17 },
 });

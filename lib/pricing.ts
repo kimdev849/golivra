@@ -171,12 +171,12 @@ export function displayDeliveryFeeFcfa(
 //
 // Le temps de livraison est géré par GoLivra (livreur) et dépend de la ZONE
 // de livraison du client, pas du commerce :
-//   - Zone proche  → ~30 min
-//   - Zone moyenne → ~45 min
-//   - Zone éloignée → ~60 min
+//   - Zone proche  → ~25 min
+//   - Zone moyenne → ~35 min
+//   - Zone éloignée → ~45 min
 // Le temps de PRÉPARATION, lui, reste géré par le commerce (delai_preparation_min).
 
-export const DELIVERY_MINUTES_TIERS = [30, 45, 60] as const;
+export const DELIVERY_MINUTES_TIERS = [25, 35, 45] as const;
 
 export type DeliveryZoneTier = 'proche' | 'moyenne' | 'éloignée';
 
@@ -220,13 +220,13 @@ function zoneTierForQuartier(
 }
 
 const TIER_MINUTES: Record<DeliveryZoneTier, number> = {
-  proche: 30,
-  moyenne: 45,
-  éloignée: 60,
+  proche: 25,
+  moyenne: 35,
+  éloignée: 45,
 };
 
 export type DeliveryEstimateForQuartier = {
-  /** Minutes estimées (30/45/60) ou null si la zone n'est pas déterminable. */
+  /** Minutes estimées (25/35/45) ou null si la zone n'est pas déterminable. */
   minutes: number | null;
   /** 'proche' | 'moyenne' | 'éloignée' ou null. */
   tier: DeliveryZoneTier | null;
@@ -261,4 +261,79 @@ export function deliveryMinutesForQuartier(
   pricing: PublicPricing = DEFAULT_PUBLIC_PRICING,
 ): number | null {
   return deliveryEstimateForQuartier(quartier, pricing).minutes;
+}
+
+// ─── Temps de PRÉPARATION (géré par le commerce) ────────────────────────
+//
+// Le temps de préparation appartient au commerce et se lit dans la fiche :
+//   - restaurant → `delai_preparation_min`  (cuisiner, emballer) — défaut 20 min
+//   - boutique   → `delai_livraison_min`    (préparer le sac, vérifier, emballer)
+//                  — historiquement le délai boutique, il joue ce rôle — défaut 30 min
+// La livraison, elle, est gérée par GoLivra (voir plus haut : 25/35/45 selon la zone).
+
+export const DEFAULT_PREP_MINUTES = 20;
+export const DEFAULT_BOUTIQUE_PREP_MINUTES = 30;
+
+/** Choix proposés au vendeur pour son temps de préparation. */
+export const PREP_MINUTE_CHOICES = [10, 15, 20, 25, 30, 45, 60] as const;
+
+/**
+ * Temps de préparation (min) du commerce : restaurant → `delai_preparation_min`,
+ * boutique → `delai_livraison_min` (le délai boutique sert de temps de préparation
+ * du colis). Valeur bornée 5–180 min, repli sur les défauts plateforme.
+ */
+export function enterprisePrepMinutes(
+  ent:
+    | {
+        type?: 'restaurant' | 'boutique' | string | null;
+        delai_preparation_min?: number | null;
+        delai_livraison_min?: number | null;
+      }
+    | null
+    | undefined,
+): number {
+  const isBoutique = ent?.type === 'boutique';
+  const raw = isBoutique ? ent?.delai_livraison_min : ent?.delai_preparation_min;
+  const fallback = isBoutique ? DEFAULT_BOUTIQUE_PREP_MINUTES : DEFAULT_PREP_MINUTES;
+  const n = Math.floor(Number(raw));
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.min(Math.max(n, 5), 180);
+}
+
+/** Estimation « temps total » d'une commande pour un commerce et un quartier. */
+export type EtaEstimate = {
+  /** Temps de préparation (min) — fixé par le commerce. */
+  prepMinutes: number;
+  /** Temps de livraison GoLivra (min) selon la zone — null si indéterminé. */
+  deliveryMinutes: number | null;
+  /** préparation + livraison (min) — null si la livraison n'est pas déterminable. */
+  totalMinutes: number | null;
+  /** « Zone proche » / « Zone moyenne » / « Zone éloignée » ou null. */
+  tierLabel: string | null;
+};
+
+/**
+ * Estimation complète pour un commerce + quartier client :
+ * préparation (commerce) + livraison (zone GoLivra) + arrivée (somme).
+ */
+export function etaEstimateForEnterprise(
+  ent:
+    | {
+        type?: 'restaurant' | 'boutique' | string | null;
+        delai_preparation_min?: number | null;
+        delai_livraison_min?: number | null;
+      }
+    | null
+    | undefined,
+  quartier: string | null | undefined,
+  pricing: PublicPricing = DEFAULT_PUBLIC_PRICING,
+): EtaEstimate {
+  const prepMinutes = enterprisePrepMinutes(ent);
+  const est = deliveryEstimateForQuartier(quartier, pricing);
+  return {
+    prepMinutes,
+    deliveryMinutes: est.minutes,
+    totalMinutes: est.minutes != null ? prepMinutes + est.minutes : null,
+    tierLabel: est.tierLabel,
+  };
 }

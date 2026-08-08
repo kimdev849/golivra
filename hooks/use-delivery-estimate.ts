@@ -5,7 +5,7 @@ import { getSessionToken } from '@/lib/auth';
 import { deliveryEstimateForQuartier, fetchPublicPricing } from '@/lib/pricing';
 
 export type DeliveryEstimate = {
-  /** Minutes de livraison estimées selon la zone (30 / 45 / 60) ou null si indéterminé. */
+  /** Minutes de livraison estimées selon la zone (25 / 35 / 45) ou null si indéterminé. */
   minutes: number | null;
   /** « Zone proche » / « Zone moyenne » / « Zone éloignée » ou null. */
   tierLabel: string | null;
@@ -69,8 +69,8 @@ function sharedEstimate(): Promise<DeliveryEstimate> {
 
 /**
  * Estime le temps de livraison GoLivra (géré par la plateforme) selon la zone
- * de l'adresse principale du client : proche ~30 min, moyenne ~45 min,
- * éloignée ~60 min. Retourne `minutes: null` tant que la zone n'est pas
+ * de l'adresse principale du client : proche ~25 min, moyenne ~35 min,
+ * éloignée ~45 min. Retourne `minutes: null` tant que la zone n'est pas
  * déterminable (pas d'adresse enregistrée ou config zones absente).
  *
  * Le résultat est partagé entre tous les appelsants (cache module-level avec

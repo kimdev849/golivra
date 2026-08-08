@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -12,7 +11,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BadgePercent, Image as ImageIcon, Info, List, Settings2, Truck } from 'lucide-react-native';
+import {
+  Image as ImageIcon,
+  Info,
+  List,
+  Settings2,
+  Truck,
+  type LucideIcon,
+} from 'lucide-react-native';
 
 import { CategoryPicker } from '@/components/category-picker';
 import {
@@ -22,6 +28,7 @@ import {
   VendorPhotoGalleryField,
   type VendorImageAsset,
 } from '@/components/vendor-form-shared';
+import { VendorCollapsibleSection } from '@/components/vendor-collapsible-section';
 import { VendorFormFooter } from '@/components/vendor-form-footer';
 import { DateField } from '@/components/date-field';
 import { ThemedText } from '@/components/themed-text';
@@ -32,7 +39,6 @@ import { getSessionToken } from '@/lib/auth';
 import { uploadVendorListingImages } from '@/lib/vendor-image-upload';
 import { buildProductApiBody } from '@/lib/vendor-product-payload';
 import {
-  createArticleCategory,
   createVendorProduct,
   fetchArticleCategories,
   updateVendorProduct,
@@ -46,7 +52,6 @@ import {
   type VendorProductFormValues,
 } from '@/lib/vendor-product-types';
 import type { VendorProduct } from '@/lib/vendor-types';
-import { validateCommerceName } from '@/lib/form-validation';
 import {
   firstListingError,
   validateProductStep,
@@ -59,9 +64,16 @@ const DESC_MAX = 500;
 /** Nombre d'étapes de validation existantes — utilisées pour valider tout le formulaire d'un coup. */
 const VALIDATION_STEPS = 5;
 
+/**
+ * Champs logés dans la section repliable « Informations supplémentaires » :
+ * s'il y a une erreur de validation dessus, on ouvre la section automatiquement.
+ */
+const EXTRA_FIELD_KEYS = new Set(['marque', 'options', 'tagsText']);
+
+// « Numérique » retiré : GoLivra est une marketplace de produits physiques et
+// de services. Le backend reste générique (la valeur est conservée en base).
 const TYPE_CHOICES: { key: ProductTypeKind; label: string }[] = [
   { key: 'physique', label: 'Physique' },
-  { key: 'numerique', label: 'Numérique' },
   { key: 'service', label: 'Service' },
 ];
 
@@ -141,6 +153,24 @@ function SectionTitle({
   );
 }
 
+/** Petit sous-titre à l'intérieur de la section repliable (groupe de champs). */
+function SubLabel({
+  colors,
+  Icon,
+  children,
+}: {
+  colors: ReturnType<typeof useAppColors>;
+  Icon: LucideIcon;
+  children: string;
+}) {
+  return (
+    <View style={styles.subLabelRow}>
+      <Icon size={14} color={colors.textSecondary} strokeWidth={2.2} />
+      <ThemedText style={[styles.subLabel, { color: colors.textSecondary }]}>{children}</ThemedText>
+    </View>
+  );
+}
+
 export function VendorProductFormWizard({
   enterpriseId,
   palette,
@@ -153,36 +183,46 @@ export function VendorProductFormWizard({
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const { showError, FeedbackOverlay } = useActionFeedback();
+  const scrollRef = useRef<ScrollView>(null);
+  const [extraSectionY, setExtraSectionY] = useState(0);
   const [values, setValues] = useState<VendorProductFormValues>(initialValues ?? DEFAULT_PRODUCT_FORM);
   const [categories, setCategories] = useState<ArticleCategory[]>([]);
   const [catLoading, setCatLoading] = useState(true);
+  const [catError, setCatError] = useState<string | null>(null);
   const [catPickerOpen, setCatPickerOpen] = useState(false);
-  const [newCatOpen, setNewCatOpen] = useState(false);
-  const [newCatName, setNewCatName] = useState('');
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<ListingFieldErrors>({});
+  const [extraOpen, setExtraOpen] = useState(false);
 
   const patch = (p: Partial<VendorProductFormValues>) => setValues((v) => ({ ...v, ...p }));
   const clearFieldError = (field: string) =>
     setErrors((s) => ({ ...s, [field]: null }));
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const token = await getSessionToken();
-        if (!token) return;
-        const list = await fetchArticleCategories(token, enterpriseId);
-        if (alive) setCategories(list);
-      } catch {
-        if (alive) setCategories([]);
-      } finally {
-        if (alive) setCatLoading(false);
+  const loadCategories = async () => {
+    setCatLoading(true);
+    setCatError(null);
+    try {
+      const token = await getSessionToken();
+      if (!token) {
+        setCatError('Session expirée. Reconnectez-vous.');
+        return;
       }
-    })();
-    return () => {
-      alive = false;
-    };
+      const list = await fetchArticleCategories(token, enterpriseId);
+      setCategories(list);
+      if (list.length === 0) {
+        setCatError('Aucune catégorie reçue. La migration des catégories GoLivra est-elle appliquée ?');
+      }
+    } catch (e) {
+      setCategories([]);
+      setCatError(e instanceof Error ? e.message : 'Erreur réseau.');
+    } finally {
+      setCatLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadCategories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enterpriseId]);
 
   const selectedCategory = categories.find((c) => c.id === values.categorieId) ?? null;
@@ -256,6 +296,14 @@ export function VendorProductFormWizard({
     }
     const first = firstListingError(merged);
     setErrors(merged);
+    // Si une erreur est cachée dans « Informations supplémentaires », on déplie
+    // et on défile jusqu'à la section pour qu'elle soit visible.
+    if (Object.keys(merged).some((k) => EXTRA_FIELD_KEYS.has(k) && merged[k])) {
+      setExtraOpen(true);
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({ y: Math.max(0, extraSectionY - 16), animated: true });
+      });
+    }
     if (first) {
       showToast({ message: first, variant: 'error', duration: 3200 });
       return false;
@@ -295,26 +343,6 @@ export function VendorProductFormWizard({
     }
   };
 
-  const createCategory = async () => {
-    const e = validateCommerceName(newCatName);
-    if (!e.ok) {
-      showToast({ message: e.message, variant: 'error', duration: 2500 });
-      return;
-    }
-    try {
-      const token = await getSessionToken();
-      if (!token) throw new Error('Session expirée.');
-      const created = await createArticleCategory(token, enterpriseId, { nom: newCatName.trim() });
-      setCategories((prev) => [...prev, created]);
-      patch({ categorieId: created.id });
-      setNewCatOpen(false);
-      setNewCatName('');
-      showToast({ message: 'Catégorie créée ✓', variant: 'success' });
-    } catch (e) {
-      showError('Catégorie non créée', e instanceof Error ? e.message : undefined);
-    }
-  };
-
   return (
     <View style={styles.root}>
       <FeedbackOverlay />
@@ -323,6 +351,7 @@ export function VendorProductFormWizard({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: insets.bottom + 100 }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
@@ -340,8 +369,8 @@ export function VendorProductFormWizard({
             mainRequired
           />
 
-          {/* INFOS ESSENTIELLES */}
-          <SectionTitle accent={palette.primary} Icon={Info}>Infos essentielles</SectionTitle>
+          {/* INFORMATIONS PRINCIPALES */}
+          <SectionTitle accent={palette.primary} Icon={Info}>Informations principales</SectionTitle>
           <ThemedText style={[styles.label, { color: colors.text }]}>Nom du produit *</ThemedText>
           <TextInput
             style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
@@ -367,21 +396,26 @@ export function VendorProductFormWizard({
             placeholderTextColor={colors.placeholder}
           />
           <InlineFormError message={errors.prix} colors={colors} />
-          <ThemedText style={[styles.label, { color: colors.text }]}>Catégorie boutique</ThemedText>
+          <ThemedText style={[styles.label, { color: colors.text }]}>Catégorie du produit</ThemedText>
           <Pressable
             style={[styles.selectCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
             onPress={() => setCatPickerOpen(true)}
             disabled={catLoading}>
             <ThemedText style={[styles.selectTxt, { color: colors.text }]}>
-              {catLoading ? 'Chargement…' : selectedCategory?.nom ?? 'Choisir ou créer une catégorie'}
+              {catLoading ? 'Chargement…' : selectedCategory?.nom ?? 'Choisir une catégorie'}
             </ThemedText>
           </Pressable>
-          <Pressable onPress={() => setNewCatOpen(true)}>
-            <ThemedText style={[styles.linkTxt, { color: palette.primary }]}>+ Nouvelle catégorie</ThemedText>
-          </Pressable>
-
-          {/* DÉTAILS */}
-          <SectionTitle accent={palette.primary} Icon={List}>Détails</SectionTitle>
+          {catError && !catLoading ? (
+            <Pressable onPress={() => void loadCategories()}>
+              <ThemedText style={[styles.hintTxt, { color: colors.error }]}>
+                Catégories indisponibles — appuyez pour réessayer.
+              </ThemedText>
+            </Pressable>
+          ) : (
+            <ThemedText style={[styles.hintTxt, { color: colors.textMuted }]}>
+              Les catégories sont définies par GoLivra — vous choisissez simplement celle qui correspond à votre produit.
+            </ThemedText>
+          )}
           <ThemedText style={[styles.label, { color: colors.text }]}>Description</ThemedText>
           <TextInput
             style={[styles.input, styles.area, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
@@ -396,26 +430,6 @@ export function VendorProductFormWizard({
             placeholderTextColor={colors.placeholder}
           />
           <InlineFormError message={errors.description} colors={colors} />
-          <ThemedText style={[styles.label, { color: colors.text }]}>Marque</ThemedText>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
-            value={values.marque}
-            onChangeText={(t) => {
-              patch({ marque: t });
-              clearFieldError('marque');
-            }}
-            placeholder="Samsung, Nike, Dior…"
-            placeholderTextColor={colors.placeholder}
-          />
-          <InlineFormError message={errors.marque} colors={colors} />
-          <ThemedText style={[styles.label, { color: colors.text }]}>Type de produit</ThemedText>
-          <ChipRow
-            options={TYPE_CHOICES}
-            value={values.typeProduit}
-            onChange={(t) => patch({ typeProduit: t })}
-            accent={palette.primary}
-            colors={colors}
-          />
           <ThemedText style={[styles.label, { color: colors.text }]}>État</ThemedText>
           <ChipRow
             options={ETAT_CHOICES}
@@ -424,111 +438,6 @@ export function VendorProductFormWizard({
             accent={palette.primary}
             colors={colors}
           />
-          <View style={styles.switchRow}>
-            <ThemedText style={[styles.labelInline, { color: colors.text }]}>Stock illimité</ThemedText>
-            <Switch
-              value={values.stockIllimite}
-              onValueChange={(v) => patch({ stockIllimite: v, stock: v ? '' : values.stock })}
-              trackColor={{ false: colors.borderStrong, true: colors.success }}
-              thumbColor={values.stockIllimite ? palette.primary : colors.surfaceMuted}
-            />
-          </View>
-          {!values.stockIllimite ? (
-            <>
-              <ThemedText style={[styles.label, { color: colors.text }]}>Quantité en stock</ThemedText>
-              <TextInput
-                style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
-                value={values.stock}
-                onChangeText={(t) => {
-                  patch({ stock: t });
-                  clearFieldError('stock');
-                }}
-                keyboardType="numeric"
-                placeholder="20"
-                placeholderTextColor={colors.placeholder}
-              />
-              <InlineFormError message={errors.stock} colors={colors} />
-            </>
-          ) : null}
-          <ThemedText style={[styles.label, { color: colors.text }]}>Unité de vente</ThemedText>
-          <View style={styles.chipRow}>
-            {UNITE_CHOICES.map((u) => {
-              const on = values.unite === u;
-              return (
-                <Pressable
-                  key={u}
-                  style={[
-                    styles.chip,
-                    { borderColor: colors.border, backgroundColor: colors.surface },
-                    on && { backgroundColor: palette.primary, borderColor: palette.primary },
-                  ]}
-                  onPress={() => patch({ unite: u })}>
-                  <ThemedText
-                    style={[
-                      styles.chipTxt,
-                      on && styles.chipTxtOn,
-                      { color: on ? colors.onPrimary : colors.text },
-                    ]}>
-                    {u}
-                  </ThemedText>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {/* LIVRAISON (OPTIONNEL) */}
-          <SectionTitle accent={palette.primary} Icon={Truck}>Livraison (optionnel)</SectionTitle>
-          <ThemedText style={[styles.label, { color: colors.text }]}>Poids (kg)</ThemedText>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
-            value={values.poidsKg}
-            onChangeText={(t) => patch({ poidsKg: t })}
-            keyboardType="decimal-pad"
-            placeholder="0.5"
-            placeholderTextColor={colors.placeholder}
-          />
-          <View style={styles.dimRow}>
-            <TextInput
-              style={[styles.input, styles.dimInput, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
-              value={values.longueurCm}
-              onChangeText={(t) => patch({ longueurCm: t })}
-              keyboardType="numeric"
-              placeholder="L (cm)"
-              placeholderTextColor={colors.placeholder}
-            />
-            <TextInput
-              style={[styles.input, styles.dimInput, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
-              value={values.largeurCm}
-              onChangeText={(t) => patch({ largeurCm: t })}
-              keyboardType="numeric"
-              placeholder="l (cm)"
-              placeholderTextColor={colors.placeholder}
-            />
-            <TextInput
-              style={[styles.input, styles.dimInput, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
-              value={values.hauteurCm}
-              onChangeText={(t) => patch({ hauteurCm: t })}
-              keyboardType="numeric"
-              placeholder="H (cm)"
-              placeholderTextColor={colors.placeholder}
-            />
-          </View>
-
-          {/* VARIANTES */}
-          <SectionTitle accent={palette.primary} Icon={Settings2}>Variantes</SectionTitle>
-          <InlineFormError message={errors.options} colors={colors} />
-          <OptionGroupsEditor
-            groups={values.optionGroups}
-            onChange={(optionGroups) => {
-              patch({ optionGroups });
-              clearFieldError('options');
-            }}
-            accent={palette.primary}
-            colors={colors}
-          />
-
-          {/* PROMOTION & DISPONIBILITÉ */}
-          <SectionTitle accent={palette.primary} Icon={BadgePercent}>Promotion &amp; disponibilité</SectionTitle>
           <ThemedText style={[styles.label, { color: colors.text }]}>Prix promo (FCFA)</ThemedText>
           <TextInput
             style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
@@ -583,27 +492,157 @@ export function VendorProductFormWizard({
             />
           </View>
           <View style={styles.switchRow}>
-            <ThemedText style={[styles.labelInline, { color: colors.text }]}>Mettre en vedette</ThemedText>
+            <ThemedText style={[styles.labelInline, { color: colors.text }]}>Stock illimité</ThemedText>
             <Switch
-              value={values.enVedette}
-              onValueChange={(v) => patch({ enVedette: v })}
+              value={values.stockIllimite}
+              onValueChange={(v) => patch({ stockIllimite: v, stock: v ? '' : values.stock })}
               trackColor={{ false: colors.borderStrong, true: colors.success }}
-              thumbColor={values.enVedette ? palette.primary : colors.surfaceMuted}
+              thumbColor={values.stockIllimite ? palette.primary : colors.surfaceMuted}
             />
           </View>
-          <ThemedText style={[styles.label, { color: colors.text }]}>Tags</ThemedText>
-          <TextInput
-            style={[styles.input, styles.area, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
-            value={values.tagsText}
-            onChangeText={(t) => {
-              patch({ tagsText: t });
-              clearFieldError('tagsText');
-            }}
-            multiline
-            placeholder="samsung, promo, gaming…"
-            placeholderTextColor={colors.placeholder}
-          />
-          <InlineFormError message={errors.tagsText} colors={colors} />
+          {!values.stockIllimite ? (
+            <>
+              <ThemedText style={[styles.label, { color: colors.text }]}>Quantité en stock</ThemedText>
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
+                value={values.stock}
+                onChangeText={(t) => {
+                  patch({ stock: t });
+                  clearFieldError('stock');
+                }}
+                keyboardType="numeric"
+                placeholder="20"
+                placeholderTextColor={colors.placeholder}
+              />
+              <InlineFormError message={errors.stock} colors={colors} />
+            </>
+          ) : null}
+
+          {/* INFORMATIONS SUPPLÉMENTAIRES */}
+          <View onLayout={(e) => setExtraSectionY(e.nativeEvent.layout.y)}>
+          <VendorCollapsibleSection
+            title="Informations supplémentaires"
+            accent={palette.primary}
+            colors={colors}
+            Icon={Settings2}
+            open={extraOpen}
+            onToggle={() => setExtraOpen((v) => !v)}>
+            <ThemedText style={[styles.label, { color: colors.text }]}>Marque</ThemedText>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
+              value={values.marque}
+              onChangeText={(t) => {
+                patch({ marque: t });
+                clearFieldError('marque');
+              }}
+              placeholder="Samsung, Nike, Dior…"
+              placeholderTextColor={colors.placeholder}
+            />
+            <InlineFormError message={errors.marque} colors={colors} />
+            <ThemedText style={[styles.label, { color: colors.text }]}>Type de produit</ThemedText>
+            <ChipRow
+              options={TYPE_CHOICES}
+              value={values.typeProduit}
+              onChange={(t) => patch({ typeProduit: t })}
+              accent={palette.primary}
+              colors={colors}
+            />
+            <ThemedText style={[styles.label, { color: colors.text }]}>Unité de vente</ThemedText>
+            <View style={styles.chipRow}>
+              {UNITE_CHOICES.map((u) => {
+                const on = values.unite === u;
+                return (
+                  <Pressable
+                    key={u}
+                    style={[
+                      styles.chip,
+                      { borderColor: colors.border, backgroundColor: colors.surface },
+                      on && { backgroundColor: palette.primary, borderColor: palette.primary },
+                    ]}
+                    onPress={() => patch({ unite: u })}>
+                    <ThemedText
+                      style={[
+                        styles.chipTxt,
+                        on && styles.chipTxtOn,
+                        { color: on ? colors.onPrimary : colors.text },
+                      ]}>
+                      {u}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <SubLabel colors={colors} Icon={Truck}>Informations de livraison</SubLabel>
+            <ThemedText style={[styles.label, { color: colors.text }]}>Poids (kg)</ThemedText>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
+              value={values.poidsKg}
+              onChangeText={(t) => patch({ poidsKg: t })}
+              keyboardType="decimal-pad"
+              placeholder="0.5"
+              placeholderTextColor={colors.placeholder}
+            />
+            <View style={styles.dimRow}>
+              <TextInput
+                style={[styles.input, styles.dimInput, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
+                value={values.longueurCm}
+                onChangeText={(t) => patch({ longueurCm: t })}
+                keyboardType="numeric"
+                placeholder="L (cm)"
+                placeholderTextColor={colors.placeholder}
+              />
+              <TextInput
+                style={[styles.input, styles.dimInput, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
+                value={values.largeurCm}
+                onChangeText={(t) => patch({ largeurCm: t })}
+                keyboardType="numeric"
+                placeholder="l (cm)"
+                placeholderTextColor={colors.placeholder}
+              />
+              <TextInput
+                style={[styles.input, styles.dimInput, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
+                value={values.hauteurCm}
+                onChangeText={(t) => patch({ hauteurCm: t })}
+                keyboardType="numeric"
+                placeholder="H (cm)"
+                placeholderTextColor={colors.placeholder}
+              />
+            </View>
+            <SubLabel colors={colors} Icon={List}>Variantes</SubLabel>
+            <InlineFormError message={errors.options} colors={colors} />
+            <OptionGroupsEditor
+              groups={values.optionGroups}
+              onChange={(optionGroups) => {
+                patch({ optionGroups });
+                clearFieldError('options');
+              }}
+              accent={palette.primary}
+              colors={colors}
+            />
+            <ThemedText style={[styles.label, { color: colors.text }]}>Tags</ThemedText>
+            <TextInput
+              style={[styles.input, styles.area, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
+              value={values.tagsText}
+              onChangeText={(t) => {
+                patch({ tagsText: t });
+                clearFieldError('tagsText');
+              }}
+              multiline
+              placeholder="samsung, promo, gaming…"
+              placeholderTextColor={colors.placeholder}
+            />
+            <InlineFormError message={errors.tagsText} colors={colors} />
+            <View style={styles.switchRow}>
+              <ThemedText style={[styles.labelInline, { color: colors.text }]}>Mettre en vedette</ThemedText>
+              <Switch
+                value={values.enVedette}
+                onValueChange={(v) => patch({ enVedette: v })}
+                trackColor={{ false: colors.borderStrong, true: colors.success }}
+                thumbColor={values.enVedette ? palette.primary : colors.surfaceMuted}
+              />
+            </View>
+          </VendorCollapsibleSection>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -623,34 +662,15 @@ export function VendorProductFormWizard({
 
       <CategoryPicker
         visible={catPickerOpen}
-        title="Catégorie produit"
+        title="Catégorie du produit"
         categories={categories.map((c) => ({ id: c.id, nom: c.nom, description: c.description ?? undefined }))}
         selectedId={values.categorieId}
         onSelect={(c) => patch({ categorieId: c.id })}
         onClose={() => setCatPickerOpen(false)}
+        loading={catLoading}
+        error={catError}
+        onRetry={() => void loadCategories()}
       />
-
-      <Modal visible={newCatOpen} transparent animationType="fade">
-        <Pressable style={styles.modalBg} onPress={() => setNewCatOpen(false)}>
-          <Pressable style={[styles.modalCard, { backgroundColor: colors.surface }]} onPress={(e) => e.stopPropagation()}>
-            <ThemedText type="defaultSemiBold" style={[styles.modalTitle, { color: colors.text }]}>
-              Nouvelle catégorie
-            </ThemedText>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
-              value={newCatName}
-              onChangeText={setNewCatName}
-              placeholder="Ex. Smartphones"
-              placeholderTextColor={colors.placeholder}
-            />
-            <Pressable
-              style={[styles.footerNext, { backgroundColor: palette.primary, marginTop: 12 }]}
-              onPress={() => void createCategory()}>
-              <ThemedText style={styles.footerNextTxt}>Créer</ThemedText>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </View>
   );
 }
@@ -672,6 +692,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sectionTitle: { fontSize: 16, fontWeight: '800', letterSpacing: 0.2 },
+  subLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 16,
+    marginBottom: 2,
+  },
+  subLabel: { fontSize: 13, fontWeight: '800' },
   label: { fontSize: 13, fontWeight: '700', marginBottom: 6, marginTop: 10, opacity: 0.92 },
   labelInline: { fontSize: 14, fontWeight: '700' },
   input: {
@@ -688,8 +716,9 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   selectTxt: { fontSize: 15 },
-  linkTxt: { fontWeight: '700', fontSize: 13, marginTop: 8 },
+  hintTxt: { fontSize: 12, marginTop: 8, lineHeight: 17, opacity: 0.8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -706,25 +735,4 @@ const styles = StyleSheet.create({
   },
   dimRow: { flexDirection: 'row', gap: 8 },
   dimInput: { flex: 1 },
-  footerNext: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: 14,
-    paddingVertical: 15,
-  },
-  footerNextTxt: { fontWeight: '800', fontSize: 15 },
-  modalBg: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  modalCard: {
-    borderRadius: 16,
-    padding: 18,
-  },
-  modalTitle: { marginBottom: 12, fontSize: 17 },
 });

@@ -18,6 +18,7 @@ export function menuItemToFormValues(product: VendorProduct): MenuItemFormValues
     enVedette: product.enVedette === true,
     limiterQuantite: product.stockIllimite !== true,
     stock: product.stockIllimite ? '' : String(product.stock),
+    unite: product.unite ?? 'pièce',
     tagsText: tagsToText(product.tags),
     allergenes: Array.isArray(product.allergenes) ? [...product.allergenes] : [],
     optionGroups: product.optionGroups?.length ? product.optionGroups : [],

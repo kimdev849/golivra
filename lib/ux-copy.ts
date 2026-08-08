@@ -153,6 +153,11 @@ export function friendlyErrorMessage(raw: unknown, fallback: string = UX_ERRORS.
   if (/cannot (get|put|post|patch|delete)\b/i.test(lower)) {
     return UX_ERRORS.serverOutdated;
   }
+  // PATCH temps de préparation : l'API déployée ne reconnaît aucun champ du
+  // corps de la requête → version serveur obsolète, le redéploiement est requis.
+  if (/aucune modification à enregistrer|aucun champ reconnu/i.test(lower)) {
+    return UX_ERRORS.serverOutdated;
+  }
   if (/route api|endpoint api|erreur http|réponse html|backend render|base api/i.test(lower)) {
     return UX_ERRORS.generic;
   }

@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { GOLIVRA_BRAND_SHADOW } from '@/constants/app-palette';
+import { formatHumanMinutes } from '@/lib/format';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
 
@@ -112,7 +113,7 @@ export default function OrderDeliveriesSummaryScreen() {
                   {row.enterpriseNom}
                 </ThemedText>
                 <ThemedText style={[styles.eta, { color: colors.textMuted }]}>
-                  Estimation ~{row.minutesEstimate} min
+                  🛵 Livraison prévue dans environ {formatHumanMinutes(row.minutesEstimate)}
                 </ThemedText>
               </View>
             </View>

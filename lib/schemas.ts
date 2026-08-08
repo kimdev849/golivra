@@ -29,6 +29,14 @@ export const EnterprisePublicSchema = z
     cree_le: z.string().nullable().optional(),
     created_at: z.string().nullable().optional(),
     est_ouvert: z.boolean().optional().default(true),
+    // Temps de préparation du commerce (géré par le vendeur) :
+    // restaurant → delai_preparation_min, boutique → delai_livraison_min
+    // (le délai boutique sert de temps de préparation du colis).
+    // Sans ces champs, zod retire les clés inconnues et les écrans client
+    // (accueil, découvre) retomberaient sur la valeur par défaut.
+    delai_preparation_min: z.number().optional(),
+    delai_livraison_min: z.number().optional(),
+    // Ancien nom conservé pour rétrocompatibilité (non renvoyé par l'API).
     temps_preparation_min: z.number().nullable().optional(),
     adresse_ville: z.string().nullable().optional(),
     adresse_quartier: z.string().nullable().optional(),

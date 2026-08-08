@@ -108,13 +108,6 @@ export default function VendorTabsLayout() {
           }}
         />
         <Tabs.Screen
-          name="deliveries"
-          options={{
-            title: 'Livraisons',
-            tabBarIcon: ({ color }) => <Truck size={22} color={color} strokeWidth={LUCIDE_STROKE} />,
-          }}
-        />
-        <Tabs.Screen
           name="products"
           options={{
             title: commerceType === 'restaurant' ? 'Menu' : 'Produits',
@@ -124,6 +117,13 @@ export default function VendorTabsLayout() {
               ) : (
                 <Package size={22} color={color} strokeWidth={LUCIDE_STROKE} />
               ),
+          }}
+        />
+        <Tabs.Screen
+          name="deliveries"
+          options={{
+            title: 'Livraisons',
+            tabBarIcon: ({ color }) => <Truck size={22} color={color} strokeWidth={LUCIDE_STROKE} />,
           }}
         />
         <Tabs.Screen

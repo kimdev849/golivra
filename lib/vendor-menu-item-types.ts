@@ -30,6 +30,7 @@ export type MenuItemFormValues = {
   /** Facultatif : activer pour limiter la quantité (ex. plat du jour). */
   limiterQuantite: boolean;
   stock: string;
+  unite: string;
   tagsText: string;
   allergenes: string[];
   optionGroups: ProductOptionGroup[];
@@ -50,6 +51,7 @@ export const DEFAULT_MENU_ITEM_FORM: MenuItemFormValues = {
   enVedette: false,
   limiterQuantite: false,
   stock: '',
+  unite: 'pièce',
   tagsText: '',
   allergenes: [],
   optionGroups: [],

@@ -40,7 +40,7 @@ import {
 } from '@/lib/cart-local';
 import { fetchUserAddresses, type UserAddress } from '@/lib/addresses';
 import { addressLabel, deliveryAddressError, formatDeliveryAddressText, snapshotFromFields, type DeliveryAddressFields } from '@/lib/format-address';
-import { formatFcfa } from '@/lib/format';
+import { formatFcfa, formatHumanMinutes } from '@/lib/format';
 import { CLIENT_PAYMENT_METHODS, type ClientPaymentMethodId } from '@/lib/payment-methods';
 import { resolveRemoteImageUrl } from '@/lib/images';
 import {
@@ -48,8 +48,8 @@ import {
   deliveryFeeForQuartier,
   deliveryMinutesForQuartier,
   displayDeliveryFeeFcfa,
+  etaEstimateForEnterprise,
   fetchPublicPricing,
-  zoneLabelForQuartier,
   type PublicPricing,
 } from '@/lib/pricing';
 import { validatePromoCode, type PromoValidation } from '@/lib/promo-api';
@@ -234,14 +234,10 @@ export default function CartScreen() {
   const zoneDeliveryHint = useMemo(() => {
     const p = pricing ?? DEFAULT_PUBLIC_PRICING;
     if (!address.quartier.trim() || !p.zones?.zones?.length) return null;
-    const label = zoneLabelForQuartier(address.quartier, p);
     const fee = deliveryFeeForQuartier(address.quartier, p);
-    // ⚡ Temps de livraison dynamique (GoLivra) selon la zone du quartier choisi.
+    // ⚡ Temps de livraison dynamique (GoLivra) selon le quartier choisi.
     const minutes = deliveryMinutesForQuartier(address.quartier, p);
-    const timePart = minutes ? ` · ~${minutes} min` : '';
-    return label
-      ? `${label} · ${formatFcfa(fee)} / livraison${timePart}`
-      : `${formatFcfa(fee)} / livraison${timePart}`;
+    return `Livraison : ${formatFcfa(fee)}${minutes != null ? ` (environ ${minutes} min)` : ''}`;
   }, [address.quartier, pricing]);
 
   const deliveryFeeTotal = useMemo(() => {
@@ -381,16 +377,25 @@ export default function CartScreen() {
           provider: methodePaiement === 'mtn_money' ? 'mtn' : 'airtel',
         },
       });
-      const rows = cart.segments.map((s, i) => ({
-        enterpriseNom: s.enterpriseNom,
-        minutesEstimate: Math.min(30 + i * 15, 90),
-        kind:
-          s.enterpriseType === 'boutique'
-            ? ('boutique' as const)
-            : s.enterpriseType === 'restaurant'
-              ? ('restaurant' as const)
-              : ('commerce' as const),
-      }));
+      // ⏱ Estimation réelle : préparation (commerce) + livraison (zone GoLivra).
+      const rows = cart.segments.map((s) => {
+        const ent = enterpriseById[s.enterpriseId];
+        const eta = etaEstimateForEnterprise(
+          ent ?? { type: s.enterpriseType ?? 'restaurant' },
+          address.quartier,
+          pricing ?? DEFAULT_PUBLIC_PRICING,
+        );
+        return {
+          enterpriseNom: s.enterpriseNom,
+          minutesEstimate: eta.totalMinutes ?? Math.max(eta.prepMinutes + 15, 30),
+          kind:
+            s.enterpriseType === 'boutique'
+              ? ('boutique' as const)
+              : s.enterpriseType === 'restaurant'
+                ? ('restaurant' as const)
+                : ('commerce' as const),
+        };
+      });
       await saveCart(null);
       clearPromo();
       setAddress(emptyAddressForm());
@@ -507,11 +512,23 @@ export default function CartScreen() {
                 const ent = enterpriseById[seg.enterpriseId];
                 const label = segmentLabel(seg, ent ?? undefined);
                 const merchantName = seg.enterpriseNom ?? ent?.nom ?? 'Commerce';
+                // ⏱ Estimation du temps par commerce : préparation (commerce) + livraison (zone GoLivra).
+                const eta = etaEstimateForEnterprise(
+                  ent ?? { type: seg.enterpriseType ?? 'restaurant' },
+                  address.quartier,
+                  pricing ?? DEFAULT_PUBLIC_PRICING,
+                );
 
                 return (
                   <View key={seg.enterpriseId} style={styles.segmentBlock}>
                     <ThemedText type="defaultSemiBold" style={[styles.sectionTitle, { color: colors.text }]}>
                       {label} · {merchantName}
+                    </ThemedText>
+                    <ThemedText style={[styles.segEta, { color: colors.textSecondary }]}>
+                      🛵{' '}
+                      {eta.deliveryMinutes != null
+                        ? `Livraison prévue dans environ ${formatHumanMinutes(eta.totalMinutes)}`
+                        : `Votre commande sera prête dans environ ${eta.prepMinutes} min`}
                     </ThemedText>
 
                     {seg.lines.map((line) => {
@@ -840,6 +857,7 @@ const styles = StyleSheet.create({
   multiBannerTitle: { fontSize: 15 },
   multiBannerBody: { fontSize: 13, lineHeight: 18, marginTop: 4 },
   segmentBlock: { marginBottom: 4 },
+  segEta: { fontSize: 12, fontWeight: '600', marginTop: -8, marginBottom: 10, lineHeight: 16 },
   emptyCard: {
     marginTop: 12,
     borderRadius: 16,

@@ -20,7 +20,7 @@ import { useAppColors } from '@/hooks/use-app-colors';
  * couleur avec ressort (spring), micro-interactions à l'appui et fine
  * bordure supérieure séparant la barre du contenu.
  */
-const TAB_ORDER = ['index', 'orders', 'deliveries', 'products', 'more'] as const;
+const TAB_ORDER = ['index', 'orders', 'products', 'deliveries', 'more'] as const;
 
 function triggerTabHaptic() {
   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

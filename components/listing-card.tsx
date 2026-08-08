@@ -28,7 +28,7 @@ export function ListingCard({ product, onPress, isFav = false, onToggleFav, vari
   const kind = productKind(product);
   const isGrid = variant === 'grid';
   const isFeed = variant === 'feed';
-  const imgWidth = isGrid ? 350 : isFeed ? 600 : 400;
+  const imgWidth = isGrid ? 350 : isFeed ? 220 : 400;
   const imgOpts: ResizeOptions = { width: imgWidth, format: 'webp', quality: 80 };
   const image = getProductPrimaryImage(product, imgOpts);
   const photoCount = getProductPhotoCount(product, imgOpts);
@@ -62,7 +62,7 @@ export function ListingCard({ product, onPress, isFav = false, onToggleFav, vari
           <Image source={{ uri: image }} style={styles.image} contentFit="cover" transition={200} recyclingKey={image} />
         ) : (
           <View style={styles.imagePlaceholder}>
-            <PlaceholderIcon size={isGrid ? 28 : 36} color={colors.primary} strokeWidth={1.2} />
+            <PlaceholderIcon size={isGrid ? 28 : isFeed ? 24 : 36} color={colors.primary} strokeWidth={1.2} />
           </View>
         )}
         {photoCount > 1 ? (
@@ -78,7 +78,7 @@ export function ListingCard({ product, onPress, isFav = false, onToggleFav, vari
         ) : null}
         {onToggleFav ? (
           <Pressable
-            style={[styles.favBtn, isGrid && styles.favBtnGrid, { backgroundColor: colors.surface }]}
+            style={[styles.favBtn, isGrid && styles.favBtnGrid, isFeed && styles.favBtnFeed, { backgroundColor: colors.surface }]}
             onPress={(e) => {
               e.stopPropagation();
               onToggleFav();
@@ -86,7 +86,7 @@ export function ListingCard({ product, onPress, isFav = false, onToggleFav, vari
             hitSlop={6}
             accessibilityLabel={isFav ? 'Retirer des favoris' : 'Ajouter aux favoris'}>
             <Heart
-              size={isGrid ? 14 : 16}
+              size={isGrid || isFeed ? 14 : 16}
               color={isFav ? colors.error : colors.textMuted}
               fill={isFav ? colors.error : 'none'}
               strokeWidth={LUCIDE_STROKE}
@@ -96,23 +96,25 @@ export function ListingCard({ product, onPress, isFav = false, onToggleFav, vari
       </View>
 
       <View style={[styles.body, isGrid && styles.bodyGrid, isFeed && styles.bodyFeed]}>
-        <ThemedText
-          style={[styles.price, isGrid && styles.priceGrid, { color: isPromo ? colors.primary : colors.text }]}
-          numberOfLines={1}>
-          {isPromo ? formatFcfa(Number(product.prix_promo)) : formatFcfa(basePrice)}
-        </ThemedText>
-        {isPromo && !isGrid ? (
-          <ThemedText style={[styles.oldPrice, { color: colors.textMuted }]} numberOfLines={1}>
-            {formatFcfa(Number(product.prix))}
+        <View style={styles.priceRow}>
+          <ThemedText
+            style={[styles.price, isGrid && styles.priceGrid, isFeed && styles.priceFeed, { color: isPromo ? colors.primary : colors.text }]}
+            numberOfLines={1}>
+            {isPromo ? formatFcfa(Number(product.prix_promo)) : formatFcfa(basePrice)}
           </ThemedText>
-        ) : null}
+          {isPromo && !isGrid ? (
+            <ThemedText style={[styles.oldPrice, { color: colors.textMuted }]} numberOfLines={1}>
+              {formatFcfa(Number(product.prix))}
+            </ThemedText>
+          ) : null}
+        </View>
         <ThemedText
-          style={[styles.title, isGrid && styles.titleGrid, { color: colors.text }]}
+          style={[styles.title, isGrid && styles.titleGrid, isFeed && styles.titleFeed, { color: colors.text }]}
           numberOfLines={2}>
           {product.nom || 'Produit'}
         </ThemedText>
         {product.enterprise_nom ? (
-          <ThemedText style={[styles.vendor, isGrid && styles.vendorGrid, { color: colors.textMuted }]} numberOfLines={1}>
+          <ThemedText style={[styles.vendor, isGrid && styles.vendorGrid, isFeed && styles.vendorFeed, { color: colors.textMuted }]} numberOfLines={1}>
             {product.enterprise_nom}
           </ThemedText>
         ) : null}
@@ -140,8 +142,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cardFeed: {
-    borderRadius: 12,
-    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 14,
+    marginBottom: 4,
+    padding: 12,
   },
   imageWrap: {
     position: 'relative',
@@ -156,8 +162,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   imageWrapFeed: {
+    width: 88,
+    height: 88,
     aspectRatio: undefined,
-    height: 220,
+    borderRadius: 12,
+    flexShrink: 0,
   },
   image: { width: '100%', height: '100%' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', width: '100%' },
@@ -207,15 +216,26 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
   },
+  favBtnFeed: {
+    top: 6,
+    right: 6,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+  },
   body: { padding: 12, gap: 3 },
   bodyGrid: { paddingHorizontal: 2, paddingTop: 6, paddingBottom: 4, gap: 2, minHeight: 58 },
-  bodyFeed: { paddingHorizontal: 12, paddingVertical: 10, gap: 3, minHeight: 88 },
+  bodyFeed: { flex: 1, padding: 0, gap: 3, minHeight: 0 },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' },
   price: { fontSize: 16, fontWeight: '800', letterSpacing: -0.3 },
   priceGrid: { fontSize: 14, fontWeight: '800' },
+  priceFeed: { fontSize: 15 },
   oldPrice: { fontSize: 12, textDecorationLine: 'line-through' },
   title: { fontSize: 15, fontWeight: '600', lineHeight: 19 },
   titleGrid: { fontSize: 13, fontWeight: '600', lineHeight: 17 },
+  titleFeed: { fontSize: 14, lineHeight: 18 },
   vendor: { fontSize: 13, marginTop: 2 },
   vendorGrid: { fontSize: 11, marginTop: 1 },
+  vendorFeed: { fontSize: 12, marginTop: 1 },
   snippet: { fontSize: 13, lineHeight: 18, marginTop: 2 },
 });

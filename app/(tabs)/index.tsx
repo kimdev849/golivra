@@ -54,6 +54,7 @@ import {
 } from '@/lib/catalog';
 import { prefetchClientCatalog } from '@/lib/client-data';
 import { resolveRemoteImageUrl, type ResizeOptions } from '@/lib/images';
+import { enterprisePrepMinutes } from '@/lib/pricing';
 import { toggleFavoriteProduct } from '@/lib/favorites';
 import { productDetailHref } from '@/lib/listing-utils';
 import { getEffectiveUnitPrice } from '@/lib/product-promo';
@@ -230,7 +231,7 @@ function EnterpriseCard({
   enterprise: EnterprisePublic;
   onPress: () => void;
   colors: ReturnType<typeof useAppColors>;
-  /** Temps de livraison GoLivra estimé par zone (30/45/60) — sinfon commerce. */
+  /** Temps de livraison GoLivra estimé par zone (25/35/45) — sinfon commerce. */
   deliveryMinutes?: number | null;
 }) {
   const imgUrl = resolveRemoteImageUrl(enterprise.image_url, { width: 300, format: 'webp', quality: 80 });
@@ -274,9 +275,9 @@ function EnterpriseCard({
             </Text>
           ) : null}
         </View>
-      ) : deliveryMinutes ?? enterprise.delai_livraison_min ? (
+      ) : deliveryMinutes != null ? (
         <Text style={[styles.enterpriseCardMeta, { color: colors.textMuted }]}>
-          {deliveryMinutes ?? enterprise.delai_livraison_min} min
+          ~{enterprisePrepMinutes(enterprise) + deliveryMinutes} min
         </Text>
       ) : null}
     </Pressable>
@@ -798,7 +799,7 @@ export default function HomeScreen() {
                   {ent.nom}
                 </Text>
                 <Text style={[styles.entRowMeta, { color: colors.textMuted }]} numberOfLines={1}>
-                  {[ent.categorie_nom, (deliveryMinutes ?? ent.delai_livraison_min) ? `${deliveryMinutes ?? ent.delai_livraison_min} min` : null]
+                  {[ent.categorie_nom, deliveryMinutes != null ? `~${enterprisePrepMinutes(ent) + deliveryMinutes} min` : null]
                     .filter(Boolean)
                     .join(' · ')}
                 </Text>

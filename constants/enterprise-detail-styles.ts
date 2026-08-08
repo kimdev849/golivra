@@ -95,7 +95,27 @@ export function createEnterpriseDetailStyles(c: AppPalette) {
     desc: { fontSize: 15, lineHeight: 22, color: c.textSecondary },
     infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
     infoText: { flex: 1, fontSize: 14, color: c.textMuted, lineHeight: 20 },
-    deliveryHint: { fontSize: 12, color: c.textMuted, lineHeight: 17, paddingLeft: 30 },
+    // Carte « Livraison prévue » : l'essentiel d'abord, le détail se plie.
+    etaCard: {
+      padding: 14,
+      borderRadius: 14,
+      borderWidth: 1,
+      gap: 8,
+    },
+    etaHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    etaHeadline: { flex: 1, fontSize: 16, color: c.text, lineHeight: 22 },
+    etaBody: { fontSize: 13, color: c.textSecondary, lineHeight: 19 },
+    etaToggle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      alignSelf: 'flex-start',
+      paddingVertical: 2,
+    },
+    etaToggleTxt: { fontSize: 13, fontWeight: '700' },
+    etaDetail: { gap: 6, marginTop: 2 },
+    etaText: { flex: 1, fontSize: 13.5, color: c.textSecondary, lineHeight: 18 },
+    etaEmoji: { fontSize: 14 },
     hoursBanner: {
       flexDirection: 'row',
       alignItems: 'center',

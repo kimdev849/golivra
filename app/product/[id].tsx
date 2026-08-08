@@ -47,6 +47,7 @@ import {
   type ProductPublic,
 } from '@/lib/catalog';
 import { peekEnterpriseById } from '@/lib/client-data';
+import { enterprisePrepMinutes } from '@/lib/pricing';
 import { trackInteraction } from '@/lib/tracking';
 import { resolveRemoteImageUrl, type ResizeOptions } from '@/lib/images';
 import { getEffectiveUnitPrice } from '@/lib/product-promo';
@@ -168,7 +169,7 @@ export default function ProductDetailScreen() {
   // d'ajout au panier resterait bloqué.
   const now = useCurrentTime(30_000);
   const liveStatus = computeLiveStatus(enterprise?.horaires ?? [], {
-    prepMinutes: enterprise?.delai_preparation_min ?? 25,
+    prepMinutes: enterprisePrepMinutes(enterprise),
     kind: enterprise?.type === 'restaurant' ? 'restaurant' : 'boutique',
     fermeManuellement: enterprise?.ouvert === false,
     sansHoraires: enterprise?.accepte_commandes === false,

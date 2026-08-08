@@ -36,6 +36,7 @@ import {
   type EnterprisePublic,
 } from '@/lib/catalog';
 import { resolveRemoteImageUrl } from '@/lib/images';
+import { enterprisePrepMinutes } from '@/lib/pricing';
 
 type SortKey = 'popular' | 'recent';
 
@@ -175,8 +176,8 @@ export default function DiscoverAllScreen() {
                     {[
                       ent.type === 'restaurant' ? 'Restaurant' : 'Boutique',
                       ent.categorie_nom,
-                      (deliveryMinutes ?? ent.delai_livraison_min)
-                        ? `${deliveryMinutes ?? ent.delai_livraison_min} min`
+                      deliveryMinutes != null
+                        ? `~${enterprisePrepMinutes(ent) + deliveryMinutes} min`
                         : null,
                     ]
                       .filter(Boolean)

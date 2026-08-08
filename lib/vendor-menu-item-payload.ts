@@ -46,6 +46,7 @@ export function buildMenuItemApiBody(
     estEnVedette: values.enVedette,
     estDisponible: values.estDisponible,
     options: cleanOptionGroups(values.optionGroups),
+    unite: values.unite.trim() || 'pièce',
     tags: parseTagsText(values.tagsText),
     allergenes: values.allergenes.length ? values.allergenes : undefined,
     promoDebutAt: values.promoDebutAt.trim() || null,
