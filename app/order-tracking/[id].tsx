@@ -1025,7 +1025,7 @@ const styles = StyleSheet.create({
   },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   cardTitle: { fontSize: 16, fontWeight: '700' },
-  orderInfoCard: { marginHorizontal: 16, marginTop: 16, padding: 16, borderRadius: 12, borderWidth: 1 },
+  orderInfoCard: { padding: 16, borderRadius: 16, borderWidth: 1 },
   orderInfoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   orderLabel: { fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
   orderValue: { fontSize: 16, fontWeight: '600' },

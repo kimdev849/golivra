@@ -1,7 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -22,10 +21,8 @@ import {
   ShoppingCart,
   Store,
   UtensilsCrossed,
-  X,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeIn } from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
 
 import { GalleryViewer } from '@/components/gallery-viewer';
@@ -43,7 +40,6 @@ import {
   fetchEnterpriseById,
   fetchProductById,
   peekProductById,
-  trackProductClick,
   type ProductPublic,
 } from '@/lib/catalog';
 import { peekEnterpriseById } from '@/lib/client-data';
@@ -69,7 +65,6 @@ import { isFavoriteProduct, toggleFavoriteProduct } from '@/lib/favorites';
 import { getProductGalleryUrls } from '@/lib/listing-utils';
 
 const IMG_HERO: ResizeOptions = { width: 800, format: 'webp', quality: 85 };
-const IMG_THUMB: ResizeOptions = { width: 200, format: 'webp', quality: 80 };
 
 type SelectedOptionChoice = { groupIndex: number; choiceIndex: number };
 
@@ -101,7 +96,9 @@ export default function ProductDetailScreen() {
   const kindParam = typeof params.kind === 'string' ? params.kind.toLowerCase() : '';
   const kind: 'plat' | 'article' = kindParam === 'article' ? 'article' : 'plat';
 
-  const [quantity, setQuantity] = useState(1);
+  // La quantité réelle est gérée par les lignes du panier (cartLine) ;
+  // ici le détail produit affiche toujours le prix unitaire total.
+  const quantity = 1;
   const [isFav, setIsFav] = useState(false);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
@@ -719,7 +716,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   thumbImg: { width: '100%', height: '100%' },
-  body: { padding: 18, gap: 18 },
+  body: { padding: 16, gap: 16 },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   title: { fontSize: 20, fontWeight: '800', letterSpacing: -0.2, lineHeight: 26 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
@@ -858,7 +855,7 @@ function ProductDetailSkeleton({ colors }: { colors: ReturnType<typeof useAppCol
           <Skeleton key={i} width={60} height={60} borderRadius={10} />
         ))}
       </View>
-      <View style={{ padding: 18, gap: 18 }}>
+      <View style={{ padding: 16, gap: 16 }}>
         {/* Title */}
         <Skeleton width="85%" height={24} borderRadius={6} />
         <Skeleton width="40%" height={22} borderRadius={6} />
