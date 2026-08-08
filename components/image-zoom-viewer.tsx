@@ -1,8 +1,8 @@
 import { Image } from 'expo-image';
-import { ImageIcon, X } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
-import { Dimensions, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { ImageIcon, Maximize2, Minus, Plus, X } from 'lucide-react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Dimensions, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -12,6 +12,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LUCIDE_STROKE } from '@/constants/icons';
+import { useWebImageGestures } from '@/hooks/use-web-image-gestures';
 import { resolveRemoteImageUrl } from '@/lib/images';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -54,6 +55,8 @@ type Props = {
  */
 export function ImageZoomViewer({ visible, source, onClose, caption }: Props) {
   const insets = useSafeAreaInsets();
+  const zoomRef = useRef<Animated.View>(null);
+  const isWeb = Platform.OS === 'web';
 
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -89,6 +92,50 @@ export function ImageZoomViewer({ visible, source, onClose, caption }: Props) {
     resetTransform();
     onClose();
   }, [onClose, resetTransform]);
+
+  // Sur le web, react-native-gesture-handler est peu fiable dans les Modal :
+  // on gère double-clic / molette / glisser via des écouteurs DOM directs.
+  useWebImageGestures({
+    ref: zoomRef,
+    enabled: visible,
+    scale,
+    savedScale,
+    translateX,
+    translateY,
+    savedX,
+    savedY,
+    onClose: onCloseWrapped,
+  });
+
+  const zoomWebBy = useCallback(
+    (factor: number) => {
+      const { width, height } = Dimensions.get('window');
+      const s = clamp(scale.value * factor, MIN_SCALE, MAX_SCALE);
+      scale.value = s;
+      savedScale.value = s;
+      if (s <= 1.02) {
+        translateX.value = 0;
+        translateY.value = 0;
+        savedX.value = 0;
+        savedY.value = 0;
+      } else {
+        const maxX = (width * (s - 1)) / 2;
+        const maxY = (height * (s - 1)) / 2;
+        translateX.value = clamp(translateX.value, -maxX, maxX);
+        translateY.value = clamp(translateY.value, -maxY, maxY);
+      }
+    },
+    [scale, savedScale, translateX, translateY, savedX, savedY],
+  );
+
+  const resetWebZoom = useCallback(() => {
+    scale.value = 1;
+    savedScale.value = 1;
+    translateX.value = 0;
+    translateY.value = 0;
+    savedX.value = 0;
+    savedY.value = 0;
+  }, [scale, savedScale, translateX, translateY, savedX, savedY]);
 
   const uri = source == null ? null : typeof source === 'string' ? source : source.uri;
   const resolved = resolveRemoteImageUrl(uri);
@@ -174,6 +221,29 @@ export function ImageZoomViewer({ visible, source, onClose, caption }: Props) {
     opacity: dismissOpacity.value,
   }));
 
+  const imageContent = (
+    <>
+      {resolved ? (
+        <Image
+          source={{ uri: resolved }}
+          style={styles.img}
+          contentFit="contain"
+          onLoad={() => setLoaded(true)}
+          onError={() => setErrored(true)}
+        />
+      ) : (
+        <Image source={source as any} style={styles.img} contentFit="contain" />
+      )}
+
+      {errored ? (
+        <View style={styles.fallback} pointerEvents="none">
+          <ImageIcon size={42} color="rgba(255,255,255,0.55)" strokeWidth={1.6} />
+          <Text style={styles.fallbackTxt}>Image indisponible</Text>
+        </View>
+      ) : null}
+    </>
+  );
+
   if (!resolved && !source) return null;
 
   return (
@@ -183,29 +253,16 @@ export function ImageZoomViewer({ visible, source, onClose, caption }: Props) {
       animationType="fade"
       onRequestClose={onCloseWrapped}
       statusBarTranslucent>
-      <View style={styles.root}>
-        <GestureDetector gesture={composed}>
-          <Animated.View style={[styles.center, animatedStyle]}>
-            {resolved ? (
-              <Image
-                source={{ uri: resolved }}
-                style={styles.img}
-                contentFit="contain"
-                onLoad={() => setLoaded(true)}
-                onError={() => setErrored(true)}
-              />
-            ) : (
-              <Image source={source as any} style={styles.img} contentFit="contain" />
-            )}
-
-            {errored ? (
-              <View style={styles.fallback} pointerEvents="none">
-                <ImageIcon size={42} color="rgba(255,255,255,0.55)" strokeWidth={1.6} />
-                <Text style={styles.fallbackTxt}>Image indisponible</Text>
-              </View>
-            ) : null}
+      <GestureHandlerRootView style={styles.root}>
+        {isWeb ? (
+          <Animated.View ref={zoomRef} style={[styles.center, animatedStyle]}>
+            {imageContent}
           </Animated.View>
-        </GestureDetector>
+        ) : (
+          <GestureDetector gesture={composed}>
+            <Animated.View style={[styles.center, animatedStyle]}>{imageContent}</Animated.View>
+          </GestureDetector>
+        )}
 
         {/* Loader tant que l'image distante n'est pas prête */}
         {!loaded && resolved ? (
@@ -216,7 +273,9 @@ export function ImageZoomViewer({ visible, source, onClose, caption }: Props) {
 
         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <View style={styles.hint}>
-            <Text style={styles.hintTxt}>Pincez pour zoomer · double-tap</Text>
+            <Text style={styles.hintTxt}>
+              {isWeb ? 'Molette ou double-clic pour zoomer' : 'Pincez pour zoomer · double-tap'}
+            </Text>
           </View>
           <Pressable
             accessibilityRole="button"
@@ -228,6 +287,36 @@ export function ImageZoomViewer({ visible, source, onClose, caption }: Props) {
           </Pressable>
         </View>
 
+        {/* Zoom avant / arrière / reset (web) */}
+        {isWeb ? (
+          <View style={[styles.webZoomRow, { bottom: Math.max(insets.bottom, 16) + 12 }]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Zoom avant"
+              onPress={() => zoomWebBy(1.4)}
+              hitSlop={8}
+              style={({ pressed }) => [styles.webZoomBtn, pressed && { opacity: 0.7 }]}>
+              <Plus size={18} color="#FFF" strokeWidth={LUCIDE_STROKE} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Zoom arrière"
+              onPress={() => zoomWebBy(1 / 1.4)}
+              hitSlop={8}
+              style={({ pressed }) => [styles.webZoomBtn, pressed && { opacity: 0.7 }]}>
+              <Minus size={18} color="#FFF" strokeWidth={LUCIDE_STROKE} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Réinitialiser le zoom"
+              onPress={resetWebZoom}
+              hitSlop={8}
+              style={({ pressed }) => [styles.webZoomBtn, pressed && { opacity: 0.7 }]}>
+              <Maximize2 size={16} color="#FFF" strokeWidth={LUCIDE_STROKE} />
+            </Pressable>
+          </View>
+        ) : null}
+
         {caption ? (
           <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]} pointerEvents="none">
             <Text style={styles.caption} numberOfLines={2}>
@@ -235,7 +324,7 @@ export function ImageZoomViewer({ visible, source, onClose, caption }: Props) {
             </Text>
           </View>
         ) : null}
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
@@ -274,6 +363,20 @@ const styles = StyleSheet.create({
   },
   hintTxt: { color: '#FFF', fontSize: 11, fontWeight: '600' },
   closeBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  webZoomRow: {
+    position: 'absolute',
+    right: 16,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  webZoomBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,

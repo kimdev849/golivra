@@ -1,13 +1,20 @@
 import { Image } from 'expo-image';
-import { Heart, Images, Store, UtensilsCrossed } from 'lucide-react-native';
+import { Heart, Images, Maximize2, Store, UtensilsCrossed } from 'lucide-react-native';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { GalleryViewer } from '@/components/gallery-viewer';
 import { ThemedText } from '@/components/themed-text';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
 import type { ProductPublic } from '@/lib/catalog';
 import { formatFcfa } from '@/lib/format';
-import { getProductPhotoCount, getProductPrimaryImage, productKind } from '@/lib/listing-utils';
+import {
+  getProductGalleryUrls,
+  getProductPhotoCount,
+  getProductPrimaryImage,
+  productKind,
+} from '@/lib/listing-utils';
 import { getEffectiveUnitPrice } from '@/lib/product-promo';
 import type { ResizeOptions } from '@/lib/images';
 
@@ -25,6 +32,11 @@ type Props = {
  */
 export function ListingCard({ product, onPress, isFav = false, onToggleFav, variant = 'grid' }: Props) {
   const colors = useAppColors();
+  const [zoomOpen, setZoomOpen] = useState(false);
+  const galleryImages = useMemo(
+    () => getProductGalleryUrls(product, { width: 900, format: 'webp', quality: 85 }),
+    [product],
+  );
   const kind = productKind(product);
   const isGrid = variant === 'grid';
   const isFeed = variant === 'feed';
@@ -59,7 +71,20 @@ export function ListingCard({ product, onPress, isFav = false, onToggleFav, vari
           { backgroundColor: colors.primarySoft },
         ]}>
         {image ? (
-          <Image source={{ uri: image }} style={styles.image} contentFit="cover" transition={200} recyclingKey={image} />
+          <>
+            <Image source={{ uri: image }} style={styles.image} contentFit="cover" transition={200} recyclingKey={image} />
+            <Pressable
+              style={[styles.zoomBtn, isGrid && styles.zoomBtnGrid, isFeed && styles.zoomBtnFeed]}
+              onPress={(e) => {
+                e.stopPropagation();
+                setZoomOpen(true);
+              }}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel="Agrandir la photo">
+              <Maximize2 size={13} color="#FFF" strokeWidth={LUCIDE_STROKE} />
+            </Pressable>
+          </>
         ) : (
           <View style={styles.imagePlaceholder}>
             <PlaceholderIcon size={isGrid ? 28 : isFeed ? 24 : 36} color={colors.primary} strokeWidth={1.2} />
@@ -124,6 +149,16 @@ export function ListingCard({ product, onPress, isFav = false, onToggleFav, vari
           </ThemedText>
         ) : null}
       </View>
+
+      {/* Visionneuse plein écran des photos (zoom) */}
+      {zoomOpen && galleryImages.length > 0 ? (
+        <GalleryViewer
+          visible
+          images={galleryImages}
+          caption={product.nom ?? null}
+          onClose={() => setZoomOpen(false)}
+        />
+      ) : null}
     </Pressable>
   );
 }
@@ -184,6 +219,19 @@ const styles = StyleSheet.create({
   },
   photoBadgeGrid: { bottom: 6, left: 6 },
   photoBadgeTxt: { color: '#FFF', fontSize: 10, fontWeight: '700' },
+  zoomBtn: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  zoomBtnGrid: { bottom: 6, right: 6, width: 26, height: 26, borderRadius: 13 },
+  zoomBtnFeed: { bottom: 6, right: 6, width: 24, height: 24, borderRadius: 12 },
   promoBadge: {
     position: 'absolute',
     top: 8,

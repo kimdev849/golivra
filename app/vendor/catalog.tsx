@@ -1,5 +1,4 @@
 import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react-native';
@@ -8,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { VendorScreenHeader } from '@/components/vendor-screen-header';
 import { ThemedText } from '@/components/themed-text';
+import { ZoomableImage } from '@/components/zoomable-image';
 import { ThemedView } from '@/components/themed-view';
 import { VENDOR_TAB_BAR_PADDING_BOTTOM } from '@/constants/vendor-layout';
 import { LUCIDE_STROKE } from '@/constants/icons';
@@ -157,7 +157,7 @@ export default function VendorCatalogScreen() {
                   delayLongPress={450}
                   android_ripple={{ color: colors.primarySoft }}>
                   {img ? (
-                    <Image source={{ uri: img }} style={styles.thumb} contentFit="cover" />
+                    <ZoomableImage source={{ uri: img }} style={styles.thumb} contentFit="cover" />
                   ) : (
                     <View style={[styles.thumb, { backgroundColor: colors.surfaceMuted }]} />
                   )}

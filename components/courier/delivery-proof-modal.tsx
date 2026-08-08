@@ -1,5 +1,4 @@
 import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useState } from 'react';
 import {
@@ -14,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Camera, CheckCircle2, RefreshCw, ShieldCheck, X } from 'lucide-react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { ZoomableImage } from '@/components/zoomable-image';
 import {
   assetToVendorImage,
   type VendorImageAsset,
@@ -171,7 +171,7 @@ export function DeliveryProofModal({
 
           {photo ? (
             <View style={[styles.photoWrap, { borderColor: palette.border }]}>
-              <Image
+              <ZoomableImage
                 source={{ uri: photo.dataUrl || photo.uri }}
                 style={styles.photoPreview}
                 contentFit="cover"

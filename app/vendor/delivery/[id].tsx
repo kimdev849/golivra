@@ -1,4 +1,3 @@
-import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -18,6 +17,7 @@ import {
 
 import { VendorScreenHeader } from '@/components/vendor-screen-header';
 import { ThemedText } from '@/components/themed-text';
+import { ZoomableImage } from '@/components/zoomable-image';
 import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
@@ -356,7 +356,7 @@ export default function VendorDeliveryDetailScreen() {
                 <PackageCheck size={17} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
                 <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Preuve de livraison</ThemedText>
               </View>
-              <Image
+              <ZoomableImage
                 source={{ uri: liv.proof.photoUrl }}
                 style={styles.proofImg}
                 contentFit="cover"

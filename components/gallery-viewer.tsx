@@ -1,18 +1,19 @@
 import { Image } from 'expo-image';
-import { ImageIcon, X } from 'lucide-react-native';
+import { ImageIcon, Maximize2, Minus, Plus, X } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
   FlatList,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
   type ViewToken,
 } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -22,6 +23,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LUCIDE_STROKE } from '@/constants/icons';
+import { useWebImageGestures } from '@/hooks/use-web-image-gestures';
 import { resolveRemoteImageUrl } from '@/lib/images';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -61,6 +63,8 @@ type Props = {
 export function GalleryViewer({ visible, images, initialIndex = 0, caption, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const [activeIndex, setActiveIndex] = useState(initialIndex);
+  // Clé de remontage : chaque ouverture repart d'un état de zoom vierge.
+  const [openCount, setOpenCount] = useState(0);
   const listRef = useRef<FlatList<string>>(null);
 
   const clampedInitial = Math.max(0, Math.min(initialIndex, Math.max(images.length - 1, 0)));
@@ -69,6 +73,7 @@ export function GalleryViewer({ visible, images, initialIndex = 0, caption, onCl
   useEffect(() => {
     if (!visible) return;
     setActiveIndex(clampedInitial);
+    setOpenCount((c) => c + 1);
     const t = setTimeout(() => {
       listRef.current?.scrollToOffset({
         offset: clampedInitial * SCREEN_WIDTH,
@@ -92,6 +97,15 @@ export function GalleryViewer({ visible, images, initialIndex = 0, caption, onCl
     onClose();
   }, [onClose]);
 
+  // Web : navigation à la molette (image non zoomée) entre les photos.
+  const goToPage = useCallback(
+    (dir: 1 | -1) => {
+      const next = Math.max(0, Math.min(activeIndex + dir, images.length - 1));
+      listRef.current?.scrollToOffset({ offset: next * SCREEN_WIDTH, animated: true });
+    },
+    [activeIndex, images.length],
+  );
+
   if (images.length === 0) return null;
 
   return (
@@ -102,8 +116,9 @@ export function GalleryViewer({ visible, images, initialIndex = 0, caption, onCl
       onRequestClose={handleClose}
       statusBarTranslucent
       supportedOrientations={['portrait', 'landscape']}>
-      <View style={styles.root}>
+      <GestureHandlerRootView style={styles.root}>
         <FlatList
+          key={openCount}
           ref={listRef}
           data={images}
           keyExtractor={(u, i) => `${i}-${u}`}
@@ -121,6 +136,7 @@ export function GalleryViewer({ visible, images, initialIndex = 0, caption, onCl
               isActive={index === activeIndex}
               caption={index === activeIndex ? caption : null}
               onClose={handleClose}
+              onPage={images.length > 1 ? goToPage : undefined}
             />
           )}
         />
@@ -153,7 +169,7 @@ export function GalleryViewer({ visible, images, initialIndex = 0, caption, onCl
             ))}
           </View>
         ) : null}
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
@@ -168,14 +184,18 @@ function GalleryItem({
   isActive,
   caption,
   onClose,
+  onPage,
 }: {
   uri: string;
   isActive: boolean;
   caption?: string | null;
   onClose: () => void;
+  onPage?: (dir: 1 | -1) => void;
 }) {
   const resolved = resolveRemoteImageUrl(uri);
   const [loadState, setLoadState] = useState<'idle' | 'ok' | 'error'>('idle');
+  const isWeb = Platform.OS === 'web';
+  const zoomRef = useRef<Animated.View>(null);
 
   // Réinitialise l'état de chargement quand l'URL change (swipe entre images).
   useEffect(() => {
@@ -276,6 +296,52 @@ function GalleryItem({
     Gesture.Simultaneous(pinchGesture, panGesture),
   );
 
+  // Sur le web (RNGH peu fiable dans les Modal) : double-clic, molette et
+  // glisser souris/doigt. Le glissement horizontal reste à la galerie.
+  useWebImageGestures({
+    ref: zoomRef,
+    enabled: isActive,
+    scale,
+    savedScale,
+    translateX,
+    translateY,
+    savedX,
+    savedY,
+    onClose,
+    allowHorizontalPageSwipe: true,
+    wheelToPage: onPage,
+  });
+
+  const zoomWebBy = useCallback(
+    (factor: number) => {
+      const { width, height } = Dimensions.get('window');
+      const s = clamp(scale.value * factor, MIN_SCALE, MAX_SCALE);
+      scale.value = s;
+      savedScale.value = s;
+      if (s <= 1.02) {
+        translateX.value = 0;
+        translateY.value = 0;
+        savedX.value = 0;
+        savedY.value = 0;
+      } else {
+        const maxX = (width * (s - 1)) / 2;
+        const maxY = (height * (s - 1)) / 2;
+        translateX.value = clamp(translateX.value, -maxX, maxX);
+        translateY.value = clamp(translateY.value, -maxY, maxY);
+      }
+    },
+    [scale, savedScale, translateX, translateY, savedX, savedY],
+  );
+
+  const resetWebZoom = useCallback(() => {
+    scale.value = 1;
+    savedScale.value = 1;
+    translateX.value = 0;
+    translateY.value = 0;
+    savedX.value = 0;
+    savedY.value = 0;
+  }, [scale, savedScale, translateX, translateY, savedX, savedY]);
+
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: translateX.value },
@@ -284,35 +350,75 @@ function GalleryItem({
     ],
   }));
 
+  const imageContent = (
+    <>
+      {resolved ? (
+        <Image
+          source={{ uri: resolved }}
+          style={styles.img}
+          contentFit="contain"
+          onLoadStart={() => setLoadState((s) => (s === 'ok' ? s : 'idle'))}
+          onLoad={() => setLoadState('ok')}
+          onError={() => setLoadState('error')}
+        />
+      ) : null}
+
+      {loadState === 'error' || !resolved ? (
+        <View style={styles.imgFallback} pointerEvents="none">
+          <ImageIcon size={42} color="rgba(255,255,255,0.55)" strokeWidth={1.6} />
+          <Text style={styles.fallbackTxt}>Image indisponible</Text>
+        </View>
+      ) : null}
+
+      {resolved && loadState === 'idle' ? (
+        <View pointerEvents="none" style={styles.loaderWrap}>
+          <ActivityIndicator color="rgba(255,255,255,0.75)" />
+        </View>
+      ) : null}
+    </>
+  );
+
   return (
     <View style={styles.slide}>
-      <GestureDetector gesture={composed}>
-        <Animated.View style={[styles.imgWrap, animatedStyle]}>
-          {resolved ? (
-            <Image
-              source={{ uri: resolved }}
-              style={styles.img}
-              contentFit="contain"
-              onLoadStart={() => setLoadState((s) => (s === 'ok' ? s : 'idle'))}
-              onLoad={() => setLoadState('ok')}
-              onError={() => setLoadState('error')}
-            />
-          ) : null}
-
-          {loadState === 'error' || !resolved ? (
-            <View style={styles.imgFallback} pointerEvents="none">
-              <ImageIcon size={42} color="rgba(255,255,255,0.55)" strokeWidth={1.6} />
-              <Text style={styles.fallbackTxt}>Image indisponible</Text>
-            </View>
-          ) : null}
-
-          {resolved && loadState === 'idle' ? (
-            <View pointerEvents="none" style={styles.loaderWrap}>
-              <ActivityIndicator color="rgba(255,255,255,0.75)" />
-            </View>
-          ) : null}
+      {isWeb ? (
+        <Animated.View ref={zoomRef} style={[styles.imgWrap, animatedStyle]}>
+          {imageContent}
         </Animated.View>
-      </GestureDetector>
+      ) : (
+        <GestureDetector gesture={composed}>
+          <Animated.View style={[styles.imgWrap, animatedStyle]}>{imageContent}</Animated.View>
+        </GestureDetector>
+      )}
+
+      {/* Zoom avant / arrière / reset (web) */}
+      {isWeb ? (
+        <View style={[styles.webZoomRow, { bottom: 24 }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Zoom avant"
+            onPress={() => zoomWebBy(1.4)}
+            hitSlop={8}
+            style={({ pressed }) => [styles.webZoomBtn, pressed && { opacity: 0.7 }]}>
+            <Plus size={18} color="#FFF" strokeWidth={LUCIDE_STROKE} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Zoom arrière"
+            onPress={() => zoomWebBy(1 / 1.4)}
+            hitSlop={8}
+            style={({ pressed }) => [styles.webZoomBtn, pressed && { opacity: 0.7 }]}>
+            <Minus size={18} color="#FFF" strokeWidth={LUCIDE_STROKE} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Réinitialiser le zoom"
+            onPress={resetWebZoom}
+            hitSlop={8}
+            style={({ pressed }) => [styles.webZoomBtn, pressed && { opacity: 0.7 }]}>
+            <Maximize2 size={16} color="#FFF" strokeWidth={LUCIDE_STROKE} />
+          </Pressable>
+        </View>
+      ) : null}
 
       {caption ? (
         <View pointerEvents="none" style={styles.captionWrap}>
@@ -371,6 +477,20 @@ const styles = StyleSheet.create({
   },
   counter: { color: '#FFF', fontSize: 13, fontWeight: '700' },
   closeBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  webZoomRow: {
+    position: 'absolute',
+    right: 16,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  webZoomBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,

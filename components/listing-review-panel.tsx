@@ -1,8 +1,8 @@
-import { Image } from 'expo-image';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
 import { InlineFormError } from '@/components/inline-form-error';
+import { ThemedText } from '@/components/themed-text';
+import { ZoomableImage } from '@/components/zoomable-image';
 import type { AppPalette } from '@/constants/app-palette';
 import { formatFcfa } from '@/lib/format';
 
@@ -58,7 +58,7 @@ export function ListingReviewPanel({
         {photos.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoRow}>
             {photos.map((uri) => (
-              <Image key={uri} source={{ uri }} style={styles.photo} contentFit="cover" />
+              <ZoomableImage key={uri} source={{ uri }} style={styles.photo} contentFit="cover" />
             ))}
           </ScrollView>
         ) : (

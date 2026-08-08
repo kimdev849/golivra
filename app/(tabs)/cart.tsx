@@ -1,7 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import type { Href } from 'expo-router';
 import { useRouter } from 'expo-router';
-import { Image } from 'expo-image';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -19,6 +18,7 @@ import * as Haptics from 'expo-haptics';
 
 import { DeliveryAddressForm } from '@/components/delivery-address-form';
 import { ProductPrice } from '@/components/product-price';
+import { ZoomableImage } from '@/components/zoomable-image';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useCart } from '@/contexts/cart-context';
@@ -521,7 +521,7 @@ export default function CartScreen() {
                         <View key={`${seg.enterpriseId}-${line.productId}`} style={[styles.itemCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                           <View style={styles.itemTop}>
                             {imgUrl ? (
-                              <Image source={{ uri: imgUrl }} style={styles.thumb} contentFit="cover" />
+                              <ZoomableImage source={{ uri: imgUrl }} style={styles.thumb} contentFit="cover" />
                             ) : (
                               <View style={[styles.thumb, styles.thumbPh, { backgroundColor: colors.primarySoft, borderColor: colors.border }]} />
                             )}
