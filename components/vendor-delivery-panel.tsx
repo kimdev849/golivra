@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 
-import { MapPin, Package, Phone, Plus, Truck } from 'lucide-react-native';
+import { MapPin, Package, Phone, Plus } from 'lucide-react-native';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -162,24 +162,12 @@ export function VendorDeliveryPanel({ embedded }: { embedded?: boolean }) {
 
     <>
 
-      <Pressable
-
-        style={[styles.createBtn, { backgroundColor: palette.primary }]}
-
-        onPress={() => router.push('/vendor/create-external-delivery')}>
-
-        <Plus size={20} color={colors.textInverse} strokeWidth={LUCIDE_STROKE} />
-
-        <ThemedText style={styles.createBtnTxt}>Créer une livraison externe</ThemedText>
-
-      </Pressable>
-
-
-
-      <View style={[styles.infoBanner, { backgroundColor: palette.primarySoft, borderColor: palette.onlinePillBorder }]}>
-        <Truck size={20} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
-        <ThemedText style={[styles.infoTxt, { color: palette.primaryDeep }]}>
-          Vos commandes sont livrées automatiquement. Créez vos propres livraisons en un clic.
+      <View style={styles.head}>
+        <ThemedText type="title" style={[styles.headTitle, { color: palette.primaryDeep }]}>
+          Vos livraisons, simplement.
+        </ThemedText>
+        <ThemedText style={[styles.headSub, { color: palette.primaryDeep }]}>
+          Les commandes prêtes sont automatiquement prises en charge par Golivra.
         </ThemedText>
       </View>
 
@@ -229,19 +217,37 @@ export function VendorDeliveryPanel({ embedded }: { embedded?: boolean }) {
 
         <View style={styles.empty}>
 
-          <Package size={40} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-
+          <View style={[styles.emptyIcon, { backgroundColor: palette.primarySoft }]}>
+            <Package size={26} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
+          </View>
           <ThemedText style={[styles.emptyTitle, { color: colors.textSecondary }]}>Aucune livraison en cours</ThemedText>
 
           <ThemedText style={[styles.emptyHint, { color: colors.textMuted }]}>
 
-            Marquez une commande « prête » (livraison interne auto) ou créez une livraison externe.
+            Préparez une commande, indiquez qu'elle est prête et nous nous occupons du reste.
 
           </ThemedText>
 
         </View>
 
       ) : null}
+
+
+
+      <Pressable
+
+        style={[styles.createBtn, { backgroundColor: palette.primary }]}
+
+        onPress={() => router.push('/vendor/create-external-delivery')}>
+
+        <Plus size={20} color={colors.textInverse} strokeWidth={LUCIDE_STROKE} />
+
+        <ThemedText style={styles.createBtnTxt}>Créer une livraison</ThemedText>
+
+      </Pressable>
+      <ThemedText style={[styles.createHelp, { color: colors.textMuted }]}>
+        Besoin d'organiser une livraison vous-même ? Créez-la ici.
+      </ThemedText>
 
 
 
@@ -447,6 +453,10 @@ const styles = StyleSheet.create({
 
   scroll: { paddingHorizontal: 18, paddingBottom: 24 },
 
+  head: { gap: 6, marginBottom: 16 },
+  headTitle: { fontSize: 22, fontWeight: '900', letterSpacing: -0.3 },
+  headSub: { fontSize: 14, lineHeight: 20, fontWeight: '500', opacity: 0.85 },
+
   createBtn: {
 
     flexDirection: 'row',
@@ -457,37 +467,23 @@ const styles = StyleSheet.create({
 
     gap: 8,
 
-    paddingVertical: 14,
+    paddingVertical: 15,
 
-    borderRadius: 12,
+    borderRadius: 14,
 
-    marginBottom: 14,
+    marginTop: 8,
 
   },
 
   createBtnTxt: { color: '#FFF', fontWeight: '800', fontSize: 15 },
 
-  infoBanner: {
-
-    flexDirection: 'row',
-
-    gap: 12,
-
-    padding: 14,
-
-    borderRadius: 14,
-
-    borderWidth: 1,
-
-    marginBottom: 16,
-
-  },
-
-  infoTxt: { flex: 1, fontSize: 13, lineHeight: 19 },
+  createHelp: { fontSize: 13, textAlign: 'center', marginTop: 10, marginBottom: 4, lineHeight: 18 },
 
   sectionTitle: { fontSize: 14, fontWeight: '800', marginBottom: 10 },
 
-  empty: { alignItems: 'center', paddingVertical: 32, gap: 10 },
+  empty: { alignItems: 'center', paddingVertical: 28, gap: 10 },
+
+  emptyIcon: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
 
   emptyTitle: { fontSize: 16, fontWeight: '800' },
 

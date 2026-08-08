@@ -9,7 +9,7 @@ export default function VendorDeliveryScreen() {
 
   return (
     <ThemedView style={{ flex: 1 }}>
-      <VendorScreenHeader title="LIVRAISONS EN COURS" />
+      <VendorScreenHeader title="LIVRAISONS" />
       <VendorDeliveryPanel />
       <ThemedView style={{ height: insets.bottom }} lightColor="transparent" darkColor="transparent" />
     </ThemedView>

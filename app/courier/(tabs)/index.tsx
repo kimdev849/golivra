@@ -1,11 +1,26 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, View } from 'react-native';
-import { Bell, ChevronRight, MapPin, Package, Target, CheckCircle2, Navigation } from 'lucide-react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  View,
+} from 'react-native';
+import {
+  Bell,
+  ChevronRight,
+  MapPin,
+  Package,
+  Target,
+  CheckCircle2,
+  Navigation,
+  Bike,
+} from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AppContentWidth } from '@/components/app-content-width';
-import { CourierHero } from '@/components/courier/courier-hero';
 import { ThemedText } from '@/components/themed-text';
 import { COURIER_TAB_BAR_PADDING_BOTTOM } from '@/constants/courier-layout';
 import { LUCIDE_STROKE } from '@/constants/icons';
@@ -61,7 +76,7 @@ export default function CourierHomeScreen() {
 
   if (loading && !profile) {
     return (
-      <View style={styles.loader}>
+      <View style={[styles.loader, { backgroundColor: palette.bg }]}>
         <ActivityIndicator size="large" color={palette.primary} />
       </View>
     );
@@ -75,16 +90,19 @@ export default function CourierHomeScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={palette.primary} />}
         contentContainerStyle={[styles.scroll, { paddingTop: Math.max(insets.top, 12), paddingBottom: bottom }]}>
-        <AppContentWidth phonePadding={0}>
-        <View style={styles.heroRow}>
-          <View style={{ flex: 1 }}>
-          <CourierHero
-            nom={profile?.utilisateur?.nom || 'Livreur'}
-            subtitle={profile?.entreprise?.nom || 'GoLivra Livreur'}
-            imageUrl={profile?.utilisateur?.imageUrl}
-            disponible={disponible}
-            vehicule={profile?.livreur?.type_vehicule}
-          />
+
+        {/* ── En-tête : logo + Bonjour + cloche ── */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <View style={[styles.logoBadge, { backgroundColor: palette.primary }]}>
+              <Bike size={20} color="#FFFFFF" strokeWidth={2.4} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText style={[styles.greeting, { color: palette.muted }]}>Bonjour,</ThemedText>
+              <ThemedText style={[styles.name, { color: palette.text }]} numberOfLines={1}>
+                {profile?.utilisateur?.nom || 'Livreur'}
+              </ThemedText>
+            </View>
           </View>
           <Pressable
             style={[styles.notifBtn, { backgroundColor: palette.card, borderColor: palette.border }]}
@@ -105,6 +123,7 @@ export default function CourierHomeScreen() {
           </View>
         ) : null}
 
+        {/* ── Disponibilité ── */}
         <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
           <View style={styles.dispoRow}>
             <View style={{ flex: 1 }}>
@@ -125,24 +144,27 @@ export default function CourierHomeScreen() {
           </View>
         </View>
 
-        <View style={styles.kpiRow}>
-          <Kpi 
-            label="En cours" 
-            value={profile?.resume?.missions_actives ?? 0} 
-            palette={palette} 
-            icon={<Navigation size={18} color={palette.primary} strokeWidth={LUCIDE_STROKE} />} 
+        {/* ── Statistiques (3 colonnes, comme le client) ── */}
+        <View style={[styles.statsCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
+          <Kpi
+            label="En cours"
+            value={profile?.resume?.missions_actives ?? 0}
+            palette={palette}
+            icon={<Navigation size={18} color={palette.primary} strokeWidth={LUCIDE_STROKE} />}
           />
-          <Kpi 
-            label="Aujourd'hui" 
-            value={profile?.resume?.missions_aujourdhui ?? 0} 
-            palette={palette} 
-            icon={<Target size={18} color={palette.primary} strokeWidth={LUCIDE_STROKE} />} 
+          <View style={[styles.statDivider, { backgroundColor: palette.border }]} />
+          <Kpi
+            label="Aujourd'hui"
+            value={profile?.resume?.missions_aujourdhui ?? 0}
+            palette={palette}
+            icon={<Target size={18} color={palette.primary} strokeWidth={LUCIDE_STROKE} />}
           />
-          <Kpi 
-            label="Réussies" 
-            value={profile?.resume?.reussies_historique ?? 0} 
-            palette={palette} 
-            icon={<CheckCircle2 size={18} color={palette.primary} strokeWidth={LUCIDE_STROKE} />} 
+          <View style={[styles.statDivider, { backgroundColor: palette.border }]} />
+          <Kpi
+            label="Réussies"
+            value={profile?.resume?.reussies_historique ?? 0}
+            palette={palette}
+            icon={<CheckCircle2 size={18} color={palette.primary} strokeWidth={LUCIDE_STROKE} />}
           />
         </View>
 
@@ -185,7 +207,7 @@ export default function CourierHomeScreen() {
         <View style={styles.missionList}>
           {activeMissions.length === 0 ? (
             <View style={[styles.emptyCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
-              <Package size={28} color={palette.muted} strokeWidth={LUCIDE_STROKE} />
+              <Package size={26} color={palette.muted} strokeWidth={LUCIDE_STROKE} />
               <ThemedText style={[styles.emptyTitle, { color: palette.primaryDeep }]}>Aucune course active</ThemedText>
               <ThemedText style={[styles.emptyText, { color: palette.muted }]}>
                 Restez disponible : GoLivra vous attribuera les prochaines missions.
@@ -193,9 +215,9 @@ export default function CourierHomeScreen() {
             </View>
           ) : (
             activeMissions.map((m) => (
-              <Pressable 
-                key={m.id} 
-                style={[styles.missionCard, { backgroundColor: palette.card, borderColor: palette.border }]} 
+              <Pressable
+                key={m.id}
+                style={[styles.missionCard, { backgroundColor: palette.card, borderColor: palette.border }]}
                 onPress={() => router.push(hrefCourierMission(m.id))}
                 android_ripple={{ color: palette.primarySoft }}>
                 <View style={styles.missionTop}>
@@ -217,28 +239,25 @@ export default function CourierHomeScreen() {
             ))
           )}
         </View>
-        </AppContentWidth>
       </ScrollView>
     </View>
   );
 }
 
-function Kpi({ 
-  label, 
-  value, 
-  palette, 
-  icon 
-}: { 
-  label: string; 
-  value: number; 
-  palette: ReturnType<typeof useCourierPalette>; 
+function Kpi({
+  label,
+  value,
+  palette,
+  icon,
+}: {
+  label: string;
+  value: number;
+  palette: ReturnType<typeof useCourierPalette>;
   icon: React.ReactNode;
 }) {
   return (
-    <View style={[styles.kpi, { backgroundColor: palette.card, borderColor: palette.border }]}>
-      <View style={[styles.kpiIcon, { backgroundColor: palette.primarySoft }]}>
-        {icon}
-      </View>
+    <View style={styles.kpi}>
+      <View style={[styles.kpiIcon, { backgroundColor: palette.primarySoft }]}>{icon}</View>
       <ThemedText style={[styles.kpiVal, { color: palette.primaryDeep }]}>{value}</ThemedText>
       <ThemedText style={[styles.kpiLbl, { color: palette.muted }]}>{label}</ThemedText>
     </View>
@@ -248,16 +267,33 @@ function Kpi({
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  scroll: { paddingHorizontal: 18, gap: 16 },
-  heroRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 4 },
+  scroll: { paddingHorizontal: 16, gap: 14 },
+
+  // ── En-tête ──
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  logoBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  greeting: { fontSize: 13, fontWeight: '500' },
+  name: { fontSize: 20, fontWeight: '800', letterSpacing: -0.2, marginTop: 1 },
   notifBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
+    position: 'relative',
   },
   notifBadge: {
     position: 'absolute',
@@ -271,70 +307,64 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   notifBadgeText: { color: '#FFF', fontSize: 10, fontWeight: '900' },
+
   bannerErr: {
     borderRadius: 14,
     padding: 12,
   },
   bannerErrText: { fontSize: 13, fontWeight: '600' },
+
+  // ── Carte disponibilité ──
   card: {
-    borderRadius: 20,
-    padding: 18,
+    borderRadius: 18,
+    padding: 16,
     borderWidth: 1,
-    shadowColor: '#0A3A28',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
   },
   dispoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  cardTitle: { fontSize: 16, fontWeight: '800', marginBottom: 2 },
+  cardTitle: { fontSize: 15, fontWeight: '800', marginBottom: 2 },
   cardHint: { fontSize: 13, fontWeight: '500', lineHeight: 18 },
-  kpiRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  kpi: {
-    flex: 1,
-    borderRadius: 20,
-    padding: 14,
-    borderWidth: 1,
+
+  // ── Stats (3 colonnes) ──
+  statsCard: {
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  kpiIcon: {
-    width: 36,
-    height: 36,
     borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+  },
+  kpi: { flex: 1, alignItems: 'center', gap: 3 },
+  statDivider: { width: StyleSheet.hairlineWidth, height: 34 },
+  kpiIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 2,
   },
   kpiVal: { fontSize: 18, fontWeight: '900' },
-  kpiLbl: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
+  kpiLbl: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
+
+  // ── Sections ──
   sectionHead: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 12,
-    marginBottom: 4,
+    marginTop: 6,
+    marginBottom: 2,
   },
-  sectionTitle: { fontSize: 17, fontWeight: '800' },
-  sectionLink: { fontSize: 14, fontWeight: '700' },
+  sectionTitle: { fontSize: 16, fontWeight: '800' },
+  sectionLink: { fontSize: 13, fontWeight: '700' },
   missionList: { gap: 10 },
   missionCard: {
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 16,
+    padding: 14,
     borderWidth: 1,
     position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
   },
   missionTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  missionRef: { fontSize: 15, fontWeight: '800' },
+  missionRef: { fontSize: 14, fontWeight: '800' },
   statutPill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -343,15 +373,17 @@ const styles = StyleSheet.create({
   statutText: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
   addrRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 24 },
   missionAddr: { fontSize: 13, fontWeight: '500', lineHeight: 18 },
-  chev: { position: 'absolute', right: 14, top: '50%', marginTop: 2 },
+  chev: { position: 'absolute', right: 12, top: '50%', marginTop: 2 },
+
+  // ── État vide ──
   emptyCard: {
-    borderRadius: 20,
-    padding: 32,
+    borderRadius: 18,
+    padding: 26,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
-  emptyTitle: { fontSize: 16, fontWeight: '800', marginTop: 8 },
-  emptyText: { fontSize: 14, fontWeight: '500', textAlign: 'center', lineHeight: 20, opacity: 0.8 },
+  emptyTitle: { fontSize: 15, fontWeight: '800', marginTop: 6 },
+  emptyText: { fontSize: 13, fontWeight: '500', textAlign: 'center', lineHeight: 19, opacity: 0.8 },
 });
