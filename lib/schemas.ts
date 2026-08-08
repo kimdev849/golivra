@@ -99,6 +99,7 @@ export const VendorOrderSchema = z.object({
   adresse: z.string(),
   creeLeLabel: z.string(),
   prixTotal: z.number(),
+  sousTotal: z.number().optional(),
   fraisLivraison: z.number(),
   noteClient: z.string().optional(),
   lignes: z.array(VendorOrderLineSchema),

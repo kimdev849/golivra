@@ -56,7 +56,14 @@ export type VendorOrder = {
   clientTel: string;
   adresse: string;
   creeLeLabel: string;
+  /**
+   * Part du vendeur = SOUS-TOTAL PRODUITS (jamais les frais de livraison).
+   * C'est le montant que le commerce recevra pour ses plats/articles.
+   */
   prixTotal: number;
+  /** Sous-total produits (explicite, backé par sc.sous_total). */
+  sousTotal?: number;
+  /** Frais de livraison GoLivra — NE COMPTENT PAS dans les revenus du vendeur. */
   fraisLivraison: number;
   noteClient?: string;
   lignes: VendorOrderLine[];
@@ -182,9 +189,16 @@ export function computeVendorStats(
   });
 
   const periodLabel = periodDays === 7 ? '7 jours' : periodDays === 30 ? '30 jours' : `${periodDays} jours`;
-  const validRecent = recent.filter((o) => o.statut !== 'annulee');
-  
-  const revenus7j = validRecent.reduce((acc, o) => acc + o.prixTotal, 0);
+
+  // Seules les commandes PAYÉES comptent dans les revenus (le client paie après
+  // acceptation ; tant qu'il n'a pas payé, rien n'est gagné).
+  const validRecent = recent.filter((o) => o.statut !== 'annulee' && o.paiement_statut === 'valide');
+
+  // Part du vendeur = produits uniquement (sousTotal / prixTotal), JAMAIS les
+  // frais de livraison (argent du livreur / GoLivra logistique).
+  const vendorShare = (o: VendorOrder) => o.sousTotal ?? o.prixTotal;
+
+  const revenus7j = validRecent.reduce((acc, o) => acc + vendorShare(o), 0);
   const produitsVendus = validRecent.reduce((acc, o) => acc + o.lignes.reduce((s, l) => s + l.quantite, 0), 0);
   const averageOrderValue = validRecent.length > 0 ? revenus7j / validRecent.length : 0;
 
@@ -216,7 +230,7 @@ export function computeVendorStats(
     const dayLabel = dayNames[d.getDay()];
     const amount = validRecent
       .filter(o => o.created_at?.startsWith(dateStr))
-      .reduce((acc, o) => acc + o.prixTotal, 0);
+      .reduce((acc, o) => acc + vendorShare(o), 0);
     
     dailyRevenues.push({
       date: dateStr,

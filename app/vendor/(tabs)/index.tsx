@@ -195,9 +195,14 @@ export default function VendorDashboardScreen() {
     () => orders.filter((o) => isSameDay(o.created_at)),
     [orders],
   );
+  // Revenus du jour : UNIQUEMENT les commandes payées (paiement_statut ===
+  // 'valide') et la part PRODUITS du vendeur (jamais les frais de livraison,
+  // qui reviennent au livreur / GoLivra logistique).
   const todayRevenue = useMemo(
     () =>
-      todayOrders.filter((o) => o.statut !== 'annulee').reduce((acc, o) => acc + o.prixTotal, 0),
+      todayOrders
+        .filter((o) => o.statut !== 'annulee' && o.paiement_statut === 'valide')
+        .reduce((acc, o) => acc + (o.sousTotal ?? o.prixTotal), 0),
     [todayOrders],
   );
 
