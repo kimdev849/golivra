@@ -23,6 +23,7 @@ import { warmAppCaches } from '@/lib/app-bootstrap';
 import { prefetchClientCatalog } from '@/lib/client-data';
 import { stackAuthOptions, stackScreenOptions } from '@/lib/app-navigation';
 import { syncSystemBars } from '@/lib/system-ui';
+import { startUpdateChecker } from '@/lib/update-checker';
 import { installGlobalErrorReporting } from '@/lib/error-reporting';
 import {
   initializeNotifications,
@@ -40,6 +41,12 @@ function RootNavigation() {
 
   useEffect(() => {
     installGlobalErrorReporting();
+  }, []);
+
+  // Mises à jour OTA : vérifie au lancement + au retour au premier plan, et
+  // télécharge les nouvelles versions (elles s'appliquent au prochain lancement).
+  useEffect(() => {
+    startUpdateChecker();
   }, []);
 
   // Barre de navigation système transparente + boutons adaptés au thème
