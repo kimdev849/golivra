@@ -32,6 +32,9 @@ import { safeGetItem, safeSetItem } from '@/lib/safe-store';
  */
 const LAST_HANDLED_NOTIF_KEY = 'golivra_last_handled_notif_id';
 
+/** Mémorise que la demande de permission a déjà été affichée (1 fois max). */
+const NOTIF_PERMISSION_ASKED_KEY = 'golivra_notif_permission_asked_v1';
+
 export async function markNotificationHandled(id: string | null | undefined): Promise<void> {
   if (!id) return;
   try {
@@ -67,6 +70,12 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
     const { status: existing } = await Notifications.getPermissionsAsync();
     if (existing === 'granted') return 'granted';
 
+    // Le dialogue de permission n'est affiché QU'UNE SEULE FOIS par
+    // installation : un refus ou un « undetermined » répété ne relance jamais
+    // la demande (sauf effacement des données / réinstallation de l'app).
+    const alreadyAsked = (await safeGetItem(NOTIF_PERMISSION_ASKED_KEY)) === '1';
+    if (alreadyAsked) return existing as NotificationPermissionStatus;
+
     const { status } = await Notifications.requestPermissionsAsync({
       ios: {
         allowAlert: true,
@@ -77,6 +86,7 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
       },
     });
 
+    await safeSetItem(NOTIF_PERMISSION_ASKED_KEY, '1');
     return status as NotificationPermissionStatus;
   } catch (err) {
     console.warn('[notifications] requestPermission error:', err);

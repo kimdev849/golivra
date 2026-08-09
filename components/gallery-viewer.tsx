@@ -24,7 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useWebImageGestures } from '@/hooks/use-web-image-gestures';
-import { resolveRemoteImageUrl } from '@/lib/images';
+import { resolveZoomImageUrl } from '@/lib/images';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -192,7 +192,9 @@ function GalleryItem({
   onClose: () => void;
   onPage?: (dir: 1 | -1) => void;
 }) {
-  const resolved = resolveRemoteImageUrl(uri);
+  // Image bornée (webp ≤ 1800 px) : zoom sans faire exploser la mémoire
+  // Android (la pleine résolution d'origine provoquait un crash au zoom).
+  const resolved = resolveZoomImageUrl(uri);
   const [loadState, setLoadState] = useState<'idle' | 'ok' | 'error'>('idle');
   const isWeb = Platform.OS === 'web';
   const zoomRef = useRef<Animated.View>(null);

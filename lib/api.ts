@@ -14,7 +14,7 @@ export function apiUrl(path: string): string {
 
 import { z } from 'zod';
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 export type ApiFetchOptions<T = unknown> = RequestInit & {
   token?: string | null;
@@ -55,14 +55,22 @@ function networkErrorMessage(cause: unknown): string {
 }
 
 let lastSlowToastAt = 0;
+/** Démarrage de l'app : les premiers chargements sont attendus, pas d'alerte. */
+const appStartTime = Date.now();
 
 /**
- * Signale (au plus une fois toutes les 25 s) que la connexion est lente, pour
- * que l'utilisateur comprenne pourquoi les données tardent à s'afficher.
+ * Signale que la connexion est réellement lente (une requête GET a dépassé 3 s).
+ *
+ * Gardes pour ne pas spammer :
+ *  - au plus une fois toutes les 25 s ;
+ *  - jamais pendant les 8 premières secondes (chargement de démarrage) ;
+ *  - jamais en arrière-plan.
  */
 function notifySlowConnection(): void {
   const now = Date.now();
   if (now - lastSlowToastAt < 25_000) return;
+  if (now - appStartTime < 8_000) return;
+  if (AppState.currentState !== 'active') return;
   lastSlowToastAt = now;
   showToast({
     message: 'Connexion lente… les données peuvent mettre un moment à s\u2019afficher.',

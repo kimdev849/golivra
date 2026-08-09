@@ -43,3 +43,22 @@ export function resolveRemoteImageUrl(
   if (u.startsWith('data:image/')) return u;
   return null;
 }
+
+/** Taille maximale (px) demandée pour les visionneuses plein écran. */
+export const ZOOM_VIEWER_EDGE = 1800;
+
+/**
+ * URL d'image BORNÉE pour les visionneuses plein écran zoomables.
+ *
+ * Charger la photo en pleine résolution d'origine puis la zoomer fait exploser
+ * la mémoire Android → l'app s'arrête (OOM). On demande un webp plafonné à
+ * ZOOM_VIEWER_EDGE px : net sur tous les écrans, mémoire maîtrisée.
+ */
+export function resolveZoomImageUrl(url: string | null | undefined): string | null {
+  return resolveRemoteImageUrl(url, {
+    width: ZOOM_VIEWER_EDGE,
+    height: ZOOM_VIEWER_EDGE,
+    format: 'webp',
+    quality: 82,
+  });
+}

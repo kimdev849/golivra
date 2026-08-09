@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useWebImageGestures } from '@/hooks/use-web-image-gestures';
-import { resolveRemoteImageUrl } from '@/lib/images';
+import { resolveZoomImageUrl } from '@/lib/images';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -138,7 +138,9 @@ export function ImageZoomViewer({ visible, source, onClose, caption }: Props) {
   }, [scale, savedScale, translateX, translateY, savedX, savedY]);
 
   const uri = source == null ? null : typeof source === 'string' ? source : source.uri;
-  const resolved = resolveRemoteImageUrl(uri);
+  // Image bornée (webp ≤ 1800 px) : zoom sans faire exploser la mémoire
+  // Android (la pleine résolution d'origine provoquait un crash au zoom).
+  const resolved = resolveZoomImageUrl(uri);
 
   const pinchGesture = Gesture.Pinch()
     .onUpdate((e) => {
