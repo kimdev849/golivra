@@ -8,6 +8,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SplashScreen from 'expo-splash-screen';
 
 import { paletteForScheme } from '@/constants/app-palette';
 
@@ -37,6 +38,18 @@ export function CustomSplashScreen({ onAnimationComplete }: Props) {
     return () => {
       alive = false;
     };
+  }, []);
+
+  // Cache immédiatement le splash NATIF (fond blanc du téléphone) dès que le
+  // splash JS — fond conforme au thème — est rendu à l'écran. Sans cela, un
+  // court cadre blanc avec le logo apparaît au démarrage quand le téléphone
+  // est en mode clair mais que l'app est en mode sombre.
+  useEffect(() => {
+    try {
+      SplashScreen.hideAsync().catch(() => {});
+    } catch {
+      /* non bloquant */
+    }
   }, []);
 
   const pref = storedPref ?? 'system';
@@ -101,7 +114,7 @@ export function CustomSplashScreen({ onAnimationComplete }: Props) {
     <View style={[styles.container, { backgroundColor: bg }]}>
       <Animated.View style={{ opacity, transform: [{ scale: pulse }] }}>
         <Image
-          source={require('@/assets/images/logo.png')}
+          source={require('@/assets/images/icon.png')}
           style={styles.logo}
           resizeMode="contain"
         />
