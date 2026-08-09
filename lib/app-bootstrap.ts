@@ -43,8 +43,10 @@ export async function resolveBootstrapTarget(): Promise<BootstrapTarget> {
     return { kind: 'home', href: homeHrefForRole(snapshot?.role) };
   }
 
-  const seen = await isOnboardingComplete();
-  if (seen) return { kind: 'auth' };
+  // Pas de session : on affiche TOUJOURS l'écran d'accueil (image + slogan).
+  // L'ancien drapeau one-shot faisait sauter ce landing dès que l'app avait
+  // déjà été ouverte une fois (même sur un téléphone d'essai), et l'utilisateur
+  // tombait directement sur la connexion sans jamais voir l'image ni le slogan.
   return { kind: 'onboarding' };
 }
 
