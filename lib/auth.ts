@@ -65,6 +65,21 @@ export async function clearSessionToken(): Promise<void> {
 export async function persistAuthSession(session: AuthSession): Promise<void> {
   await setSessionToken(session.token);
   await saveSessionSnapshot(session);
+  // Bêta fermée : si l'admin a activé beta_mode et que ce téléphone n'est pas
+  // autorisé, on refuse l'accès (le message remonte à l'écran de connexion).
+  try {
+    const { isPhoneAllowedInBeta } = await import('@/lib/app-status');
+    const allowed = await isPhoneAllowedInBeta(session.user.telephone);
+    if (!allowed) {
+      await logoutLocal();
+      throw new Error(
+        "Accès restreint : GoLivra est en test privé. Votre numéro n'est pas encore autorisé."
+      );
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('Accès restreint')) throw error;
+    /* hors-ligne : on laisse passer, le filet n'est pas un bloqueur */
+  }
   // Push notifications : le token est DÉSENREGISTRÉ au logout et l'init complète
   // n'a lieu qu'au démarrage de l'app. On le (ré)enregistre donc après chaque
   // connexion/inscription pour garantir la réception (fire-and-forget).

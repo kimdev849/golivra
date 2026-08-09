@@ -10,6 +10,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
+import { AnnouncementBanner } from '@/components/announcement-banner';
+import { AppStatusGate } from '@/components/app-status-gate';
 import { AppToastHost } from '@/components/app-toast-host';
 import { BiometricAppGate } from '@/components/biometric-app-gate';
 import { OfflineBanner } from '@/components/offline-banner';
@@ -168,14 +170,17 @@ function RootLayout() {
         <TextScaleProvider>
         <AppThemeProvider>
           <BiometricAppGate>
-            <View style={{ flex: 1 }}>
-              {splashVisible && (
-                <CustomSplashScreen onAnimationComplete={handleSplashDone} />
-              )}
-              <OfflineBanner />
-              <RootNavigation />
-              <AppToastHost />
-            </View>
+            <AppStatusGate>
+              <View style={{ flex: 1 }}>
+                {splashVisible && (
+                  <CustomSplashScreen onAnimationComplete={handleSplashDone} />
+                )}
+                <OfflineBanner />
+                <AnnouncementBanner />
+                <RootNavigation />
+                <AppToastHost />
+              </View>
+            </AppStatusGate>
           </BiometricAppGate>
         </AppThemeProvider>
         </TextScaleProvider>

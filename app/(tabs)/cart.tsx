@@ -56,6 +56,7 @@ import { effectiveStockCap, UNLIMITED_STOCK_CAP } from '@/lib/product-stock';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
+import { useFeatureEnabled } from '@/hooks/use-feature-enabled';
 
 /** Valeur d'adresse vierge (aucune adresse sélectionnée). */
 const emptyAddressForm = (): DeliveryAddressFields => ({
@@ -108,6 +109,8 @@ export default function CartScreen() {
   const [promoError, setPromoError] = useState<string | null>(null);
   const [pricing, setPricing] = useState<PublicPricing | null>(null);
   const orderInFlight = useRef(false);
+  // ── Contrôle à distance : si l'admin coupe les commandes, on bloque ici aussi
+  const ordersEnabled = useFeatureEnabled('orders');
 
   /** Référence de l'adresse courante, lisible depuis les callbacks stables. */
   const addressRef = useRef(address);
@@ -753,19 +756,27 @@ export default function CartScreen() {
                 </View>
               </View>
 
-              <Pressable
-                style={[styles.submitBtn, { backgroundColor: colors.primaryDeep }, (submitting || !addressOk) && styles.submitBtnDisabled]}
-                disabled={submitting || !addressOk}
-                onPress={() => void submitOrder()}
-                android_ripple={{ color: 'rgba(255,255,255,0.2)' }}>
-                {submitting ? (
-                  <ActivityIndicator color={colors.onPrimary} />
-                ) : (
-                  <ThemedText style={[styles.submitText, { color: colors.onPrimary }]}>
-                    {segmentCount > 1 ? `Commander (${segmentCount} commerces)` : 'Passer la commande'}
+              {!ordersEnabled ? (
+                <View style={[styles.ordersOffBanner, { backgroundColor: colors.error + '18', borderColor: colors.error }]}>
+                  <ThemedText style={[styles.ordersOffText, { color: colors.error }]}>
+                    Les commandes sont temporairement désactivées par l&apos;administrateur. Réessayez plus tard.
                   </ThemedText>
-                )}
-              </Pressable>
+                </View>
+              ) : (
+                <Pressable
+                  style={[styles.submitBtn, { backgroundColor: colors.primaryDeep }, (submitting || !addressOk) && styles.submitBtnDisabled]}
+                  disabled={submitting || !addressOk}
+                  onPress={() => void submitOrder()}
+                  android_ripple={{ color: 'rgba(255,255,255,0.2)' }}>
+                  {submitting ? (
+                    <ActivityIndicator color={colors.onPrimary} />
+                  ) : (
+                    <ThemedText style={[styles.submitText, { color: colors.onPrimary }]}>
+                      {segmentCount > 1 ? `Commander (${segmentCount} commerces)` : 'Passer la commande'}
+                    </ThemedText>
+                  )}
+                </Pressable>
+              )}
 
               <Pressable onPress={() => router.push('/how-multi-delivery' as Href)} style={styles.footerLink}>
                 <ThemedText style={[styles.footerLinkText, { color: colors.primary }]}>Comment fonctionnent les livraisons multiples ?</ThemedText>
@@ -1042,6 +1053,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   submitBtnDisabled: { opacity: 0.75 },
+  ordersOffBanner: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  ordersOffText: { fontSize: 13, fontWeight: '700', lineHeight: 19, textAlign: 'center' },
   submitText: { fontWeight: '800', fontSize: 16 },
   footerLink: { marginBottom: 10, alignSelf: 'center', paddingVertical: 4 },
   footerLinkText: { fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' },
