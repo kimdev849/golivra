@@ -10,6 +10,7 @@ import { ThemedView } from '@/components/themed-view';
 import { EventTimeline } from '@/components/event-timeline';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
+import { useFeatureEnabled } from '@/hooks/use-feature-enabled';
 import { apiFetch } from '@/lib/api';
 import { getSessionToken } from '@/lib/auth';
 import type { TimelineStep as _TimelineStep } from '@/lib/datetime';
@@ -132,6 +133,7 @@ export default function OrderTrackingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
+  const paymentsEnabled = useFeatureEnabled('payments');
 
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -638,18 +640,27 @@ export default function OrderTrackingScreen() {
               })}
             </View>
 
-            <Pressable
-              style={[styles.payCta, { backgroundColor: colors.primary }]}
-              onPress={() => void payNow()}
-              disabled={paying || paymentDeadlineExpired}>
-              {paying ? (
-                <ActivityIndicator color={colors.onPrimary} size="small" />
-              ) : (
-                <ThemedText style={[styles.payCtaText, { color: colors.onPrimary }]}>
-                  {paymentDeadlineExpired ? 'Délai expiré' : 'Payer ma commande'}
+            {!paymentsEnabled ? (
+              <View style={[styles.payBlocked, { backgroundColor: colors.error + '18', borderColor: colors.error }]}>
+                <ThemedText style={[styles.payBlockedText, { color: colors.error }]}>
+                  Les paiements sont temporairement désactivés par l&apos;administrateur. Votre commande est
+                  conservée — réessayez plus tard.
                 </ThemedText>
-              )}
-            </Pressable>
+              </View>
+            ) : (
+              <Pressable
+                style={[styles.payCta, { backgroundColor: colors.primary }]}
+                onPress={() => void payNow()}
+                disabled={paying || paymentDeadlineExpired}>
+                {paying ? (
+                  <ActivityIndicator color={colors.onPrimary} size="small" />
+                ) : (
+                  <ThemedText style={[styles.payCtaText, { color: colors.onPrimary }]}>
+                    {paymentDeadlineExpired ? 'Délai expiré' : 'Payer ma commande'}
+                  </ThemedText>
+                )}
+              </Pressable>
+            )}
             {payError ? (
               <ThemedText style={[styles.payErr, { color: colors.error }]}>{payError}</ThemedText>
             ) : null}
@@ -955,6 +966,13 @@ const styles = StyleSheet.create({
   },
   payCtaText: { fontWeight: '800', fontSize: 15 },
   payErr: { fontSize: 12, fontWeight: '700' },
+  payBlocked: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  payBlockedText: { fontSize: 13, fontWeight: '600', lineHeight: 19, textAlign: 'center' },
   cancelLink: { alignSelf: 'center', paddingVertical: 4 },
   cancelLinkText: { fontSize: 13, fontWeight: '800', textDecorationLine: 'underline' },
 

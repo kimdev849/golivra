@@ -25,6 +25,7 @@ import { ThemedText } from '@/components/themed-text';
 import { COURIER_TAB_BAR_PADDING_BOTTOM } from '@/constants/courier-layout';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useCourier } from '@/contexts/courier-context';
+import { useFeatureEnabled } from '@/hooks/use-feature-enabled';
 import { missionStatutLabel } from '@/lib/courier-api';
 import { useCourierPalette } from '@/lib/courier-theme';
 import { hrefCourierMission } from '@/lib/courier-nav';
@@ -41,6 +42,7 @@ export default function CourierHomeScreen() {
   const [localError, setErrorLocal] = useState<string | null>(null);
 
   const disponible = Boolean(profile?.livreur?.est_disponible);
+  const deliveryEnabled = useFeatureEnabled('delivery');
   const openMissions = missions.filter((m) => m.ouverte && m.statut === 'en_attente');
   const activeMissions = missions
     .filter((m) => m.statut !== 'livree' && m.statut !== 'annulee' && !m.ouverte)
@@ -138,12 +140,20 @@ export default function CourierHomeScreen() {
             </View>
             <Switch
               value={disponible}
-              disabled={acting}
+              disabled={acting || !deliveryEnabled}
               onValueChange={(v) => void toggleDispo(v)}
               trackColor={{ false: palette.trackStroke, true: palette.primary }}
               thumbColor={disponible ? palette.primary : '#F9FAFB'}
             />
           </View>
+          {!deliveryEnabled ? (
+            <View style={[styles.bannerErr, { borderColor: palette.danger }]}>
+              <ThemedText style={[styles.bannerErrText, { color: palette.danger }]}>
+                Les livraisons sont temporairement désactivées par l&apos;administrateur. Les nouvelles courses
+                sont suspendues.
+              </ThemedText>
+            </View>
+          ) : null}
         </View>
 
         {/* ── Statistiques (3 colonnes, comme le client) ── */}
