@@ -630,7 +630,7 @@ export default function OrderTrackingScreen() {
                       },
                     ]}
                     onPress={() => setPayMethod(m.id)}
-                    disabled={paying}>
+                    disabled={paying || !paymentsEnabled}>
                     <Smartphone size={16} color={on ? colors.onPrimary : colors.primary} strokeWidth={LUCIDE_STROKE} />
                     <ThemedText style={[styles.payMethodLabel, { color: on ? colors.onPrimary : colors.text }]}>
                       {m.label}
@@ -643,8 +643,8 @@ export default function OrderTrackingScreen() {
             {!paymentsEnabled ? (
               <View style={[styles.payBlocked, { backgroundColor: colors.error + '18', borderColor: colors.error }]}>
                 <ThemedText style={[styles.payBlockedText, { color: colors.error }]}>
-                  Les paiements sont temporairement désactivés par l&apos;administrateur. Votre commande est
-                  conservée — réessayez plus tard.
+                  Les paiements en ligne sont temporairement désactivés par l&apos;administrateur. Votre
+                  commande reste en attente — elle sera annulée si le délai de paiement expire.
                 </ThemedText>
               </View>
             ) : (
