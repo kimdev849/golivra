@@ -1,4 +1,4 @@
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -115,7 +115,7 @@ export default function LandingScreen() {
         />
       </Animated.View>
 
-      {/* Bloc bas : slogan + boutons Connexion / Inscription */}
+      {/* Bloc bas : slogan + bouton Connexion */}
       <Animated.View
         entering={BOTTOM_ENTER}
         style={[
@@ -136,20 +136,6 @@ export default function LandingScreen() {
           ]}>
           <ThemedText style={styles.ctaText}>Connexion</ThemedText>
         </Pressable>
-
-        <Link href="/signup/choose" asChild>
-          <Pressable
-            onPress={() => {
-              void markOnboardingComplete();
-            }}
-            android_ripple={{ color: 'rgba(255,255,255,0.25)', borderless: false }}
-            style={({ pressed }) => [
-              styles.signupBtn,
-              { width: buttonWidth, opacity: pressed ? 0.9 : 1 },
-            ]}>
-            <ThemedText style={styles.signupBtnText}>Créer un compte</ThemedText>
-          </Pressable>
-        </Link>
       </Animated.View>
     </View>
   );
@@ -203,23 +189,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 20,
     fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  // Bouton secondaire plein format : fond blanc opaque pour ressortir sur la photo,
-  // même gabarit que « Connexion » pour une vraie paire de boutons centrés.
-  signupBtn: {
-    minHeight: 56,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.94)',
-    boxShadow: '0px 8px 22px rgba(0,0,0,0.25)',
-    elevation: 4,
-  },
-  signupBtnText: {
-    color: GOLIVRA_ORANGE,
-    fontSize: 19,
-    fontWeight: '800',
     letterSpacing: 0.3,
   },
 });

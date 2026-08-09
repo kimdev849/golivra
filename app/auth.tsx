@@ -41,7 +41,7 @@ const LOGO_ENTER = ZoomIn.springify().damping(14).mass(0.9).stiffness(120);
 export default function AuthScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const colors = useAppColors();
   const { isDark, setDarkMode } = useAppTheme();
   const styles = useMemo(() => makeAuthStyles(colors), [colors]);
@@ -55,6 +55,10 @@ export default function AuthScreen() {
   const phoneE164 = toE164(loginPhone);
   const canSubmit = Boolean(phoneE164) && Boolean(password) && password.length >= 6 && !isSubmitting;
   const formWidth = Math.min(width - 40, 460);
+
+  // Sur les grands écrans (Android > 800px de haut), on descend TRÈS légèrement
+  // le logo et le formulaire pour éviter l'effet « tout collé en haut ».
+  const tallScreenPad = height > 800 ? Math.min(Math.round((height - 800) * 0.07), 26) : 0;
 
   // Secousse simple en transform JS quand la connexion échoue. Volontairement
   // SANS reanimated : un Animated.View autour des champs faisait perdre le
@@ -158,6 +162,7 @@ export default function AuthScreen() {
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
+            { paddingTop: 24 + tallScreenPad },
             Platform.OS === 'android' ? styles.scrollContentAndroid : undefined,
           ]}
           keyboardShouldPersistTaps="always"
