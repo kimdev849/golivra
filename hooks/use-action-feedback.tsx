@@ -67,13 +67,18 @@ export function useActionFeedback() {
   }, []);
 
   const showSuccess = useCallback(
-    (title: string, message?: string, options?: { primaryLabel?: string; onPrimary?: () => void }) => {
+    (
+      title: string,
+      message?: string,
+      options?: { primaryLabel?: string; onPrimary?: () => void; icon?: LucideIcon },
+    ) => {
       open({
         variant: 'success',
         title,
         message,
         primaryLabel: options?.primaryLabel,
         onPrimary: options?.onPrimary,
+        icon: options?.icon,
       });
     },
     [open],

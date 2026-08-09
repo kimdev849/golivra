@@ -54,6 +54,11 @@ async function writeProductRefs(refs: FavoriteProductRef[]): Promise<void> {
   await safeSetItem(STORAGE_KEY_PRODUCTS, JSON.stringify(refs));
 }
 
+/** Lecture locale instantanée (sans réseau) — pour afficher sans attendre. */
+export async function getFavoriteEnterpriseIdsLocal(): Promise<string[]> {
+  return readIds();
+}
+
 export async function getFavoriteEnterpriseIds(): Promise<string[]> {
   const token = await getSessionToken();
   if (token) {
@@ -118,6 +123,11 @@ export async function syncFavoritesWithServer(): Promise<void> {
 
 function productRefKey(ref: FavoriteProductRef): string {
   return `${ref.produit_kind}:${ref.produit_id}`;
+}
+
+/** Lecture locale instantanée (sans réseau) — pour afficher sans attendre. */
+export async function getFavoriteProductsLocal(): Promise<FavoriteProductRef[]> {
+  return readProductRefs();
 }
 
 export async function getFavoriteProducts(): Promise<FavoriteProductRef[]> {

@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -28,7 +28,9 @@ import { fetchAllEnterprises, peekAllEnterprises } from '@/lib/client-data';
 import { fetchProductFeed } from '@/lib/catalog';
 import {
   getFavoriteEnterpriseIds,
+  getFavoriteEnterpriseIdsLocal,
   getFavoriteProducts,
+  getFavoriteProductsLocal,
   toggleFavoriteProduct,
   type FavoriteProductRef,
 } from '@/lib/favorites';
@@ -60,38 +62,60 @@ export default function FavoritesScreen() {
 
   const bottomPad = Math.max(insets.bottom, 16) + TAB_BAR_CONTENT_PADDING_BOTTOM;
 
+  // Garde d'instance : ignore les réponses d'un chargement obsolète si un
+  // nouveau chargement a démarré entre-temps (pull-to-refresh + focus).
+  const loadGen = useRef(0);
+
   const loadEnterprises = useCallback(async (force = false) => {
+    const gen = ++loadGen.current;
     setErrorEnt(null);
+    // 1) Affichage instantané : favoris locaux + catalogue en cache.
+    const localIds = await getFavoriteEnterpriseIdsLocal();
+    setFavoriteEntIds(localIds);
+    const cached = peekAllEnterprises();
+    const cachedSet = new Set(localIds);
+    if (localIds.length === 0) setEnterprises([]);
+    else if (cached?.length) setEnterprises(cached.filter((e) => cachedSet.has(e.id)));
+    setLoadingEnt(false);
+    // 2) Rafraîchissement réseau en arrière-plan.
     try {
       const ids = await getFavoriteEnterpriseIds();
+      if (gen !== loadGen.current) return;
       setFavoriteEntIds(ids);
       if (ids.length === 0) {
         setEnterprises([]);
+        setRefreshingEnt(false);
         return;
       }
-      const cached = peekAllEnterprises();
-      if (cached?.length) {
-        const idSet = new Set(ids);
-        setEnterprises(cached.filter((e) => idSet.has(e.id)));
-      }
       const data = await fetchAllEnterprises(force);
+      if (gen !== loadGen.current) return;
       const idSet = new Set(ids);
       setEnterprises(data.filter((e) => idSet.has(e.id)));
     } catch (e) {
-      setErrorEnt(e instanceof Error ? e.message : 'Impossible de charger les favoris.');
+      if (gen === loadGen.current && localIds.length === 0) {
+        setErrorEnt(e instanceof Error ? e.message : 'Impossible de charger les favoris.');
+      }
     } finally {
-      setLoadingEnt(false);
-      setRefreshingEnt(false);
+      if (gen === loadGen.current) setRefreshingEnt(false);
     }
   }, []);
 
   const loadProducts = useCallback(async (force = false) => {
+    const gen = ++loadGen.current;
     setErrorProd(null);
+    // 1) Affichage instantané : favoris produits locaux.
+    const localRefs = await getFavoriteProductsLocal();
+    setFavProductRefs(localRefs);
+    if (localRefs.length === 0) setFavProducts([]);
+    setLoadingProd(false);
+    // 2) Rafraîchissement réseau en arrière-plan.
     try {
       const refs = await getFavoriteProducts();
+      if (gen !== loadGen.current) return;
       setFavProductRefs(refs);
       if (refs.length === 0) {
         setFavProducts([]);
+        setRefreshingProd(false);
         return;
       }
       // Charge les 2 feeds en parallele.
@@ -99,6 +123,7 @@ export default function FavoritesScreen() {
         fetchProductFeed({ type: 'plat', limit: 100, offset: 0 }),
         fetchProductFeed({ type: 'article', limit: 100, offset: 0 }),
       ]);
+      if (gen !== loadGen.current) return;
       const refSet = new Set(refs.map((r) => `${r.produit_kind}:${r.produit_id}`));
       const merged = [...plats, ...articles].filter((p) => {
         const kind: 'plat' | 'article' = p.kind === 'article' ? 'article' : 'plat';
@@ -114,10 +139,11 @@ export default function FavoritesScreen() {
       setFavProducts(merged);
       void force; // force non utilise ici (pas de cache dedie produits)
     } catch (e) {
-      setErrorProd(e instanceof Error ? e.message : 'Impossible de charger les favoris produits.');
+      if (gen === loadGen.current && localRefs.length === 0) {
+        setErrorProd(e instanceof Error ? e.message : 'Impossible de charger les favoris produits.');
+      }
     } finally {
-      setLoadingProd(false);
-      setRefreshingProd(false);
+      if (gen === loadGen.current) setRefreshingProd(false);
     }
   }, []);
 

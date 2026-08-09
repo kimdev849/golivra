@@ -1,6 +1,7 @@
 import { getApiOrigin } from '@/lib/config';
 import { createRequestId } from '@/lib/request-id';
 import { reportAppIncident } from '@/lib/error-reporting';
+import { showToast } from '@/lib/app-toast';
 import { UX_ERRORS, friendlyErrorMessage } from '@/lib/ux-copy';
 
 export { getApiOrigin };
@@ -53,6 +54,23 @@ function networkErrorMessage(cause: unknown): string {
   return friendlyErrorMessage(cause, UX_ERRORS.network);
 }
 
+let lastSlowToastAt = 0;
+
+/**
+ * Signale (au plus une fois toutes les 25 s) que la connexion est lente, pour
+ * que l'utilisateur comprenne pourquoi les données tardent à s'afficher.
+ */
+function notifySlowConnection(): void {
+  const now = Date.now();
+  if (now - lastSlowToastAt < 25_000) return;
+  lastSlowToastAt = now;
+  showToast({
+    message: 'Connexion lente… les données peuvent mettre un moment à s\u2019afficher.',
+    variant: 'info',
+    duration: 2600,
+  });
+}
+
 export async function apiFetch<T = unknown>(path: string, options: ApiFetchOptions<T> = {}): Promise<T> {
   const { token, jsonBody, headers: initHeaders, body, schema, skipIncidentReport, ...rest } = options;
   const headers = new Headers(initHeaders);
@@ -75,6 +93,7 @@ export async function apiFetch<T = unknown>(path: string, options: ApiFetchOptio
 
   const url = apiUrl(path);
   const method = (rest.method || 'GET').toUpperCase();
+  const fetchStart = Date.now();
   let res: Response;
   try {
     res = await fetch(url, {
@@ -97,6 +116,10 @@ export async function apiFetch<T = unknown>(path: string, options: ApiFetchOptio
       });
     }
     throw new Error(message);
+  }
+
+  if (method === 'GET' && Date.now() - fetchStart >= 3000) {
+    notifySlowConnection();
   }
 
   const text = await res.text();

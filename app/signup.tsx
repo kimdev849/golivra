@@ -19,6 +19,7 @@ import {
   Lock,
   MapPin,
   MessageCircle,
+  PartyPopper,
   Smartphone,
   Store,
   Tag,
@@ -225,9 +226,9 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
         await persistAuthSession(session);
         signupDoneRef.current = true;
         showSuccess(
-          'Compte créé',
-          'Votre commerce est en attente de validation. Complétez votre fiche (logo, description) depuis votre espace vendeur pour attirer plus de clients.',
-          { primaryLabel: 'Continuer', onPrimary: () => router.replace(VENDOR_HREF.root) },
+          'Compte créé !',
+          `Votre ${commerceKind === 'restaurant' ? 'restaurant' : 'boutique'} est enregistré et en attente de validation. Complétez votre fiche (logo, description) pour attirer vos premiers clients.`,
+          { primaryLabel: 'Continuer', onPrimary: () => router.replace(VENDOR_HREF.root), icon: PartyPopper },
         );
         return;
       }
@@ -243,10 +244,15 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
       }
       await persistAuthSession(session);
       signupDoneRef.current = true;
-      showSuccess('Compte créé', 'Bienvenue sur GoLivra ! Complétez votre profil (photo, adresses) depuis l’onglet Profil.', {
-        primaryLabel: 'Explorer',
-        onPrimary: () => router.replace('/(tabs)'),
-      });
+      showSuccess(
+        'Bienvenue à bord !',
+        'Votre compte GoLivra est prêt. Prenez le temps de compléter votre profil (photo, adresses), puis découvrez les commerces près de chez vous.',
+        {
+          primaryLabel: 'Explorer',
+          onPrimary: () => router.replace('/(tabs)'),
+          icon: PartyPopper,
+        },
+      );
     } catch (e) {
       if (signupDoneRef.current) return;
       const reqId = (e as { requestId?: string })?.requestId;

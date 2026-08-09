@@ -22,6 +22,7 @@ import { useIsOffline } from '@/hooks/use-network-status';
 import { warmAppCaches } from '@/lib/app-bootstrap';
 import { prefetchClientCatalog } from '@/lib/client-data';
 import { stackAuthOptions, stackScreenOptions } from '@/lib/app-navigation';
+import { syncSystemBars } from '@/lib/system-ui';
 import { installGlobalErrorReporting } from '@/lib/error-reporting';
 import {
   initializeNotifications,
@@ -40,6 +41,12 @@ function RootNavigation() {
   useEffect(() => {
     installGlobalErrorReporting();
   }, []);
+
+  // Barre de navigation système transparente + boutons adaptés au thème
+  // (edge-to-edge propre : plus de bande blanche ni d'écran coupé en bas).
+  useEffect(() => {
+    void syncSystemBars(isDark);
+  }, [isDark]);
 
   // ── Initialisation des notifications push au démarrage (natif uniquement) ──
   useEffect(() => {
