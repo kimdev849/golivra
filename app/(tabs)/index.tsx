@@ -2,7 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -129,7 +129,7 @@ function promoPercent(p: ProductPublic): number | null {
 
 // ─── Premium Product Card ─────────────────────────────────────────
 
-function PremiumCard({
+const PremiumCard = memo(function PremiumCard({
   product,
   onPress,
   isFav,
@@ -220,11 +220,11 @@ function PremiumCard({
       </View>
     </Pressable>
   );
-}
+});
 
 // ─── Enterprise card (horizontal scroll) ─────────────────────────
 
-function EnterpriseCard({
+const EnterpriseCard = memo(function EnterpriseCard({
   enterprise,
   onPress,
   colors,
@@ -284,7 +284,7 @@ function EnterpriseCard({
       ) : null}
     </Pressable>
   );
-}
+});
 
 // ─── Main screen ──────────────────────────────────────────────────
 
