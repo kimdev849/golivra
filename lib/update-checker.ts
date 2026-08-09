@@ -27,7 +27,7 @@ export function startUpdateChecker(): void {
     lastCheckAt = now;
 
     try {
-      if (!Updates.isEnabled()) return;
+      if (!Updates.isEnabled) return;
       const result = await Updates.checkForUpdateAsync();
       if (!result.isAvailable) return;
       await Updates.fetchUpdateAsync();
