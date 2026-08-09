@@ -52,7 +52,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             base.extra &&
             'eas' in base.extra &&
             (base.extra as { eas?: { projectId?: string } }).eas?.projectId) ||
-          'e05e349a-fb96-4adb-ae4c-e8be602b1537',
+          '',
       },
     },
   };

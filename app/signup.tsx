@@ -332,14 +332,9 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
 
               {/* ── Section 1 : VOS INFORMATIONS ── */}
               <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <View style={[styles.sectionNumber, { backgroundColor: colors.primary }]}>
-                    <ThemedText style={styles.sectionNumberText}>1</ThemedText>
-                  </View>
-                  <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
-                    Vos informations
-                  </ThemedText>
-                </View>
+                <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
+                  Vos informations
+                </ThemedText>
 
                 {profile === 'client' ? (
                   <View style={styles.field}>
@@ -384,14 +379,9 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
 
               {/* ── Section 2 : LOCALISATION ── */}
               <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <View style={[styles.sectionNumber, { backgroundColor: colors.primary }]}>
-                    <ThemedText style={styles.sectionNumberText}>2</ThemedText>
-                  </View>
-                  <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
-                    Localisation
-                  </ThemedText>
-                </View>
+                <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
+                  Localisation
+                </ThemedText>
                 <LocationPicker
                   value={location}
                   onChange={setLocation}
@@ -404,14 +394,9 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
               {/* ── Section 3 : VOTRE COMMERCE ── */}
               {isVendor && vc ? (
                 <View style={styles.section}>
-                  <View style={styles.sectionHeader}>
-                    <View style={[styles.sectionNumber, { backgroundColor: colors.primary }]}>
-                      <ThemedText style={styles.sectionNumberText}>3</ThemedText>
-                    </View>
-                    <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
-                      Votre {vendorKind === 'restaurant' ? 'restaurant' : 'boutique'}
-                    </ThemedText>
-                  </View>
+                  <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
+                    Votre {vendorKind === 'restaurant' ? 'restaurant' : 'boutique'}
+                  </ThemedText>
 
                   <View style={styles.field}>
                     <ThemedText style={[styles.fieldLabel, { color: colors.textSecondary }]}>{vc.nameLabel}</ThemedText>
@@ -456,14 +441,9 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
               {/* ── Vérification OTP ── */}
               {otpSent ? (
                 <View style={styles.section}>
-                  <View style={styles.sectionHeader}>
-                    <View style={[styles.sectionNumber, { backgroundColor: colors.primary }]}>
-                      <ThemedText style={styles.sectionNumberText}>✓</ThemedText>
-                    </View>
-                    <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
-                      Vérification
-                    </ThemedText>
-                  </View>
+                  <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
+                    Vérification
+                  </ThemedText>
                   {testOtpCode ? <ThemedText style={[styles.testOtpHint, { color: colors.primary }]}>Mode test actif - code OTP : {testOtpCode}</ThemedText> : null}
                   <View style={styles.field}>
                     <ThemedText style={[styles.fieldLabel, { color: colors.textSecondary }]}>Code SMS</ThemedText>
@@ -557,20 +537,10 @@ const styles = StyleSheet.create({
   formPage: { paddingHorizontal: 20, alignItems: 'center' },
   formCard: { borderWidth: 1.2, borderRadius: 24, padding: 18, gap: 12, elevation: 6 },
   section: { gap: 12 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2 },
-  sectionNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sectionNumberText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
   sectionTitle: {
-    fontSize: 13.5,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+    fontSize: 14.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   field: { gap: 8 },
   fieldLabel: { fontSize: 13.5, fontWeight: '700' },

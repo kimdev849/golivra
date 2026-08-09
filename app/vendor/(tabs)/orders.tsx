@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Search, Clock, MapPin } from 'lucide-react-native';
+import { Clock, MapPin } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -77,7 +77,7 @@ export default function VendorOrdersTabScreen() {
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const { orders, refreshOrders, shop, loading } = useVendor();
-  const { palette, labels } = useVendorTheme();
+  const { labels } = useVendorTheme();
   const horaires = useVendorHoraires(shop?.id);
   const [filter, setFilter] = useState<FilterKey>('all');
   const [token, setToken] = useState<string | null>(null);
@@ -113,14 +113,7 @@ export default function VendorOrdersTabScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <VendorTabHeader
-        title="COMMANDES"
-        right={
-          <Pressable hitSlop={10} onPress={() => {}}>
-            <Search size={22} color={palette.primaryDeep} strokeWidth={LUCIDE_STROKE} />
-          </Pressable>
-        }
-      />
+      <VendorTabHeader title="COMMANDES" />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scroll, { paddingBottom: bottom }]}>

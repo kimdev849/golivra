@@ -75,17 +75,15 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "e05e349a-fb96-4adb-ae4c-e8be602b1537"
+        "projectId": "4946c226-c558-46ff-84a6-6cf58a83bf8d"
       }
+    },
+    "owner": "devkim242s-team",
+    "updates": {
+      "url": "https://u.expo.dev/4946c226-c558-46ff-84a6-6cf58a83bf8d"
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/e05e349a-fb96-4adb-ae4c-e8be602b1537",
-      "enabled": true,
-      "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 10000
     }
   }
 }

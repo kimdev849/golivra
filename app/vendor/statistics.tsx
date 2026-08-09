@@ -298,7 +298,6 @@ export default function VendorStatisticsScreen() {
                 : 'Aucune commande sur cette période'}
             </ThemedText>
           </View>
-          <View style={styles.heroGlow} />
         </LinearGradient>
 
         {/* KPIs */}
@@ -539,15 +538,6 @@ const styles = StyleSheet.create({
   heroValue: { fontSize: 34, fontWeight: '900', color: '#FFFFFF', marginBottom: 10 },
   heroFooter: { flexDirection: 'row' },
   heroTrend: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.85)' },
-  heroGlow: {
-    position: 'absolute',
-    right: -40,
-    top: -40,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
 
   // KPIs
   kpiRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },

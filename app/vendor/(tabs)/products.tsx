@@ -1,8 +1,16 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Plus, AlertCircle, Package } from 'lucide-react-native';
-import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import {
+  AlertCircle,
+  Package,
+  Plus,
+  Search,
+  Star,
+  UtensilsCrossed,
+  X,
+} from 'lucide-react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { VendorTabHeader } from '@/components/vendor-tab-header';
@@ -17,16 +25,70 @@ import { useAppColors } from '@/hooks/use-app-colors';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
 import { getSessionToken } from '@/lib/auth';
 import { formatFcfa } from '@/lib/format';
-import { vendorStockLabel } from '@/lib/product-stock';
 import { resolveRemoteImageUrl } from '@/lib/images';
 import { deleteVendorProduct, updateVendorProduct } from '@/lib/vendor-api';
 import { hrefVendorStock, VENDOR_HREF } from '@/lib/vendor-nav';
-import { Skeleton, CardSkeleton } from '@/components/ui/skeleton';
+import { CardSkeleton } from '@/components/ui/skeleton';
+import type { VendorProduct } from '@/lib/vendor-types';
+import type { AppPalette } from '@/constants/app-palette';
 
 function triggerHaptic() {
   if (process.env.EXPO_OS === 'ios') {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }
+}
+
+/** Statut de stock / disponibilité affiché sous le prix, coloré selon l'état. */
+function stockStatus(p: VendorProduct, commerceType: 'restaurant' | 'boutique', colors: AppPalette) {
+  if (commerceType === 'restaurant') {
+    return p.enLigne
+      ? { label: 'En carte', color: colors.success, dot: true }
+      : { label: 'Indisponible', color: colors.textMuted, dot: false };
+  }
+  const stock = p.stock ?? 0;
+  if (!p.stockIllimite && stock <= 0) {
+    return { label: 'Rupture de stock', color: colors.error, dot: false };
+  }
+  if (!p.stockIllimite && stock <= 5) {
+    return { label: `Stock faible · ${stock}`, color: colors.warning, dot: false };
+  }
+  if (p.stockIllimite) return { label: 'Stock illimité', color: colors.textMuted, dot: false };
+  return { label: `${stock} en stock`, color: colors.textMuted, dot: false };
+}
+
+function promoPercent(p: VendorProduct): number | null {
+  const base = Number(p.prix);
+  const promo = Number(p.prixPromo);
+  if (!base || !promo || promo <= 0 || promo >= base) return null;
+  return Math.round(((base - promo) / base) * 100);
+}
+
+/**
+ * Clé de comparaison d'une URL d'image : sans les paramètres de resize
+ * (?width=…&format=webp…) qui diffèrent selon la provenance, mais avec le
+ * chemin complet. Permet de détecter que deux URLs pointent vers le même
+ * fichier alors qu'elles diffèrent d'un paramètre.
+ */
+function imageStorageKey(url: string | null | undefined): string | null {
+  const resolved = resolveRemoteImageUrl(url);
+  if (!resolved) return null;
+  const q = resolved.indexOf('?');
+  return q >= 0 ? resolved.slice(0, q) : resolved;
+}
+
+/**
+ * Vrai si l'URL pointe vers le logo de la boutique (même fichier que
+ * l'avatar, ou fichier stocké dans le dossier des logos des entreprises).
+ * Évite d'afficher le logo de la boutique comme photo d'un produit.
+ */
+function isShopLogoImage(url: string | null | undefined, avatarUrl: string | null | undefined): boolean {
+  const key = imageStorageKey(url);
+  if (!key) return false;
+  const avatarKey = imageStorageKey(avatarUrl);
+  if (avatarKey && key === avatarKey) return true;
+  // Les logos uploadés depuis l'app vont dans le dossier « enterprises/ » :
+  // une image de produit qui pointe là-dedans est un logo, pas une photo.
+  return /\/enterprises\//.test(key);
 }
 
 export default function VendorProductsTabScreen() {
@@ -37,15 +99,20 @@ export default function VendorProductsTabScreen() {
   const { shop, products, setProducts, refresh, loading } = useVendor();
   const { palette, labels, commerceType } = useVendorTheme();
   const [tab, setTab] = useState<'all' | 'on' | 'off'>('all');
+  const [query, setQuery] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const tabBarHeight = Math.max(insets.bottom, 10) + VENDOR_TAB_BAR_PADDING_BOTTOM;
-  const fabClearance = tabBarHeight + 20;
 
+  const itemLabel = commerceType === 'restaurant' ? 'plat' : 'produit';
+
+  // Recherche locale par nom, puis filtre en ligne / hors ligne.
   const filtered = useMemo(() => {
-    if (tab === 'on') return products.filter((p) => p.enLigne);
-    if (tab === 'off') return products.filter((p) => !p.enLigne);
-    return products;
-  }, [products, tab]);
+    const q = query.trim().toLowerCase();
+    const base = q ? products.filter((p) => p.nom.toLowerCase().includes(q)) : products;
+    if (tab === 'on') return base.filter((p) => p.enLigne);
+    if (tab === 'off') return base.filter((p) => !p.enLigne);
+    return base;
+  }, [products, tab, query]);
 
   const allCount = products.length;
   const onCount = products.filter((p) => p.enLigne).length;
@@ -56,9 +123,9 @@ export default function VendorProductsTabScreen() {
     return { ...def, label: `${def.label} (${n})` };
   });
 
-  const lowStockProducts = useMemo(() => 
-    products.filter(p => !p.stockIllimite && p.stock <= 5 && p.enLigne),
-    [products]
+  const lowStockProducts = useMemo(
+    () => products.filter((p) => !p.stockIllimite && p.stock <= 5 && p.enLigne),
+    [products],
   );
 
   const toggle = async (id: string, value: boolean) => {
@@ -96,7 +163,7 @@ export default function VendorProductsTabScreen() {
           if (!token) throw new Error('Session expirée');
           await deleteVendorProduct(token, shop.id, id);
           void refresh();
-          showSuccess('Produit supprimé', `« ${nom} » a été retiré du catalogue.`);
+          showSuccess('Supprimé', `« ${nom} » a été retiré du catalogue.`);
         } catch (e) {
           setProducts(prev);
           showError('Erreur', e instanceof Error ? e.message : 'Suppression impossible.');
@@ -107,48 +174,91 @@ export default function VendorProductsTabScreen() {
     });
   };
 
+  const empty = !loading && filtered.length === 0;
+
   return (
     <ThemedView style={styles.screen}>
       <FeedbackOverlay />
       <VendorTabHeader
         title={labels.productsHeader}
+        subtitle={`${products.length} ${itemLabel}${products.length > 1 ? 's' : ''} · ${onCount} en ${commerceType === 'restaurant' ? 'carte' : 'ligne'}`}
         right={
           <Pressable
             onPress={() => router.push(VENDOR_HREF.addProduct)}
             style={({ pressed }) => [
               styles.headerAddBtn,
-              { backgroundColor: palette.primary, opacity: pressed ? 0.8 : 1 }
-            ]}>
+              { backgroundColor: palette.primary, opacity: pressed ? 0.8 : 1 },
+            ]}
+            hitSlop={6}>
             <Plus size={22} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
           </Pressable>
         }
       />
+
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scroll, { paddingBottom: fabClearance }]}>
-        
-        {/* Stock Alerts Section */}
-        {lowStockProducts.length > 0 && tab === 'all' && (
-          <View style={[styles.alertCard, { backgroundColor: colors.warningSoft, borderColor: colors.warning }]}>
-            <AlertCircle size={18} color={colors.warning} />
-            <ThemedText style={[styles.alertText, { color: colors.warning }]}>
-              {lowStockProducts.length} article(s) en stock faible ou épuisé.
+        contentContainerStyle={[styles.scroll, { paddingBottom: tabBarHeight }]}>
+        {/* Recherche */}
+        <View style={[styles.search, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
+          <Search size={17} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          <TextInput
+            style={[styles.searchIn, { color: colors.text }]}
+            placeholder={`Rechercher un ${itemLabel}…`}
+            placeholderTextColor={colors.placeholder}
+            value={query}
+            onChangeText={setQuery}
+            returnKeyType="search"
+            autoCorrect={false}
+          />
+          {query.length > 0 ? (
+            <Pressable onPress={() => setQuery('')} hitSlop={8}>
+              <X size={16} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+            </Pressable>
+          ) : null}
+        </View>
+
+        {/* Alerte stock faible */}
+        {lowStockProducts.length > 0 && tab === 'all' && !query ? (
+          <View
+            style={[styles.alertCard, { backgroundColor: colors.warningSoft, borderColor: colors.warning }]}>
+            <AlertCircle size={18} color={colors.warning} strokeWidth={LUCIDE_STROKE} />
+            <ThemedText style={[styles.alertText, { color: colors.warning }]} numberOfLines={1}>
+              {lowStockProducts.length} {itemLabel}
+              {lowStockProducts.length > 1 ? 's' : ''} en stock faible ou épuisé.
             </ThemedText>
-            <Pressable onPress={() => setTab('off')}>
+            <Pressable
+              onPress={() => setTab('off')}
+              hitSlop={8}
+              style={({ pressed }) => pressed && styles.pressed}>
               <ThemedText style={[styles.alertAction, { color: colors.warning }]}>Voir</ThemedText>
             </Pressable>
           </View>
-        )}
+        ) : null}
 
+        {/* Filtres */}
         <View style={styles.pillRow}>
           {pillDefs.map((p) => {
             const on = tab === p.key;
             return (
               <Pressable
                 key={p.key}
-                style={[styles.pill, on ? { backgroundColor: colors.primary } : { backgroundColor: colors.surfaceMuted }]}
-                onPress={() => setTab(p.key)}>
-                <ThemedText style={[styles.pillText, on ? { color: colors.onPrimary } : { color: colors.textSecondary }]}>{p.label}</ThemedText>
+                style={[
+                  styles.pill,
+                  on
+                    ? { backgroundColor: palette.primary, borderColor: palette.primary }
+                    : { backgroundColor: colors.surface, borderColor: colors.border },
+                ]}
+                onPress={() => {
+                  void Haptics.selectionAsync();
+                  setTab(p.key);
+                }}>
+                <ThemedText
+                  style={[
+                    styles.pillText,
+                    { color: on ? colors.onPrimary : colors.textSecondary },
+                  ]}>
+                  {p.label}
+                </ThemedText>
               </Pressable>
             );
           })}
@@ -156,63 +266,157 @@ export default function VendorProductsTabScreen() {
 
         {loading ? (
           <View style={{ gap: 10 }}>
-            {[1, 2, 3, 4, 5].map(i => <CardSkeleton key={i} />)}
+            {[1, 2, 3, 4].map((i) => (
+              <CardSkeleton key={i} />
+            ))}
           </View>
-        ) : filtered.length === 0 ? (
+        ) : empty ? (
           <View style={[styles.emptyBox, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
-            <ThemedText style={[styles.emptyText, { color: colors.textSecondary }]}>Aucun produit</ThemedText>
-            <ThemedText style={[styles.emptyHint, { color: colors.textMuted }]}>
-              Ajoutez votre premier {commerceType === 'restaurant' ? 'plat' : 'produit'} pour commencer.
+            <View style={[styles.emptyIcon, { backgroundColor: colors.surface }]}>
+              {commerceType === 'restaurant' ? (
+                <UtensilsCrossed size={26} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+              ) : (
+                <Package size={26} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+              )}
+            </View>
+            <ThemedText style={[styles.emptyTitle, { color: colors.text }]}>
+              {query.trim()
+                ? 'Aucun résultat'
+                : commerceType === 'restaurant'
+                  ? 'Votre menu est vide'
+                  : 'Aucun produit'}
             </ThemedText>
+            <ThemedText style={[styles.emptyHint, { color: colors.textMuted }]}>
+              {query.trim()
+                ? 'Essayez un autre mot-clé.'
+                : `Ajoutez votre premier ${itemLabel} pour le proposer aux clients.`}
+            </ThemedText>
+            {!query.trim() ? (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.emptyCta,
+                  { backgroundColor: palette.primary },
+                  pressed && styles.pressed,
+                ]}
+                onPress={() => router.push(VENDOR_HREF.addProduct)}>
+                <Plus size={18} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
+                <ThemedText style={[styles.emptyCtaTxt, { color: colors.onPrimary }]}>
+                  {labels.addProductFab}
+                </ThemedText>
+              </Pressable>
+            ) : null}
           </View>
         ) : (
           <View style={{ gap: 10 }}>
             {filtered.map((p) => {
-              const img = resolveRemoteImageUrl(p.imageUrl);
-              const isLowStock = !p.stockIllimite && p.stock <= 5;
+              // Photo principale : imageUrl, sinon la 1re photo de la galerie.
+              // On refuse d'afficher le logo de la boutique (fichier identique
+              // à l'avatar ou stocké dans le dossier « enterprises/ ») :
+              // beaucoup de produits ont le logo stocké par erreur comme image.
+              const mainUrl = resolveRemoteImageUrl(p.imageUrl);
+              const mainIsLogo = isShopLogoImage(mainUrl, shop?.avatar);
+              const galleryFallback =
+                p.imagesUrls?.find((u) => !isShopLogoImage(u, shop?.avatar)) ?? null;
+              const img = mainUrl && !mainIsLogo ? mainUrl : resolveRemoteImageUrl(galleryFallback);
+              const status = stockStatus(p, commerceType, colors);
+              const pct = promoPercent(p);
+              const showOldPrice = pct != null;
               return (
                 <Pressable
                   key={p.id}
-                  style={[styles.row, { backgroundColor: colors.surface, borderColor: isLowStock ? colors.warning : colors.border }]}
+                  style={({ pressed }) => [
+                    styles.row,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    pressed && styles.pressed,
+                  ]}
                   onPress={() => router.push(hrefVendorStock(p.id))}
                   onLongPress={() => confirmDelete(p.id, p.nom)}
                   delayLongPress={450}
                   android_ripple={{ color: colors.primarySoft }}>
-                  {img ? (
-                    <ZoomableImage source={{ uri: img }} style={styles.thumb} contentFit="cover" />
-                  ) : (
-                    <View style={[styles.thumb, { backgroundColor: colors.surfaceMuted }]}>
-                       <Package size={20} color={colors.textMuted} />
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <ThemedText type="defaultSemiBold" style={[styles.name, { color: colors.text }]}>
-                      {p.nom}
-                    </ThemedText>
-                    <View style={styles.metaRow}>
-                      <ThemedText style={[styles.meta, { color: colors.textMuted }]}>
-                        {formatFcfa(p.prix)} · {commerceType === 'restaurant' ? 'Dispo.' : 'Stock'}:{' '}
-                        <ThemedText style={{ color: isLowStock ? colors.warning : colors.textMuted, fontWeight: isLowStock ? '800' : '400' }}>
-                          {commerceType === 'restaurant' ? (p.enLigne ? 'Oui' : 'Non') : vendorStockLabel(p, { enterpriseType: 'boutique' })}
+                  {/* Vignette */}
+                  <View style={[styles.thumbWrap, { backgroundColor: colors.surfaceMuted }]}>
+                    {img ? (
+                      <ZoomableImage source={{ uri: img }} style={styles.thumb} contentFit="cover" />
+                    ) : commerceType === 'restaurant' ? (
+                      <UtensilsCrossed size={22} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+                    ) : (
+                      <Package size={22} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+                    )}
+                    {pct != null ? (
+                      <View style={[styles.promoBadge, { backgroundColor: colors.error }]}>
+                        <ThemedText style={styles.promoBadgeTxt}>-{pct}%</ThemedText>
+                      </View>
+                    ) : null}
+                  </View>
+
+                  {/* Corps */}
+                  <View style={styles.body}>
+                    <View style={styles.topRow}>
+                      <View style={styles.nameWrap}>
+                        <ThemedText
+                          type="defaultSemiBold"
+                          style={[styles.name, { color: colors.text }]}
+                          numberOfLines={1}>
+                          {p.nom}
                         </ThemedText>
+                        {p.enVedette ? (
+                          <View style={styles.vedetteRow}>
+                            <Star size={11} color="#F5A524" fill="#F5A524" strokeWidth={0} />
+                            <ThemedText style={[styles.vedetteTxt, { color: colors.textMuted }]}>
+                              En vedette
+                            </ThemedText>
+                          </View>
+                        ) : null}
+                      </View>
+                      {busyId === p.id ? (
+                        <View style={styles.switchSlot}>
+                          <View style={[styles.switchBusy, { backgroundColor: colors.surfaceMuted }]} />
+                        </View>
+                      ) : (
+                        <Switch
+                          value={p.enLigne}
+                          onValueChange={(v) => void toggle(p.id, v)}
+                          trackColor={{ false: colors.borderStrong, true: colors.success }}
+                          thumbColor={p.enLigne ? colors.surface : colors.textMuted}
+                          accessibilityLabel={p.enLigne ? `Masquer ${p.nom}` : `Publier ${p.nom}`}
+                        />
+                      )}
+                    </View>
+
+                    <View style={styles.priceRow}>
+                      <ThemedText style={[styles.price, { color: colors.primary }]}>
+                        {showOldPrice ? formatFcfa(p.prixPromo as number) : formatFcfa(p.prix)}
+                      </ThemedText>
+                      {showOldPrice ? (
+                        <ThemedText style={[styles.oldPrice, { color: colors.textMuted }]}>
+                          {formatFcfa(p.prix)}
+                        </ThemedText>
+                      ) : null}
+                    </View>
+
+                    <View style={styles.statusRow}>
+                      <View
+                        style={[
+                          styles.statusDot,
+                          { backgroundColor: status.color, opacity: status.dot ? 1 : 0.35 },
+                        ]}
+                      />
+                      <ThemedText style={[styles.statusTxt, { color: status.color }]} numberOfLines={1}>
+                        {status.label}
                       </ThemedText>
                     </View>
                   </View>
-                  {busyId === p.id ? (
-                    <Skeleton width={40} height={24} borderRadius={12} />
-                  ) : (
-                    <Switch
-                      value={p.enLigne}
-                      onValueChange={(v) => void toggle(p.id, v)}
-                      trackColor={{ false: colors.borderStrong, true: colors.success }}
-                      thumbColor={p.enLigne ? colors.surface : colors.textMuted}
-                    />
-                  )}
                 </Pressable>
               );
             })}
           </View>
         )}
+
+        {!loading && filtered.length > 0 ? (
+          <ThemedText style={[styles.footerHint, { color: colors.textMuted }]}>
+            Appui long sur un {itemLabel} pour le supprimer.
+          </ThemedText>
+        ) : null}
       </ScrollView>
     </ThemedView>
   );
@@ -221,51 +425,136 @@ export default function VendorProductsTabScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   headerAddBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  scroll: { paddingHorizontal: 18, paddingTop: 4 },
-  alertCard: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    padding: 12, 
-    borderRadius: 12, 
-    borderWidth: 1, 
-    marginBottom: 16,
-    gap: 10
+  scroll: { paddingHorizontal: 18, paddingTop: 10 },
+
+  // Recherche
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  searchIn: { flex: 1, fontSize: 15, paddingVertical: 0 },
+
+  // Alerte stock
+  alertCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 14,
   },
   alertText: { flex: 1, fontSize: 13, fontWeight: '600' },
   alertAction: { fontSize: 13, fontWeight: '800', textDecorationLine: 'underline' },
+
+  // Filtres
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  pill: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: 999 },
-  pillText: { fontSize: 12, fontWeight: '800' },
-  emptyBox: {
-    padding: 32,
+  pill: {
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    minHeight: 34,
+    justifyContent: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  pillText: { fontSize: 13, fontWeight: '800' },
+
+  // Carte produit
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 10,
     borderRadius: 14,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 1,
+  },
+  thumbWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  thumb: { width: '100%', height: '100%' },
+  promoBadge: {
+    position: 'absolute',
+    top: 5,
+    left: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 5,
+  },
+  promoBadgeTxt: { color: '#FFFFFF', fontSize: 9, fontWeight: '800' },
+  body: { flex: 1, gap: 5 },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  nameWrap: { flex: 1 },
+  name: { fontSize: 14, fontWeight: '700' },
+  vedetteRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  vedetteTxt: { fontSize: 10.5, fontWeight: '700' },
+  switchSlot: { minWidth: 46, alignItems: 'flex-end' },
+  switchBusy: { width: 42, height: 23, borderRadius: 11.5 },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  price: { fontSize: 14, fontWeight: '800', letterSpacing: -0.2 },
+  oldPrice: { fontSize: 11, textDecorationLine: 'line-through' },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusTxt: { fontSize: 11.5, fontWeight: '700' },
+
+  // États vides
+  emptyBox: {
+    paddingVertical: 40,
+    paddingHorizontal: 24,
+    borderRadius: 18,
     borderWidth: 1,
     alignItems: 'center',
     gap: 6,
   },
-  emptyText: { fontSize: 15, fontWeight: '700' },
-  emptyHint: { fontSize: 13, textAlign: 'center' },
-  row: {
-    flexDirection: 'row',
+  emptyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: 'center',
-    gap: 12,
-    padding: 12,
-    borderRadius: 16,
-    borderWidth: 1,
+    justifyContent: 'center',
+    marginBottom: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
     elevation: 1,
   },
-  thumb: { width: 56, height: 56, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  name: { fontSize: 15, fontWeight: '700' },
-  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  meta: { fontSize: 13 },
+  emptyTitle: { fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  emptyHint: { fontSize: 13, textAlign: 'center', lineHeight: 18, marginBottom: 6 },
+  emptyCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginTop: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 999,
+  },
+  emptyCtaTxt: { fontSize: 14, fontWeight: '800' },
+
+  footerHint: { fontSize: 11.5, textAlign: 'center', marginTop: 16, opacity: 0.75 },
+  pressed: { opacity: 0.9, transform: [{ scale: 0.99 }] },
 });

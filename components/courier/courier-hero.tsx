@@ -26,7 +26,6 @@ export function CourierHero({ nom, subtitle, imageUrl, disponible, vehicule }: P
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.wrap}>
-      <View style={styles.glow} />
       <View style={styles.row}>
         <View style={styles.avatarRing}>
           {avatar ? (
@@ -71,15 +70,6 @@ const styles = StyleSheet.create({
     padding: 18,
     overflow: 'hidden',
     marginBottom: 4,
-  },
-  glow: {
-    position: 'absolute',
-    right: -40,
-    top: -30,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   avatarRing: {

@@ -7,11 +7,12 @@ import { useVendorTheme } from '@/hooks/use-vendor-theme';
 
 type Props = {
   title: string;
+  subtitle?: string;
   right?: React.ReactNode;
 };
 
 /** En-tête pour les onglets vendeur (sans flèche retour). */
-export function VendorTabHeader({ title, right }: Props) {
+export function VendorTabHeader({ title, subtitle, right }: Props) {
   const insets = useSafeAreaInsets();
   const { palette } = useVendorTheme();
   const colors = useAppColors();
@@ -26,9 +27,16 @@ export function VendorTabHeader({ title, right }: Props) {
           backgroundColor: colors.surface,
         },
       ]}>
-      <ThemedText type="defaultSemiBold" style={[styles.title, { color: palette.primaryDeep }]} numberOfLines={2}>
-        {title}
-      </ThemedText>
+      <View style={styles.titleWrap}>
+        <ThemedText type="defaultSemiBold" style={[styles.title, { color: palette.primaryDeep }]} numberOfLines={1}>
+          {title}
+        </ThemedText>
+        {subtitle ? (
+          <ThemedText style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={1}>
+            {subtitle}
+          </ThemedText>
+        ) : null}
+      </View>
       <View style={styles.right}>{right}</View>
     </View>
   );
@@ -43,11 +51,16 @@ const styles = StyleSheet.create({
     gap: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  titleWrap: { flex: 1, justifyContent: 'center' },
   title: {
-    flex: 1,
     fontSize: 22,
     fontWeight: '800',
     letterSpacing: -0.3,
+  },
+  subtitle: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    marginTop: 2,
   },
   right: { minWidth: 44, alignItems: 'flex-end' },
 });
