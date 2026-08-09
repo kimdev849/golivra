@@ -304,15 +304,27 @@ export function setupNotificationListeners(
 export async function handleInitialNotification(): Promise<void> {
   if (Platform.OS === 'web') return;
 
-  const Notifications = await loadExpoNotifications();
-  if (!Notifications) return;
-
   try {
+    // 🛑 Garde 1 : hors connexion (1er lancement, jamais connecté), on ne
+    // redirige JAMAIS automatiquement. L'utilisateur doit rester sur
+    // l'accueil / la connexion — pas sur /notifications.
+    const { getSessionToken } = await import('@/lib/auth');
+    const sessionToken = await getSessionToken();
+    if (!sessionToken) return;
+
+    const Notifications = await loadExpoNotifications();
+    if (!Notifications) return;
+
     const response = await Notifications.getLastNotificationResponseAsync();
     if (!response) return;
 
     // Identifiant stable de la notification : l'identifiant de requête côté Expo.
     const notifId = response.notification.request.identifier;
+
+    // 🛑 Garde 2 : sans identifiant stable, impossible de dédupliquer — on ne
+    // navigue jamais automatiquement (sinon boucle /notifications à chaque
+    // lancement, le garde en dessous ne pouvant rien mémoriser).
+    if (!notifId) return;
 
     // ⚠️ getLastNotificationResponseAsync() renvoie la DERNIÈRE notification
     // tapée, même si elle l'a été lors d'un lancement précédent (l'OS ne la
