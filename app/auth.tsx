@@ -13,7 +13,7 @@ import {
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { ArrowRight, Eye, EyeOff, Lock, Moon, Smartphone, Sun, UserPlus } from 'lucide-react-native';
+import { ArrowRight, Eye, EyeOff, FlaskConical, Lock, Moon, Smartphone, Sun, UserPlus } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 
@@ -337,6 +337,14 @@ export default function AuthScreen() {
               </Link>
             </View>
           </View>
+
+          {/* ── Mention version bêta ── */}
+          <View style={styles.betaBadge}>
+            <FlaskConical size={13} color={colors.primary} strokeWidth={2.4} />
+            <ThemedText style={[styles.betaText, { color: colors.textMuted }]}>
+              GoLivra · Version bêta
+            </ThemedText>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </ThemedView>
@@ -363,6 +371,19 @@ function makeAuthStyles(c: AppPalette) {
     },
     scrollContentAndroid: {
       paddingBottom: 140,
+    },
+    betaBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      marginTop: 18,
+      opacity: 0.85,
+    },
+    betaText: {
+      fontSize: 12.5,
+      fontWeight: '600',
+      letterSpacing: 0.2,
     },
     themeToggle: {
       position: 'absolute',
