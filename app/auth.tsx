@@ -1,6 +1,7 @@
 import { Link, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -50,6 +51,21 @@ export default function AuthScreen() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [keyboardInset, setKeyboardInset] = useState(0);
+
+  // Android (edge-to-edge) : le clavier peut recouvrir les champs bas du
+  // formulaire — on ajoute un padding bas = hauteur du clavier pour que le
+  // champ saisi reste visible et scrollable.
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (e) =>
+      setKeyboardInset(e.endCoordinates.height),
+    );
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardInset(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   const passwordRef = useRef<TextInput>(null);
   const phoneE164 = toE164(loginPhone);
@@ -164,6 +180,7 @@ export default function AuthScreen() {
             styles.scrollContent,
             { paddingTop: 24 + tallScreenPad },
             Platform.OS === 'android' ? styles.scrollContentAndroid : undefined,
+            keyboardInset > 0 ? { paddingBottom: keyboardInset + 48 } : undefined,
           ]}
           keyboardShouldPersistTaps="always"
           keyboardDismissMode="on-drag"

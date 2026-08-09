@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { FlaskConical } from 'lucide-react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
@@ -136,6 +137,11 @@ export default function LandingScreen() {
           ]}>
           <ThemedText style={styles.ctaText}>Connexion</ThemedText>
         </Pressable>
+
+        <View style={styles.betaBadge}>
+          <FlaskConical size={13} color="rgba(255,255,255,0.92)" strokeWidth={2.4} />
+          <ThemedText style={styles.betaText}>GoLivra · Version bêta</ThemedText>
+        </View>
       </Animated.View>
     </View>
   );
@@ -190,5 +196,21 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     letterSpacing: 0.3,
+  },
+  betaBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    opacity: 0.9,
+  },
+  betaText: {
+    color: '#FFFFFF',
+    fontSize: 12.5,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
 });
