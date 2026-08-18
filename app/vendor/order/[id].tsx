@@ -297,7 +297,7 @@ export default function VendorOrderDetailScreen() {
               gap: 4,
             }}>
             <ThemedText style={{ color: colors.warning, fontWeight: '800', fontSize: 14 }}>
-              ⏳ En attente de paiement du client
+              En attente de paiement du client
             </ThemedText>
             <ThemedText style={{ color: colors.textMuted, fontSize: 13, lineHeight: 18 }}>
               La commande est acceptée. La préparation démarrera dès la confirmation du paiement

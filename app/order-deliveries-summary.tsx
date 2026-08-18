@@ -113,7 +113,7 @@ export default function OrderDeliveriesSummaryScreen() {
                   {row.enterpriseNom}
                 </ThemedText>
                 <ThemedText style={[styles.eta, { color: colors.textMuted }]}>
-                  🛵 Livraison prévue dans environ {formatHumanMinutes(row.minutesEstimate)}
+                  Livraison prévue dans environ {formatHumanMinutes(row.minutesEstimate)}
                 </ThemedText>
               </View>
             </View>

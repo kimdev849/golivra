@@ -226,7 +226,7 @@ export default function VendorOrdersTabScreen() {
                   {o.statut === 'a_preparer' && o.paiement_statut !== 'valide' ? (
                     <View style={[styles.deliveryBadge, { backgroundColor: colors.warningSoft }]}>
                       <ThemedText style={[styles.deliveryHint, { color: colors.warning }]} numberOfLines={2}>
-                        ⏳ En attente de paiement du client — la préparation démarrera après confirmation.
+                        En attente de paiement du client — la préparation démarrera après confirmation.
                       </ThemedText>
                     </View>
                   ) : null}

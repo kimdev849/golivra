@@ -614,7 +614,6 @@ export default function CartScreen() {
                       </View>
                     ) : (
                       <ThemedText style={[styles.segEta, { color: colors.textSecondary }]}>
-                        🛵{' '}
                         {eta.deliveryMinutes != null
                           ? `Estimation livraison : environ ${formatHumanMinutes(eta.totalMinutes)}`
                           : `Estimation : préparation en environ ${eta.prepMinutes} min`}

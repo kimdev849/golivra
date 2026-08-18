@@ -423,7 +423,7 @@ export default function OrderTrackingScreen() {
       : acceptRemaining > 180
         ? `Nous attendons la confirmation ${commerceDe}.`
         : acceptRemaining > 60
-          ? `${commerceWho} vérifie encore votre commande. Merci de patienter 😊`
+          ? `${commerceWho} vérifie encore votre commande. Merci de patienter`
           : acceptRemaining > 0
             ? `Plus qu'une minute ! Nous attendons encore la réponse ${commerceDe}.`
             : null;
@@ -533,7 +533,7 @@ export default function OrderTrackingScreen() {
                     {courierDistanceLabel ? (
                       <View style={styles.heroDistancePill}>
                         <ThemedText style={styles.heroDistancePillText}>
-                          {courierProche ? 'Proche 🛵' : `à ~${courierDistanceLabel}`}
+                          {courierProche ? 'Proche' : `à ~${courierDistanceLabel}`}
                         </ThemedText>
                       </View>
                     ) : null}

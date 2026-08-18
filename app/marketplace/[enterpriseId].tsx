@@ -402,13 +402,13 @@ export default function EnterpriseDetailScreen() {
                 {etaDetailOpen ? (
                   <View style={styles.etaDetail}>
                     <View style={styles.infoRow}>
-                      <ThemedText style={styles.etaEmoji}>🍳</ThemedText>
+                      <UtensilsCrossed size={14} color={colors.textMuted} strokeWidth={2} />
                       <ThemedText style={styles.etaText}>
                         Préparation : environ {prepMin} min
                       </ThemedText>
                     </View>
                     <View style={styles.infoRow}>
-                      <ThemedText style={styles.etaEmoji}>🛵</ThemedText>
+                      <Truck size={14} color={colors.textMuted} strokeWidth={2} />
                       <ThemedText style={styles.etaText}>
                         Livraison : environ {deliveryMin} min
                       </ThemedText>

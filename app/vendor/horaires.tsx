@@ -292,7 +292,7 @@ export default function VendorHorairesScreen() {
         {!hasSavedHours && !loading ? (
           <View style={[styles.warnBanner, { backgroundColor: colors.warningSoft, borderColor: colors.warning }]}>
             <ThemedText style={[styles.warnText, { color: colors.warning }]}>
-              ⚠️ Horaires non définis : vous ne recevez aucune commande pour le moment.
+              Horaires non définis : vous ne recevez aucune commande pour le moment.
             </ThemedText>
           </View>
         ) : null}

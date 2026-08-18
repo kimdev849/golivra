@@ -220,7 +220,7 @@ export default function AuthScreen() {
               />
             </Animated.View>
             <ThemedText type="title" style={styles.title}>
-              Bon retour 👋
+              Bon retour
             </ThemedText>
             <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>
               Vos favoris, vos commandes,

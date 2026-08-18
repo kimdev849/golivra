@@ -305,7 +305,7 @@ export default function VendorDeliveryDetailScreen() {
                     </ThemedText>
                     {isProche ? (
                       <ThemedText style={[styles.liveBoxSub, { color: palette.primary }]}>
-                        Livraison imminente 👋
+                        Livraison imminente
                       </ThemedText>
                     ) : etaFromDistance != null ? (
                       <ThemedText style={[styles.liveBoxSub, { color: palette.primary }]}>
@@ -416,12 +416,12 @@ export default function VendorDeliveryDetailScreen() {
               />
               {liv.proof.gpsLat != null && liv.proof.gpsLng != null ? (
                 <ThemedText style={[styles.proofMeta, { color: colors.textMuted }]}>
-                  📍 {liv.proof.gpsLat.toFixed(5)}, {liv.proof.gpsLng.toFixed(5)}
+                  {liv.proof.gpsLat.toFixed(5)}, {liv.proof.gpsLng.toFixed(5)}
                 </ThemedText>
               ) : null}
               {liv.proof.takenAt ? (
                 <ThemedText style={[styles.proofMeta, { color: colors.textMuted }]}>
-                  🕐 {formatDateFr(liv.proof.takenAt)}
+                  {formatDateFr(liv.proof.takenAt)}
                 </ThemedText>
               ) : null}
             </View>

@@ -46,10 +46,10 @@ function todayLabelFr(d = new Date()): string {
   return `${WEEKDAYS_FR[d.getDay()]} ${d.getDate()} ${MONTHS_FR[d.getMonth()]}`;
 }
 
-/** Salutation selon l'heure : « Bonjour 👋 » le jour, « Bonsoir 👋 » le soir. */
+/** Salutation selon l'heure : « Bonjour » le jour, « Bonsoir » le soir. */
 function greetingFr(d = new Date()): string {
   const h = d.getHours();
-  return h >= 5 && h < 18 ? 'Bonjour 👋' : 'Bonsoir 👋';
+  return h >= 5 && h < 18 ? 'Bonjour' : 'Bonsoir';
 }
 
 function isSameDay(iso: string | null | undefined, now = new Date()): boolean {

@@ -293,12 +293,9 @@ export default function DeliveryDetailScreen() {
   // livreur pas encore évalué.
   const courierNb = livreur?.nb_livraisons_reussies || 0;
   const courierHasRating = livreur != null && livreur.note_moyenne != null && livreur.note_moyenne > 0;
-  const vehicleEmoji = String(livreur?.type_vehicule || '').toLowerCase().includes('moto')
-    ? '🏍️'
-    : String(livreur?.type_vehicule || '').toLowerCase().includes('voiture') ||
-        String(livreur?.type_vehicule || '').toLowerCase().includes('auto')
-      ? '🚗'
-      : '🛵';
+  const vehicleIcon = String(livreur?.type_vehicule || '').toLowerCase();
+  const isMoto = vehicleIcon.includes('moto') || vehicleIcon.includes('scooter');
+  const isVoiture = vehicleIcon.includes('voiture') || vehicleIcon.includes('auto');
 
   const isActive = liv.statut !== 'livree' && liv.statut !== 'annulee' && liv.statut !== 'echec';
 
@@ -400,7 +397,7 @@ export default function DeliveryDetailScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <ThemedText style={[styles.courierName, { color: colors.text }]}>
-                  {vehicleEmoji} {livreur.nom}
+                  {livreur.nom}
                 </ThemedText>
                 <ThemedText style={[styles.courierMeta, { color: colors.textMuted, marginTop: 2 }]}>
                   {[
@@ -443,7 +440,7 @@ export default function DeliveryDetailScreen() {
                   </ThemedText>
                   {isProche ? (
                     <ThemedText style={[styles.liveBoxSub, { color: colors.primary }]}>
-                      Préparez-vous, il arrive 👋
+                      Préparez-vous, il arrive bientôt
                     </ThemedText>
                   ) : etaFromDistance != null ? (
                     <ThemedText style={[styles.liveBoxSub, { color: colors.primary }]}>
@@ -647,7 +644,7 @@ export default function DeliveryDetailScreen() {
             entering={FadeInDown.delay(490).duration(320)}
             style={[styles.deliveredCard, { backgroundColor: colors.successSoft, borderColor: colors.success }]}>
             <ThemedText style={[styles.deliveredTitle, { color: colors.success }]}>
-              Votre commande est bien arrivée 😊
+              Votre commande est bien arrivée 🎉
             </ThemedText>
             <ThemedText style={[styles.deliveredSub, { color: colors.textMuted }]}>
               Livrée le {formatDateTimeFr(liv.livree_at || liv.created_at)}

@@ -1,19 +1,12 @@
-import Animated from 'react-native-reanimated';
+import { Hand } from 'lucide-react-native';
+import Animated, { FadeIn, RotateInDownLeft } from 'react-native-reanimated';
 
 export function HelloWave() {
   return (
-    <Animated.Text
-      style={{
-        fontSize: 28,
-        lineHeight: 32,
-        marginTop: -6,
-        animationName: {
-          '50%': { transform: [{ rotate: '25deg' }] },
-        },
-        animationIterationCount: 4,
-        animationDuration: '300ms',
-      }}>
-      👋
-    </Animated.Text>
+    <Animated.View
+      entering={RotateInDownLeft.duration(400)}
+      style={{ marginTop: -2 }}>
+      <Hand size={28} color="#0B6B45" />
+    </Animated.View>
   );
 }

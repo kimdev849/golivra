@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Smartphone, ShieldAlert, Wrench } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/contexts/app-theme-context';
 import {
@@ -105,9 +106,13 @@ export function AppStatusGate({ children }: { children: React.ReactNode }) {
       >
         <View style={styles.card}>
           <View style={[styles.iconCircle, { backgroundColor: colors.primary + '22' }]}>
-            <Text style={[styles.iconEmoji, { color: colors.primary }]}>
-              {reason === 'version' ? '📲' : reason === 'disabled' ? '⛔' : '🛠️'}
-            </Text>
+              {reason === 'version' ? (
+                <Smartphone size={40} color={colors.primary} />
+              ) : reason === 'disabled' ? (
+                <ShieldAlert size={40} color={colors.primary} />
+              ) : (
+                <Wrench size={40} color={colors.primary} />
+              )}
           </View>
           <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
           <Text style={[styles.message, { color: colors.textMuted }]}>{message}</Text>
