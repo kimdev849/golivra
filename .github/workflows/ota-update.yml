@@ -1,0 +1,45 @@
+name: OTA Update (Production)
+
+on:
+  push:
+    branches: [mobile-premium-v2]
+
+concurrency:
+  group: ota-production
+  cancel-in-progress: true
+
+jobs:
+  typecheck-and-test:
+    name: Typecheck + Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: golivra_mobile/package-lock.json
+      - run: npm ci
+        working-directory: golivra_mobile
+      - run: npx tsc --noEmit
+        working-directory: golivra_mobile
+      - run: npm test
+        working-directory: golivra_mobile
+
+  ota-update:
+    name: Push OTA Update
+    needs: typecheck-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: golivra_mobile/package-lock.json
+      - run: npm ci
+        working-directory: golivra_mobile
+      - run: npx eas update --channel production --message "OTA auto: ${{ github.event.head_commit.message }}"
+        working-directory: golivra_mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}

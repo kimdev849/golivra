@@ -18,7 +18,7 @@
     "build:ios": "eas build --profile production --platform ios",
     "update:dev": "eas update --branch development --message",
     "update:preview": "eas update --branch preview --message",
-    "update:prod": "eas update --branch production --message",
+    "update:prod": "eas update --channel production --message",
     "channel:dev": "eas channel:view development",
     "test": "jest"
   },
