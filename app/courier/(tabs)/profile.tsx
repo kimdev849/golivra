@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
-  Bell,
   Bike,
   CalendarDays,
   Check,
@@ -26,26 +26,29 @@ import { LUCIDE_STROKE } from '@/constants/icons';
 import { useCourier } from '@/contexts/courier-context';
 import { useCourierPalette } from '@/lib/courier-theme';
 import { resolveRemoteImageUrl } from '@/lib/images';
-import { useUnreadNotifications } from '@/hooks/use-unread-notifications';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useLogout } from '@/hooks/use-logout';
 
-// ─── Cellule stats (carte 3 colonnes) ─────────────────────────────
+// ─── Cellule stats ────────────────────────────────────────────────
 
 function StatCell({
   Icon,
   value,
   label,
   palette,
+  color,
 }: {
   Icon: LucideIcon;
   value: number | string;
   label: string;
   palette: ReturnType<typeof useCourierPalette>;
+  color: string;
 }) {
   return (
     <View style={styles.statCell}>
-      <Icon size={19} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
+      <View style={[styles.statIconWrap, { backgroundColor: color }]}>
+        <Icon size={15} color="#FFFFFF" strokeWidth={2.4} />
+      </View>
       <Text style={[styles.statValue, { color: palette.text }]}>{value}</Text>
       <Text style={[styles.statLabel, { color: palette.muted }]}>{label}</Text>
     </View>
@@ -57,12 +60,14 @@ function StatCell({
 function MenuRow({
   Icon,
   title,
+  subtitle,
   onPress,
   palette,
   danger,
 }: {
   Icon: LucideIcon;
   title: string;
+  subtitle?: string;
   onPress: () => void;
   palette: ReturnType<typeof useCourierPalette>;
   danger?: boolean;
@@ -87,15 +92,22 @@ function MenuRow({
           strokeWidth={LUCIDE_STROKE}
         />
       </View>
-      <Text
-        style={[
-          styles.menuTitle,
-          { color: danger ? palette.danger : palette.text },
-        ]}
-        numberOfLines={1}>
-        {title}
-      </Text>
-      <ChevronRight size={17} color={palette.muted} strokeWidth={LUCIDE_STROKE} />
+      <View style={{ flex: 1 }}>
+        <Text
+          style={[
+            styles.menuTitle,
+            { color: danger ? palette.danger : palette.text },
+          ]}
+          numberOfLines={1}>
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text style={[styles.menuSubtitle, { color: palette.muted }]} numberOfLines={1}>
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+      <ChevronRight size={16} color={palette.muted} strokeWidth={LUCIDE_STROKE} />
     </Pressable>
   );
 }
@@ -105,16 +117,16 @@ export default function CourierProfileScreen() {
   const insets = useSafeAreaInsets();
   const palette = useCourierPalette();
   const { profile, setDisponible } = useCourier();
-  const { unreadCount } = useUnreadNotifications();
+
   const { showConfirm, FeedbackOverlay } = useActionFeedback();
   const { performLogout } = useLogout({ clearCart: false });
   const [acting, setActing] = useState(false);
 
   const confirmLogout = () => {
     showConfirm({
-      title: 'Déconnexion',
-      message: 'Voulez-vous vraiment vous déconnecter ?',
-      primaryLabel: 'Se déconnecter',
+      title: 'Deconnexion',
+      message: 'Voulez-vous vraiment vous deconnecter ?',
+      primaryLabel: 'Se deconnecter',
       secondaryLabel: 'Annuler',
       danger: true,
       icon: LogOut,
@@ -144,82 +156,59 @@ export default function CourierProfileScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.content, { paddingTop: Math.max(insets.top, 12), paddingBottom: bottom }]}>
 
-        {/* ── En-tête : Bonjour + cloche + réglages ── */}
-        <View style={styles.header}>
-          <View style={styles.headerTextBlock}>
-            <Text style={[styles.greeting, { color: palette.muted }]}>Bonjour,</Text>
-            <View style={styles.nameRow}>
-              <Text style={[styles.displayName, { color: palette.text }]} numberOfLines={1}>
-                {u?.nom || 'Livreur'}
-              </Text>
-              <View style={[styles.verifiedBadge, { backgroundColor: palette.primary }]}>
-                <Check size={12} color="#FFFFFF" strokeWidth={3} />
-              </View>
+        {/* ── Hero header ── */}
+        <LinearGradient
+          colors={[palette.primary, palette.primaryDeep]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.hero}>
+          <View style={styles.heroRow}>
+            <View style={[styles.avatarWrap, { borderColor: 'rgba(255,255,255,0.3)' }]}>
+              {avatar ? (
+                <Image source={{ uri: avatar }} style={styles.avatarImg} contentFit="cover" />
+              ) : (
+                <User size={36} color="#FFFFFF" strokeWidth={LUCIDE_STROKE} />
+              )}
             </View>
-          </View>
-          <View style={styles.headerActions}>
-            <Pressable
-              style={[styles.headerBtn, { backgroundColor: palette.card, borderColor: palette.border }]}
-              onPress={() => router.push('/courier/notifications')}
-              hitSlop={8}>
-              <Bell size={18} color={palette.text} strokeWidth={LUCIDE_STROKE} />
-              {unreadCount > 0 ? (
-                <View style={[styles.notifDot, { backgroundColor: palette.primary, borderColor: palette.card }]}>
-                  <Text style={styles.notifDotTxt}>{unreadCount > 9 ? '9+' : String(unreadCount)}</Text>
+            <View style={styles.heroInfo}>
+              <Text style={styles.heroGreeting}>Bonjour,</Text>
+              <View style={styles.heroNameRow}>
+                <Text style={styles.heroName} numberOfLines={1}>
+                  {u?.nom || 'Livreur'}
+                </Text>
+                <View style={styles.verifiedBadge}>
+                  <Check size={10} color="#FFFFFF" strokeWidth={3} />
                 </View>
-              ) : null}
-            </Pressable>
-            <Pressable
-              style={[styles.headerBtn, { backgroundColor: palette.card, borderColor: palette.border }]}
-              onPress={() => router.push('/courier/settings')}
-              hitSlop={8}>
-              <Settings size={18} color={palette.text} strokeWidth={LUCIDE_STROKE} />
-            </Pressable>
-          </View>
-        </View>
-
-        {/* ── Bloc profil : avatar + contact ── */}
-        <View style={styles.profileRow}>
-          <View style={[styles.avatarWrap, { backgroundColor: palette.primarySoft }]}>
-            {avatar ? (
-              <Image source={{ uri: avatar }} style={styles.avatarImg} contentFit="cover" />
-            ) : (
-              <User size={42} color={palette.primaryDeep} strokeWidth={LUCIDE_STROKE} />
-            )}
-          </View>
-          <View style={styles.profileInfo}>
-            <View style={styles.infoRow}>
-              <Phone size={15} color={palette.primaryDeep} strokeWidth={LUCIDE_STROKE} />
-              <Text style={[styles.infoPhone, { color: palette.text }]} numberOfLines={1}>
-                {u?.telephone || '—'}
-              </Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Bike size={15} color={palette.primaryDeep} strokeWidth={LUCIDE_STROKE} />
-              <Text style={[styles.infoMember, { color: palette.muted }]} numberOfLines={1}>
+              </View>
+              <Text style={styles.heroSub}>
                 {l?.type_vehicule || profile?.entreprise?.nom || 'Livreur GoLivra'}
               </Text>
             </View>
-            <Pressable
-              style={({ pressed }) => [
-                styles.editBtn,
-                { borderColor: palette.primary, backgroundColor: palette.primarySoft },
-                pressed && styles.editBtnPressed,
-              ]}
-              onPress={() => router.push('/courier/account')}>
-              <Settings size={13} color={palette.primaryDeep} strokeWidth={2.4} />
-              <Text style={[styles.editBtnText, { color: palette.primaryDeep }]}>Modifier le profil</Text>
-            </Pressable>
           </View>
-        </View>
 
-        {/* ── Carte stats (3 colonnes) ── */}
+          {/* ── Dispo inline ── */}
+          <View style={styles.heroDispoRow}>
+            <View style={[styles.heroDispoDot, { backgroundColor: disponible ? '#4ADE80' : 'rgba(255,255,255,0.3)' }]} />
+            <Text style={styles.heroDispoLabel}>{disponible ? 'En ligne' : 'Hors ligne'}</Text>
+            <View style={{ flex: 1 }} />
+            <Switch
+              value={disponible}
+              disabled={acting}
+              onValueChange={(v) => void toggleDispo(v)}
+              trackColor={{ false: 'rgba(255,255,255,0.2)', true: '#4ADE80' }}
+              thumbColor={disponible ? '#FFFFFF' : '#F9FAFB'}
+            />
+          </View>
+        </LinearGradient>
+
+        {/* ── Stats (3 colonnes) ── */}
         <View style={[styles.statsCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
           <StatCell
             Icon={ClipboardList}
             value={profile?.resume?.missions_actives ?? 0}
             label="En cours"
             palette={palette}
+            color="#3B82F6"
           />
           <View style={[styles.statDivider, { backgroundColor: palette.border }]} />
           <StatCell
@@ -227,72 +216,78 @@ export default function CourierProfileScreen() {
             value={profile?.resume?.missions_aujourdhui ?? 0}
             label="Aujourd'hui"
             palette={palette}
+            color="#F59E0B"
           />
           <View style={[styles.statDivider, { backgroundColor: palette.border }]} />
           <StatCell
             Icon={Shield}
             value={profile?.resume?.reussies_historique ?? 0}
-            label="Réussies"
+            label="Reussies"
             palette={palette}
+            color="#22C55E"
           />
         </View>
 
-        {/* ── Disponibilité ── */}
-        <View style={[styles.dispoCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
-          <View style={styles.dispoRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.dispoTitle, { color: palette.primaryDeep }]}>Disponible pour les courses</Text>
-              <Text style={[styles.dispoHint, { color: palette.muted }]}>
-                {disponible ? 'Vous êtes en ligne, GoLivra peut vous envoyer des courses.' : 'Hors ligne pour le moment.'}
-              </Text>
-            </View>
-            <Switch
-              value={disponible}
-              disabled={acting}
-              onValueChange={(v) => void toggleDispo(v)}
-              trackColor={{ false: palette.trackStroke, true: palette.primary }}
-              thumbColor={disponible ? palette.primary : '#F9FAFB'}
-            />
+        {/* ── Contact ── */}
+        <View style={[styles.contactCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
+          <View style={styles.contactRow}>
+            <Phone size={15} color={palette.primaryDeep} strokeWidth={LUCIDE_STROKE} />
+            <Text style={[styles.contactValue, { color: palette.text }]} numberOfLines={1}>
+              {u?.telephone || '—'}
+            </Text>
           </View>
+          <Pressable
+            style={({ pressed }) => [
+              styles.editBtn,
+              { borderColor: palette.primary, backgroundColor: palette.primarySoft },
+              pressed && styles.editBtnPressed,
+            ]}
+            onPress={() => router.push('/courier/account')}>
+            <Settings size={12} color={palette.primaryDeep} strokeWidth={2.4} />
+            <Text style={[styles.editBtnText, { color: palette.primaryDeep }]}>Modifier le profil</Text>
+          </Pressable>
         </View>
 
-        {/* ── Mon activité ── */}
-        <Text style={[styles.sectionTitle, { color: palette.text }]}>Mon activité</Text>
-        <View style={styles.menuList}>
-          <MenuRow
-            Icon={Bike}
-            title="Mes courses"
-            onPress={() => router.push('/courier/missions')}
-            palette={palette}
-          />
-          <MenuRow
-            Icon={Settings}
-            title="Paramètres"
-            onPress={() => router.push('/courier/settings')}
-            palette={palette}
-          />
-          <MenuRow
-            Icon={Lock}
-            title="Sécurité"
-            onPress={() => router.push('/courier/account')}
-            palette={palette}
-          />
-          <MenuRow
-            Icon={HelpCircle}
-            title="Centre d'aide"
-            onPress={() => router.push('/help-center')}
-            palette={palette}
-          />
-        </View>
-
-        {/* ── Déconnexion ── */}
+        {/* ── Menu ── */}
         <MenuRow
-          Icon={LogOut}
-          title="Se déconnecter"
-          onPress={confirmLogout}
+          Icon={Bike}
+          title="Mes courses"
+          subtitle="Voir l'historique et les courses en cours"
+          onPress={() => router.push('/courier/missions')}
           palette={palette}
-          danger
         />
+        <MenuRow
+          Icon={Settings}
+          title="Parametres"
+          subtitle="Apparence, notification, preferences"
+          onPress={() => router.push('/courier/settings')}
+          palette={palette}
+        />
+        <MenuRow
+          Icon={Lock}
+          title="Securite"
+          subtitle="Mot de passe, biomtrie"
+          onPress={() => router.push('/courier/account')}
+          palette={palette}
+        />
+        <MenuRow
+          Icon={HelpCircle}
+          title="Centre d'aide"
+          subtitle="FAQ et support"
+          onPress={() => router.push('/help-center')}
+          palette={palette}
+        />
+
+        {/* ── Deconnexion ── */}
+        <View style={{ marginTop: 8 }}>
+          <MenuRow
+            Icon={LogOut}
+            title="Se deconnecter"
+            onPress={confirmLogout}
+            palette={palette}
+            danger
+          />
+        </View>
       </ScrollView>
     </View>
   );
@@ -300,58 +295,53 @@ export default function CourierProfileScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { paddingHorizontal: 16, gap: 16 },
+  content: { paddingHorizontal: 16, gap: 12 },
 
-  // ── En-tête ──
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerTextBlock: { flex: 1, paddingRight: 12 },
-  greeting: { fontSize: 14, fontWeight: '500', marginBottom: 2 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 1 },
-  displayName: { fontSize: 22, fontWeight: '700', letterSpacing: -0.3, flexShrink: 1 },
-  verifiedBadge: { width: 19, height: 19, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  headerBtn: {
-    width: 40,
-    height: 40,
+  // ── Hero ──
+  hero: {
     borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    position: 'relative',
+    padding: 20,
   },
-  notifDot: {
-    position: 'absolute',
-    top: 1,
-    right: 1,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-  },
-  notifDotTxt: { color: '#FFF', fontSize: 9, fontWeight: '800' },
-
-  // ── Bloc profil ──
-  profileRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   avatarWrap: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
   avatarImg: { width: '100%', height: '100%' },
-  profileInfo: { flex: 1, gap: 8 },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  infoPhone: { fontSize: 14, fontWeight: '600', flexShrink: 1 },
-  infoMember: { fontSize: 13, flexShrink: 1 },
+  heroInfo: { flex: 1 },
+  heroGreeting: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.7)' },
+  heroNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  heroName: { fontSize: 22, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.3, flexShrink: 1 },
+  verifiedBadge: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#4ADE80', alignItems: 'center', justifyContent: 'center' },
+  heroSub: { fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.6)', marginTop: 3 },
+
+  heroDispoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.15)',
+  },
+  heroDispoDot: { width: 8, height: 8, borderRadius: 4 },
+  heroDispoLabel: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
+
+  // ── Contact ──
+  contactCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+    gap: 10,
+  },
+  contactRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  contactValue: { fontSize: 15, fontWeight: '600', flex: 1 },
   editBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -361,12 +351,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1,
-    marginTop: 2,
   },
   editBtnPressed: { opacity: 0.8 },
-  editBtnText: { fontSize: 12.5, fontWeight: '600' },
+  editBtnText: { fontSize: 12, fontWeight: '600' },
 
-  // ── Stats card ──
+  // ── Stats ──
   statsCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -375,27 +364,26 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 6,
   },
-  statCell: { flex: 1, alignItems: 'center', gap: 4 },
-  statDivider: { width: StyleSheet.hairlineWidth, height: 34 },
-  statValue: { fontSize: 19, fontWeight: '700', marginTop: 2, letterSpacing: -0.2 },
-  statLabel: { fontSize: 12, fontWeight: '400' },
-
-  // ── Disponibilité ──
-  dispoCard: { borderRadius: 18, borderWidth: 1, padding: 16 },
-  dispoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  dispoTitle: { fontSize: 15, fontWeight: '800', marginBottom: 2 },
-  dispoHint: { fontSize: 13, fontWeight: '500', lineHeight: 18 },
+  statCell: { flex: 1, alignItems: 'center', gap: 6 },
+  statIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statDivider: { width: StyleSheet.hairlineWidth, height: 38 },
+  statValue: { fontSize: 20, fontWeight: '900', letterSpacing: -0.2 },
+  statLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.3 },
 
   // ── Menu ──
-  sectionTitle: { fontSize: 16, fontWeight: '600', letterSpacing: -0.2, marginTop: 2 },
-  menuList: { gap: 10 },
   menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     borderRadius: 16,
     paddingHorizontal: 13,
-    paddingVertical: 12,
+    paddingVertical: 13,
   },
   menuRowPressed: { opacity: 0.82 },
   menuIconBox: {
@@ -405,5 +393,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  menuTitle: { flex: 1, fontSize: 15, fontWeight: '600' },
+  menuTitle: { fontSize: 15, fontWeight: '700' },
+  menuSubtitle: { fontSize: 11, fontWeight: '500', marginTop: 1 },
 });

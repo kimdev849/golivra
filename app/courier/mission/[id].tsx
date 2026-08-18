@@ -1,7 +1,18 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { ArrowLeft, CheckCircle2, MapPin, Phone, Store, User } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import {
+  ArrowLeft,
+  CheckCircle2,
+  MapPin,
+  Phone,
+  Store,
+  User,
+  Navigation,
+  Package,
+  Route,
+} from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppContentWidth } from '@/components/app-content-width';
@@ -18,6 +29,94 @@ import {
 import { getSessionToken } from '@/lib/auth';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useCourierPalette } from '@/lib/courier-theme';
+
+type StepKey = 'assigned' | 'pickup' | 'picked_up' | 'delivering' | 'done';
+
+const STEP_META: Record<StepKey, { label: string; icon: typeof Store }> = {
+  assigned: { label: 'Assignee', icon: Package },
+  pickup: { label: 'En route vers le commerce', icon: Store },
+  picked_up: { label: 'Commande recuperee', icon: CheckCircle2 },
+  delivering: { label: 'En route vers le client', icon: Navigation },
+  done: { label: 'Livree', icon: CheckCircle2 },
+};
+
+function missionToStep(statut: string): StepKey {
+  switch (statut) {
+    case 'attribuee':
+      return 'assigned';
+    case 'en_collecte':
+      return 'pickup';
+    case 'collectee':
+      return 'picked_up';
+    case 'en_route':
+      return 'delivering';
+    case 'livree':
+      return 'done';
+    default:
+      return 'assigned';
+  }
+}
+
+function StepProgress({ currentStep }: { currentStep: StepKey }) {
+  const palette = useCourierPalette();
+  const steps: StepKey[] = ['assigned', 'pickup', 'picked_up', 'delivering', 'done'];
+  const currentIdx = steps.indexOf(currentStep);
+
+  return (
+    <View style={stepStyles.container}>
+      {steps.map((step, idx) => {
+        const isCompleted = idx < currentIdx;
+        const isCurrent = idx === currentIdx;
+        const isLast = idx === steps.length - 1;
+        const meta = STEP_META[step];
+        const Icon = meta.icon;
+
+        return (
+          <View key={step} style={stepStyles.stepWrap}>
+            <View style={stepStyles.stepRow}>
+              <View
+                style={[
+                  stepStyles.dot,
+                  {
+                    backgroundColor: isCompleted || isCurrent ? palette.primary : 'transparent',
+                    borderColor: isCompleted || isCurrent ? palette.primary : palette.muted,
+                  },
+                ]}>
+                {isCompleted ? (
+                  <CheckCircle2 size={14} color="#FFFFFF" strokeWidth={3} />
+                ) : (
+                  <Icon
+                    size={12}
+                    color={isCurrent ? '#FFFFFF' : palette.muted}
+                    strokeWidth={2.4}
+                  />
+                )}
+              </View>
+              {!isLast ? (
+                <View
+                  style={[
+                    stepStyles.line,
+                    { backgroundColor: idx < currentIdx ? palette.primary : palette.border },
+                  ]}
+                />
+              ) : null}
+            </View>
+            <ThemedText
+              style={[
+                stepStyles.label,
+                {
+                  color: isCompleted || isCurrent ? palette.primaryDeep : palette.muted,
+                  fontWeight: isCurrent ? '800' : '500',
+                },
+              ]}>
+              {meta.label}
+            </ThemedText>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
 
 export default function CourierMissionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -43,27 +142,25 @@ export default function CourierMissionDetailScreen() {
   const canAdvance =
     mission && !isDone && !canAccept && (mission.statut === 'attribuee' || mission.statut === 'en_collecte');
   const advanceLabel =
-    mission?.statut === 'attribuee' ? 'J’ai récupéré la commande' : 'En route vers le client';
+    mission?.statut === 'attribuee' ? 'Recuperer la commande' : 'En route vers le client';
   const canComplete =
     mission && !isDone && !canAccept && (mission.statut === 'en_route' || mission.statut === 'collectee');
 
   const accept = async () => {
     if (!id) return;
     const previous = mission;
-    // Optimiste : le bouton bascule immédiatement vers « course attribuée ».
     setMission((m) => (m ? { ...m, ouverte: false, statut: 'attribuee' as const } : m));
-    showSuccess('Course acceptée !', 'Vous pouvez récupérer la commande chez le commerce.');
+    showSuccess('Course acceptee', 'Récupérez la commande chez le commerce.');
     setActing('accept');
     try {
       const token = await getSessionToken();
-      if (!token) throw new Error('Session expirée');
+      if (!token) throw new Error('Session expiree');
       const updated = await acceptCourierMission(token, id);
       setMission({ ...updated, ouverte: false });
-      // Synchronisation en arrière-plan : missions seules, sans loading.
       void refreshMissions();
     } catch (e) {
       if (previous) setMission(previous);
-      const msg = e instanceof Error ? e.message : 'Impossible d\'accepter la course.';
+      const msg = e instanceof Error ? e.message : "Impossible d'accepter la course.";
       setError(msg);
       showError('Acceptation impossible', msg);
     } finally {
@@ -75,39 +172,39 @@ export default function CourierMissionDetailScreen() {
     if (!id) return;
     const previous = mission;
     setMission((m) => (m ? { ...m, statut: 'en_collecte' as const } : m));
-    showSuccess('Collecte enregistrée', 'Récupération confirmée chez le commerce.');
+    showSuccess('Collecte enregistree', 'Recuperation confirmee chez le commerce.');
     setActing('advance');
     try {
       const token = await getSessionToken();
-      if (!token) throw new Error('Session expirée');
+      if (!token) throw new Error('Session expiree');
       const updated = await advanceCourierMission(token, id);
       setMission(updated);
       void refreshMissions();
     } catch (e) {
       if (previous) setMission(previous);
-      const msg = e instanceof Error ? e.message : 'Impossible de mettre à jour la course.';
+      const msg = e instanceof Error ? e.message : 'Impossible de mettre a jour la course.';
       setError(msg);
-      showError('Mise à jour impossible', msg);
+      showError('Mise a jour impossible', msg);
     } finally {
       setActing(null);
     }
   };
 
-  // La validation passe par la preuve photo obligatoire (modal dédié) :
-  // la livraison n'est marquée « livrée » qu'une fois la preuve envoyée.
   const handleProofDone = (updated: CourierMission) => {
     setProofOpen(false);
     setMission(updated);
     void refreshMissions();
-    showSuccess('Livraison réussie 🎉', 'Merci pour votre travail ! Le colis est bien arrivé chez le client.');
+    showSuccess('Livraison reussie', 'Merci pour votre travail ! Le colis est bien arrive chez le client.');
   };
 
   return (
     <View style={[styles.screen, { backgroundColor: palette.bg }]}>
       <FeedbackOverlay />
+
+      {/* ── Top bar ── */}
       <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 8), backgroundColor: palette.card, borderBottomColor: palette.border }]}>
         <Pressable onPress={() => router.back()} style={[styles.back, { backgroundColor: palette.primarySoft }]} hitSlop={12}>
-          <ArrowLeft size={22} color={palette.primaryDeep} strokeWidth={LUCIDE_STROKE} />
+          <ArrowLeft size={20} color={palette.primaryDeep} strokeWidth={LUCIDE_STROKE} />
         </Pressable>
         <ThemedText style={[styles.topTitle, { color: palette.primaryDeep }]}>Course</ThemedText>
         <View style={{ width: 40 }} />
@@ -126,105 +223,147 @@ export default function CourierMissionDetailScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 32 }]}>
           <AppContentWidth phonePadding={0}>
-          <View style={[styles.hero, { backgroundColor: palette.card, borderColor: palette.border }]}>
-            <ThemedText style={[styles.ref, { color: palette.text }]}>
-              {mission.type_livraison === 'externe'
-                ? 'Livraison du commerce'
-                : mission.commande?.numero || mission.id.slice(0, 8).toUpperCase()}
-            </ThemedText>
-            <View style={[styles.statutPill, { backgroundColor: palette.primarySoft }]}>
-              <ThemedText style={[styles.statutText, { color: palette.primary }]}>{missionStatutLabel(mission.statut)}</ThemedText>
-            </View>
-          </View>
 
-          <View style={[styles.block, { backgroundColor: palette.card, borderColor: palette.border }]}>
-            <View style={styles.blockHead}>
-              <Store size={18} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
-              <ThemedText style={[styles.blockTitle, { color: palette.primaryDeep }]}>Point de retrait</ThemedText>
-            </View>
-            <ThemedText style={[styles.blockText, { color: palette.textSecondary }]}>{mission.adresse_retrait || '—'}</ThemedText>
-          </View>
-
-          {mission.client_nom || mission.client_telephone ? (
-            <View style={[styles.block, { backgroundColor: palette.card, borderColor: palette.border }]}>
-              <View style={styles.blockHead}>
-                <User size={18} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
-                <ThemedText style={[styles.blockTitle, { color: palette.primaryDeep }]}>Client</ThemedText>
+            {/* ── Header hero ── */}
+            <LinearGradient
+              colors={[palette.primary, palette.primaryDeep]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.hero}>
+              <ThemedText style={styles.heroRef}>
+                {mission.type_livraison === 'externe'
+                  ? 'Livraison externe'
+                  : mission.commande?.numero || mission.id.slice(0, 8).toUpperCase()}
+              </ThemedText>
+              <View style={styles.heroPill}>
+                <ThemedText style={styles.heroPillText}>{missionStatutLabel(mission.statut)}</ThemedText>
               </View>
-              {mission.client_nom ? (
-                <ThemedText style={[styles.blockText, { color: palette.text }]}>
-                  {mission.client_nom}
-                </ThemedText>
-              ) : null}
-              {mission.client_telephone ? (
-                <Pressable
-                  onPress={() => Linking.openURL(`tel:${mission.client_telephone}`)}
-                  style={styles.phoneRow}
-                  hitSlop={8}>
-                  <Phone size={16} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
-                  <ThemedText style={[styles.phoneText, { color: palette.primary }]}>
-                    {mission.client_telephone}
-                  </ThemedText>
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
+            </LinearGradient>
 
-          <View style={[styles.block, { backgroundColor: palette.card, borderColor: palette.border }]}>
-            <View style={styles.blockHead}>
-              <MapPin size={18} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
-              <ThemedText style={[styles.blockTitle, { color: palette.primaryDeep }]}>Adresse de livraison</ThemedText>
-            </View>
-            <ThemedText style={[styles.blockText, { color: palette.textSecondary }]}>{mission.adresse_livraison || '—'}</ThemedText>
-            {mission.note ? (
-              <ThemedText style={[styles.hint, { color: palette.muted }]}>Note : {mission.note}</ThemedText>
+            {/* ── Progression visuelle ── */}
+            {!isDone && mission.statut !== 'en_attente' ? (
+              <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
+                <ThemedText style={[styles.cardTitle, { color: palette.primaryDeep }]}>Progression</ThemedText>
+                <StepProgress currentStep={missionToStep(mission.statut)} />
+              </View>
             ) : null}
-          </View>
 
-          {error ? (
-            <View style={[styles.errBox, { borderColor: palette.border }]}>
-              <ThemedText style={[styles.err, { color: palette.danger }]}>{error}</ThemedText>
+            {/* ── Point de retrait ── */}
+            <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
+              <View style={styles.cardHead}>
+                <View style={[styles.cardIconWrap, { backgroundColor: '#F59E0B20' }]}>
+                  <Store size={16} color="#F59E0B" strokeWidth={LUCIDE_STROKE} />
+                </View>
+                <ThemedText style={[styles.cardTitle, { color: palette.primaryDeep }]}>Point de retrait</ThemedText>
+              </View>
+              <ThemedText style={[styles.cardText, { color: palette.textSecondary }]}>
+                {mission.adresse_retrait || '—'}
+              </ThemedText>
             </View>
-          ) : null}
 
-          {canAccept ? (
-            <Pressable
-              style={[styles.primaryBtn, { backgroundColor: palette.primary }, acting !== null && styles.disabled]}
-              disabled={acting !== null}
-              onPress={() => void accept()}>
-              {acting === 'accept' ? (
-                <ActivityIndicator color="#FFF" size="small" />
-              ) : (
-                <ThemedText style={styles.primaryBtnText}>Accepter cette course</ThemedText>
-              )}
-            </Pressable>
-          ) : null}
-          {canAdvance ? (
-            <Pressable
-              style={[styles.secondaryBtn, { borderColor: palette.primary }, acting !== null && styles.disabled]}
-              disabled={acting !== null}
-              onPress={() => void advance()}>
-              {acting === 'advance' ? (
-                <ActivityIndicator color={palette.primary} size="small" />
-              ) : (
-                <ThemedText style={[styles.secondaryBtnText, { color: palette.primary }]}>
-                  {advanceLabel}
-                </ThemedText>
-              )}
-            </Pressable>
-          ) : null}
-          {canComplete ? (
-            <Pressable
-              style={[styles.primaryBtn, { backgroundColor: palette.primary }]}
-              onPress={() => setProofOpen(true)}>
-              <CheckCircle2 size={20} color="#FFF" strokeWidth={LUCIDE_STROKE} />
-              <ThemedText style={styles.primaryBtnText}>Confirmer la livraison</ThemedText>
-            </Pressable>
-          ) : isDone ? (
-            <ThemedText style={[styles.hint, { color: palette.muted }]}>Course terminée.</ThemedText>
-          ) : !canAccept ? (
-            <ThemedText style={[styles.hint, { color: palette.muted }]}>Vous avez une course — récupérez la commande puis confirmez la livraison.</ThemedText>
-          ) : null}
+            {/* ── Client ── */}
+            {mission.client_nom || mission.client_telephone ? (
+              <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
+                <View style={styles.cardHead}>
+                  <View style={[styles.cardIconWrap, { backgroundColor: palette.primarySoft }]}>
+                    <User size={16} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
+                  </View>
+                  <ThemedText style={[styles.cardTitle, { color: palette.primaryDeep }]}>Client</ThemedText>
+                </View>
+                {mission.client_nom ? (
+                  <ThemedText style={[styles.cardText, { color: palette.text }]}>{mission.client_nom}</ThemedText>
+                ) : null}
+                {mission.client_telephone ? (
+                  <Pressable
+                    onPress={() => Linking.openURL(`tel:${mission.client_telephone}`)}
+                    style={[styles.phoneBtn, { backgroundColor: palette.primarySoft, borderColor: palette.primary }]}
+                    hitSlop={8}>
+                    <Phone size={14} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
+                    <ThemedText style={[styles.phoneBtnText, { color: palette.primary }]}>
+                      {mission.client_telephone}
+                    </ThemedText>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
+
+            {/* ── Adresse de livraison ── */}
+            <View style={[styles.card, { backgroundColor: palette.card, borderColor: palette.border }]}>
+              <View style={styles.cardHead}>
+                <View style={[styles.cardIconWrap, { backgroundColor: '#3B82F620' }]}>
+                  <MapPin size={16} color="#3B82F6" strokeWidth={LUCIDE_STROKE} />
+                </View>
+                <ThemedText style={[styles.cardTitle, { color: palette.primaryDeep }]}>Adresse de livraison</ThemedText>
+              </View>
+              <ThemedText style={[styles.cardText, { color: palette.textSecondary }]}>
+                {mission.adresse_livraison || '—'}
+              </ThemedText>
+              {mission.note ? (
+                <View style={[styles.noteBox, { backgroundColor: palette.pillOff }]}>
+                  <ThemedText style={[styles.noteText, { color: palette.textSecondary }]}>
+                    {mission.note}
+                  </ThemedText>
+                </View>
+              ) : null}
+            </View>
+
+            {error ? (
+              <View style={[styles.errBox, { borderColor: palette.danger }]}>
+                <ThemedText style={[styles.err, { color: palette.danger }]}>{error}</ThemedText>
+              </View>
+            ) : null}
+
+            {/* ── Actions ── */}
+            {canAccept ? (
+              <Pressable
+                style={[styles.btnPrimary, { backgroundColor: palette.primary }, acting !== null && styles.disabled]}
+                disabled={acting !== null}
+                onPress={() => void accept()}>
+                {acting === 'accept' ? (
+                  <ActivityIndicator color="#FFF" size="small" />
+                ) : (
+                  <>
+                    <Package size={18} color="#FFF" strokeWidth={LUCIDE_STROKE} />
+                    <ThemedText style={styles.btnPrimaryText}>Accepter cette course</ThemedText>
+                  </>
+                )}
+              </Pressable>
+            ) : null}
+
+            {canAdvance ? (
+              <Pressable
+                style={[styles.btnSecondary, { borderColor: palette.primary }, acting !== null && styles.disabled]}
+                disabled={acting !== null}
+                onPress={() => void advance()}>
+                {acting === 'advance' ? (
+                  <ActivityIndicator color={palette.primary} size="small" />
+                ) : (
+                  <>
+                    <Route size={18} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
+                    <ThemedText style={[styles.btnSecondaryText, { color: palette.primary }]}>{advanceLabel}</ThemedText>
+                  </>
+                )}
+              </Pressable>
+            ) : null}
+
+            {canComplete ? (
+              <Pressable
+                style={[styles.btnPrimary, { backgroundColor: palette.primary }]}
+                onPress={() => setProofOpen(true)}>
+                <CheckCircle2 size={18} color="#FFF" strokeWidth={LUCIDE_STROKE} />
+                <ThemedText style={styles.btnPrimaryText}>Confirmer la livraison</ThemedText>
+              </Pressable>
+            ) : isDone ? (
+              <View style={[styles.doneBox, { backgroundColor: '#22C55E15', borderColor: '#22C55E30' }]}>
+                <CheckCircle2 size={18} color="#22C55E" strokeWidth={LUCIDE_STROKE} />
+                <ThemedText style={[styles.doneText, { color: '#22C55E' }]}>Course terminee</ThemedText>
+              </View>
+            ) : !canAccept ? (
+              <ThemedText style={[styles.hint, { color: palette.muted }]}>
+                Recuperez la commande puis confirmez la livraison.
+              </ThemedText>
+            ) : null}
+
           </AppContentWidth>
         </ScrollView>
       )}
@@ -240,6 +379,22 @@ export default function CourierMissionDetailScreen() {
     </View>
   );
 }
+
+const stepStyles = StyleSheet.create({
+  container: { gap: 0, paddingTop: 4, paddingBottom: 4 },
+  stepWrap: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  stepRow: { alignItems: 'center', width: 28 },
+  dot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  line: { width: 2, height: 20, marginLeft: 13, marginTop: 2, marginBottom: 2, borderRadius: 1 },
+  label: { fontSize: 13, lineHeight: 28, flex: 1 },
+});
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
@@ -258,70 +413,108 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  topTitle: { fontWeight: '900', fontSize: 17 },
+  topTitle: { fontWeight: '800', fontSize: 17 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   scroll: { padding: 16, gap: 14 },
+
+  // ── Hero ──
   hero: {
     borderRadius: 20,
-    padding: 18,
+    padding: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderWidth: 1,
   },
-  ref: { fontSize: 20, fontWeight: '900' },
-  statutPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
+  heroRef: { fontSize: 20, fontWeight: '900', color: '#FFFFFF', flex: 1, marginRight: 12 },
+  heroPill: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
   },
-  statutText: { fontWeight: '800', fontSize: 12 },
-  block: {
-    borderRadius: 18,
+  heroPillText: { fontWeight: '800', fontSize: 11, color: '#FFFFFF', textTransform: 'uppercase' },
+
+  // ── Cards ──
+  card: {
+    borderRadius: 16,
     padding: 16,
-    gap: 8,
+    gap: 10,
     borderWidth: 1,
   },
-  blockHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  blockTitle: { fontWeight: '800', fontSize: 14 },
-  blockText: { fontSize: 15, lineHeight: 22 },
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  cardIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardTitle: { fontWeight: '800', fontSize: 14 },
+  cardText: { fontSize: 14, lineHeight: 20 },
+
+  phoneBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
+  },
+  phoneBtnText: { fontSize: 14, fontWeight: '800' },
+
+  noteBox: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  noteText: { fontSize: 13, lineHeight: 18 },
+
   errBox: {
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
   },
-  err: { fontWeight: '600' },
-  primaryBtn: {
+  err: { fontWeight: '600', fontSize: 13 },
+
+  // ── Buttons ──
+  btnPrimary: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 10,
     borderRadius: 16,
     paddingVertical: 16,
     marginTop: 8,
   },
-  secondaryBtn: {
+  btnPrimaryText: { color: '#FFF', fontWeight: '800', fontSize: 15 },
+  btnSecondary: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 10,
     borderRadius: 16,
     paddingVertical: 14,
     marginTop: 8,
     borderWidth: 2,
   },
-  secondaryBtnText: { fontWeight: '800', fontSize: 15 },
-  primaryBtnText: { color: '#FFF', fontWeight: '800', fontSize: 16 },
-  disabled: { opacity: 0.65 },
-  hint: { textAlign: 'center', fontSize: 13, marginTop: 8 },
-  phoneRow: {
+  btnSecondaryText: { fontWeight: '800', fontSize: 15 },
+  disabled: { opacity: 0.6 },
+
+  doneBox: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
-    marginTop: 6,
-    paddingVertical: 4,
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 8,
+    borderWidth: 1,
   },
-  phoneText: {
-    fontSize: 15,
-    fontWeight: '800',
-    textDecorationLine: 'underline',
-  },
+  doneText: { fontWeight: '800', fontSize: 14 },
+
+  hint: { textAlign: 'center', fontSize: 13, marginTop: 8, fontWeight: '500' },
 });
