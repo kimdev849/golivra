@@ -40,8 +40,9 @@ yarn-error.*
 
 # Firebase service account key (SECRET — jamais committer)
 golivra-*.json
-# Config Firebase (clés publiques de l'app, mais config locale)
-google-services.json
+# google-services.json EST dans le repo : c'est la config Firebase publique
+# nécessaire pour que les push notifications fonctionnent quand l'app est fermée.
+# NE PAS ajouter golivra-service-account.json (celui-là est un vrai secret).
 
 # typescript
 *.tsbuildinfo
