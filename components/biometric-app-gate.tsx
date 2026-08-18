@@ -1,5 +1,5 @@
 import { AppState, Platform, Pressable, StyleSheet, View } from 'react-native';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { ThemedText } from '@/components/themed-text';
 import { useAppColors } from '@/hooks/use-app-colors';
@@ -12,37 +12,95 @@ import {
 type Props = { children: ReactNode };
 
 /**
- * Verrouillage optionnel (paramètres) : Face ID / empreinte au retour sur l’app.
- * Désactivé par défaut.
+ * Verrouillage biométrique optionnel (paramètres) : Face ID / empreinte.
+ *
+ * C'est l'UNIQUE point de verrouillage de l'app :
+ *  - au démarrage à froid (une fois) ;
+ *  - au retour d'un VRAI arrière-plan (le téléphone a affiché une autre app).
+ *
+ * Points importants (anti-« pagaille ») :
+ *  - L'état `inactive` est IGNORÉ : il survient aussi pour la boîte de dialogue
+ *    biométrique elle-même, le clavier ou le panneau de notifications. Le
+ *    verrouiller dessus relançait le déverrouillage « encore et encore ».
+ *  - Délai de grâce de 15 s : une bascule rapide entre deux apps ne redemande
+ *    pas le code (seul un vrai retour après 15 s + verrouille).
+ *  - Annulation / échec : on reste sur l'écran verrouillé avec un bouton
+ *    « Déverrouiller » — jamais de déconnexion ni de renvoi vers la connexion.
  */
+const LOCK_GRACE_MS = 15_000;
+
 export function BiometricAppGate({ children }: Props) {
   const colors = useAppColors();
-  const [unlocked, setUnlocked] = useState(true);
   const [enabled, setEnabled] = useState(false);
+  const [unlocked, setUnlocked] = useState(true);
   const appState = useRef(AppState.currentState);
+  const backgroundedAt = useRef<number | null>(null);
+  const promptingRef = useRef(false);
 
-  useEffect(() => {
-    void (async () => {
-      const hardware = await isBiometricHardwareAvailable();
-      if (!hardware) return;
-      setEnabled(await getBiometricLockEnabled());
-    })();
+  const tryUnlock = useCallback(() => {
+    if (promptingRef.current) return;
+    promptingRef.current = true;
+    void promptBiometricUnlock('Déverrouiller GoLivra')
+      .then((ok) => setUnlocked(ok))
+      .finally(() => {
+        promptingRef.current = false;
+      });
   }, []);
 
+  // Démarrage à froid : si le verrou est actif, on verrouille immédiatement
+  // (l'écran de garde est au-dessus du splash) et on propose le déverrouillage.
   useEffect(() => {
-    if (!enabled || Platform.OS === 'web') return;
+    let alive = true;
+    void (async () => {
+      const hardware = await isBiometricHardwareAvailable();
+      if (!alive || !hardware) return;
+      const isEnabled = await getBiometricLockEnabled();
+      if (!alive || !isEnabled) return;
+      setEnabled(true);
+      setUnlocked(false);
+      tryUnlock();
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [tryUnlock]);
+
+  // Retour au premier plan : ne verrouille que depuis un VRAI arrière-plan.
+  // Le réglage est RE-VÉRIFIÉ à chaque retour : si l'utilisateur a désactivé
+  // le verrou dans les paramètres, on ne le demande plus (sans redémarrage).
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
 
     const sub = AppState.addEventListener('change', (next) => {
       const prev = appState.current;
       appState.current = next;
-      if ((prev === 'background' || prev === 'inactive') && next === 'active') {
-        setUnlocked(false);
-        void promptBiometricUnlock('Déverrouiller GoLivra').then((ok) => setUnlocked(ok));
+
+      if (next === 'background') {
+        backgroundedAt.current = Date.now();
+        return;
       }
+      if (prev !== 'background' || next !== 'active') return;
+
+      const elapsed =
+        backgroundedAt.current != null ? Date.now() - backgroundedAt.current : 0;
+      backgroundedAt.current = null;
+      if (elapsed < LOCK_GRACE_MS) return; // bascule rapide : pas de redemande
+
+      void (async () => {
+        const isEnabled = await getBiometricLockEnabled();
+        if (!isEnabled) {
+          setEnabled(false);
+          setUnlocked(true);
+          return;
+        }
+        setEnabled(true);
+        setUnlocked(false);
+        tryUnlock();
+      })();
     });
 
     return () => sub.remove();
-  }, [enabled]);
+  }, [tryUnlock]);
 
   if (!enabled || unlocked) return <>{children}</>;
 
@@ -56,8 +114,10 @@ export function BiometricAppGate({ children }: Props) {
       </ThemedText>
       <Pressable
         style={[styles.btn, { backgroundColor: colors.primary }]}
-        onPress={() => void promptBiometricUnlock('Déverrouiller GoLivra').then(setUnlocked)}>
-        <ThemedText style={{ color: colors.onPrimary, fontWeight: '800' }}>Déverrouiller</ThemedText>
+        onPress={tryUnlock}>
+        <ThemedText style={{ color: colors.onPrimary, fontWeight: '800' }}>
+          Déverrouiller
+        </ThemedText>
       </Pressable>
     </View>
   );

@@ -18,16 +18,6 @@ export function getApiOrigin(): string {
   return normalizeOrigin(fromEnv || fromExtra);
 }
 
-export function getSupabaseUrl(): string {
-  const extra = Constants.expoConfig?.extra as { supabaseUrl?: string } | undefined;
-  return (process.env.EXPO_PUBLIC_SUPABASE_URL || extra?.supabaseUrl || '').trim();
-}
-
-export function getSupabaseAnonKey(): string {
-  const extra = Constants.expoConfig?.extra as { supabaseAnonKey?: string } | undefined;
-  return (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || extra?.supabaseAnonKey || '').trim();
-}
-
 export function isProductionBuild(): boolean {
   return !__DEV__;
 }

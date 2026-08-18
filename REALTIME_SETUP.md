@@ -1,116 +1,46 @@
-# Configuration Temps Réel - GoLivra
+# Temps réel des commandes — DÉCISION : retiré (polling uniquement)
 
-## ✅ Ce qui a été fait
+> **Statut : remplacé par le polling.** Ce document explique pourquoi le temps
+> réel Supabase (Realtime) a été retiré du mobile et comment le réintroduire
+> correctement si un jour il devient indispensable.
 
-### 1. Installation des dépendances
-- `@supabase/supabase-js` : Client Supabase pour le temps réel
-- `react-native-url-polyfill` : Polyfill URL pour React Native
+## Pourquoi c'est retiré
 
-### 2. Fichiers créés
+L'app s'abonnait aux changements de la table `commandes` (les commandes clients)
+via Supabase Realtime avec la **clé anon** embarquée dans le binaire de l'app.
 
-#### `lib/supabase.ts`
-Client Supabase configuré pour le temps réel.
-- Utilise les variables d'env `EXPO_PUBLIC_SUPABASE_URL` et `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-- Gère automatiquement les sessions et le refresh des tokens
+Problème : la clé `anon` est **publique** (extraite de n'importe quel APK). Sans
+RLS activé sur la table `commandes`, n'importe qui pouvait s'abonner et recevoir
+**toutes les commandes de tous les marchands** (INSERT/UPDATE/DELETE + données).
 
-#### `hooks/use-realtime-orders.ts`
-Hook React pour écouter les commandes en temps réel.
-- S'abonne aux changements sur la table `commandes`
-- Déclenche un rafraîchissement automatique à chaque insertion/modification
-- Se désabonne proprement quand on quitte l'écran
+C'était exactement le cas : la base n'avait **aucune politique RLS** (vérifiable
+via `golivraback/sql/rls-deny-by-default.sql`, qui colmate la fuite).
 
-### 3. Fichiers modifiés
+## Ce qui a été fait
 
-#### `app/_layout.tsx`
-- Initialisation globale de l'application
+1. `hooks/use-realtime-orders.ts` → **polling uniquement** (20 s) via l'API
+   authentifiée. Aucun canal non authentifié vers la base.
+2. Supprimés : `lib/supabase.ts`, `lib/check-supabase.ts`, les variables
+   `EXPO_PUBLIC_SUPABASE_*` (`.env.example`, `app.config.ts`, `BUILD.md`).
+3. Migration `golivraback/sql/rls-deny-by-default.sql` : RLS deny-by-default sur
+   les tables sensibles + retrait des tables de la publication `supabase_realtime`.
+4. ADR : `docs/decisions/0001-realtime-polling.md`.
 
-#### `app/vendor/(tabs)/orders.tsx`
-- Intégration du hook `useRealtimeOrders`
-- Les commandes se mettent à jour automatiquement sans rafraîchissement manuel
+## Comment réintroduire le temps réel correctement (si un jour nécessaire)
 
-#### `.env.local` et `.env.example`
-- Ajout des variables `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+Le modèle d'auth actuel (sessions opaques maison, pas de Supabase Auth) rend le
+Realtime anon inutilisable **et** dangereux. Pour le faire proprement il faudrait :
 
----
-
-## 🔧 Configuration requise (À FAIRE)
-
-### Étape 1 : Configurer Supabase
-
-1. **Activer la réplication** :
-   - Va sur ton dashboard Supabase
-   - Menu **Database** → **Replication**
-   - Coche la table `commandes` (et `livraisons` si besoin)
-
-2. **Récupérer les clés** :
-   - Menu **Project Settings** (roue dentée) → **API**
-   - Copie :
-     - `Project URL` → `EXPO_PUBLIC_SUPABASE_URL`
-     - `anon public` → `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-
-3. **Mettre à jour `.env.local`** :
-   ```bash
-   EXPO_PUBLIC_SUPABASE_URL=https://ton-vrai-projet.supabase.co
-   EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR...
+1. Passer l'authentification mobile sur **Supabase Auth** (JWT avec `auth.uid()`).
+2. Activer RLS sur `commandes` avec une policy par entreprise :
+   ```sql
+   CREATE POLICY "commercant voit ses commandes"
+     ON commandes FOR SELECT
+     USING (entreprise_id = auth.jwt() ->> 'entreprise_id');
    ```
+3. Remettre `commandes` dans la publication `supabase_realtime` (Dashboard →
+   Database → Replication) **après** l'étape 2.
+4. Réintroduire le client Supabase côté mobile avec la **session utilisateur**
+   (jamais la clé anon seule).
 
-### Étape 2 : Redémarrer l'application
-
-```bash
-# Arrête le serveur Expo
-# Puis redémarre-le en vidant le cache
-npx expo start -c
-```
-
----
-
-## 🎯 Comment ça marche ?
-
-### Temps Réel (Realtime)
-1. Le vendeur ouvre l'écran des commandes (`app/vendor/(tabs)/orders.tsx`)
-2. Le hook `useRealtimeOrders` s'abonne à la table `commandes` pour l'ID de son entreprise
-3. Quand un client passe commande :
-   - La base de données Supabase détecte l'INSERT
-   - Envoie un événement temps réel
-   - Le hook reçoit l'événement et appelle `refresh()`
-   - L'écran se met à jour **automatiquement** (plus besoin de bouton "Rafraîchir")
-
-
-## 🧪 Tester le temps réel
-
-1. **Ouvre l'app vendeur** sur ton téléphone
-2. Va dans l'écran **Commandes**
-3. **Depuis un autre appareil** (ou via Supabase) :
-   - Insère une nouvelle commande dans la table `commandes` avec le bon `entreprise_id`
-   - Ou update une commande existante
-4. **Observe** : La liste des commandes se met à jour **toute seule** !
-
----
-
-## 📝 Notes
-
-- Le temps réel ne fonctionne que si l'entreprise est connectée (`shop?.id`)
-- Le hook se désabonne automatiquement quand on quitte l'écran (pas de fuite de mémoire)
-- Les variables d'environnement doivent être définies dans `.env.local` (dev) ou EAS Secrets (build)
-
----
-
-## 🚀 Prochaines étapes (Optionnel)
-
-- [ ] Ajouter le temps réel sur le **Dashboard Vendeur** (`app/vendor/(tabs)/index.tsx`)
-- [ ] Ajouter le temps réel pour les **livraisons** (`app/vendor/(tabs)/deliveries.tsx`)
-- [ ] Ajouter des **tests** pour le hook `useRealtimeOrders`
-
----
-
-## 🆘 Dépannage
-
-### "⚠️ Supabase keys missing"
-- Vérifie que `.env.local` existe avec les bonnes clés
-- Redémarre Expo avec `npx expo start -c`
-
-### Le temps réel ne marche pas
-1. Vérifie que la table `commandes` est bien en **Replication** dans Supabase
-2. Vérifie que `enterprise_id` est bien filtré
-3. Regarde la console : tu devrais voir `🔔 Realtime: Changement détecté...`
-
+Tant que ces 4 conditions ne sont pas réunies : **polling uniquement**.

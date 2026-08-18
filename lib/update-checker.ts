@@ -32,9 +32,17 @@ export function startUpdateChecker(): void {
       if (!result.isAvailable) return;
       await Updates.fetchUpdateAsync();
       showToast({
-        message: 'Mise à jour reçue ✓ elle s\u2019appliquera au prochain lancement.',
+        message: 'Mise à jour reçue ✓ redémarrez pour l\u2019appliquer.',
         variant: 'info',
-        duration: 3200,
+        duration: 6000,
+        action: {
+          label: 'Redémarrer',
+          onPress: () => {
+            // Applique la mise à jour téléchargée immédiatement (au lieu
+            // d'attendre le prochain lancement).
+            void Updates.reloadAsync().catch(() => {});
+          },
+        },
       });
     } catch {
       /* non bloquant : jamais bloquant pour l'utilisateur */

@@ -64,31 +64,20 @@ function promoPercent(p: VendorProduct): number | null {
 }
 
 /**
- * Clé de comparaison d'une URL d'image : sans les paramètres de resize
- * (?width=…&format=webp…) qui diffèrent selon la provenance, mais avec le
- * chemin complet. Permet de détecter que deux URLs pointent vers le même
- * fichier alors qu'elles diffèrent d'un paramètre.
+ * Photo du produit : image principale, sinon la 1re de la galerie.
+ *
+ * ⚠️ Aucun filtre « anti-logo » ici : c'est le catalogue du VENDEUR — il doit
+ * voir ses vraies photos. Le filtre anti-logo (`isShopLogoImage`) reste côté
+ * client (feed) où il évite d'afficher le logo de la boutique à la place d'une
+ * photo de produit ; appliqué ici, il masquait des photos légitimes (images
+ * stockées dans le dossier enterprises/) → vignettes vides.
  */
-function imageStorageKey(url: string | null | undefined): string | null {
-  const resolved = resolveRemoteImageUrl(url);
-  if (!resolved) return null;
-  const q = resolved.indexOf('?');
-  return q >= 0 ? resolved.slice(0, q) : resolved;
-}
-
-/**
- * Vrai si l'URL pointe vers le logo de la boutique (même fichier que
- * l'avatar, ou fichier stocké dans le dossier des logos des entreprises).
- * Évite d'afficher le logo de la boutique comme photo d'un produit.
- */
-function isShopLogoImage(url: string | null | undefined, avatarUrl: string | null | undefined): boolean {
-  const key = imageStorageKey(url);
-  if (!key) return false;
-  const avatarKey = imageStorageKey(avatarUrl);
-  if (avatarKey && key === avatarKey) return true;
-  // Les logos uploadés depuis l'app vont dans le dossier « enterprises/ » :
-  // une image de produit qui pointe là-dedans est un logo, pas une photo.
-  return /\/enterprises\//.test(key);
+function productThumbUrl(p: VendorProduct): string | null {
+  return (
+    resolveRemoteImageUrl(p.imageUrl) ??
+    resolveRemoteImageUrl(p.imagesUrls?.[0] ?? null) ??
+    null
+  );
 }
 
 export default function VendorProductsTabScreen() {
@@ -309,15 +298,10 @@ export default function VendorProductsTabScreen() {
         ) : (
           <View style={{ gap: 10 }}>
             {filtered.map((p) => {
-              // Photo principale : imageUrl, sinon la 1re photo de la galerie.
-              // On refuse d'afficher le logo de la boutique (fichier identique
-              // à l'avatar ou stocké dans le dossier « enterprises/ ») :
-              // beaucoup de produits ont le logo stocké par erreur comme image.
-              const mainUrl = resolveRemoteImageUrl(p.imageUrl);
-              const mainIsLogo = isShopLogoImage(mainUrl, shop?.avatar);
-              const galleryFallback =
-                p.imagesUrls?.find((u) => !isShopLogoImage(u, shop?.avatar)) ?? null;
-              const img = mainUrl && !mainIsLogo ? mainUrl : resolveRemoteImageUrl(galleryFallback);
+              // Photo du produit : image principale, sinon la 1re de la galerie.
+              // Aucun filtre anti-logo ici : c'est le catalogue du vendeur, ses
+              // vraies photos doivent s'afficher (voir productThumbUrl).
+              const img = productThumbUrl(p);
               const status = stockStatus(p, commerceType, colors);
               const pct = promoPercent(p);
               const showOldPrice = pct != null;

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+
 import { Pressable, StyleSheet, View } from 'react-native';
 import { MapPin, Store, DollarSign, Clock, Tag, TrendingUp } from 'lucide-react-native';
 import { ThemedText } from '@/components/themed-text';

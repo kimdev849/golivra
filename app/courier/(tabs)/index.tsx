@@ -134,7 +134,7 @@ export default function CourierHomeScreen() {
               <ThemedText style={[styles.cardTitle, { color: palette.primaryDeep }]}>Recevoir des courses</ThemedText>
               <ThemedText style={[styles.cardHint, { color: palette.muted }]}>
                 {disponible
-                  ? 'GoLivra peut vous attribuer des livraisons.'
+                  ? 'GoLivra peut vous envoyer des livraisons.'
                   : 'Activez pour signaler que vous êtes prêt.'}
               </ThemedText>
             </View>
@@ -222,7 +222,7 @@ export default function CourierHomeScreen() {
               <Package size={26} color={palette.muted} strokeWidth={LUCIDE_STROKE} />
               <ThemedText style={[styles.emptyTitle, { color: palette.primaryDeep }]}>Aucune course active</ThemedText>
               <ThemedText style={[styles.emptyText, { color: palette.muted }]}>
-                Restez disponible : GoLivra vous attribuera les prochaines missions.
+                Restez disponible : GoLivra vous enverra les prochaines courses.
               </ThemedText>
             </View>
           ) : (

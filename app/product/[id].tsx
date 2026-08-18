@@ -27,6 +27,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { GalleryViewer } from '@/components/gallery-viewer';
 import { ScreenEmptyState } from '@/components/screen-load-state';
+import { PressableScale } from '@/components/ui/pressable-scale';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -63,7 +64,11 @@ import {
 import { useCart } from '@/contexts/cart-context';
 import { showToast } from '@/lib/app-toast';
 import { isFavoriteProduct, toggleFavoriteProduct } from '@/lib/favorites';
-import { getProductGalleryUrls } from '@/lib/listing-utils';
+import {
+  getProductCondition,
+  getProductConditionColor,
+  getProductGalleryUrls,
+} from '@/lib/listing-utils';
 
 const IMG_HERO: ResizeOptions = { width: 800, format: 'webp', quality: 85 };
 
@@ -183,6 +188,8 @@ export default function ProductDetailScreen() {
   const enterpriseName = product?.enterprise_nom || '';
   const enterpriseType = product?.enterprise_type || (kind === 'plat' ? 'restaurant' : 'boutique');
   const EnterpriseIcon = enterpriseType === 'restaurant' ? UtensilsCrossed : Store;
+  // État du produit (neuf / occasion / reconditionné) — affiché sur la fiche.
+  const condition = product ? getProductCondition(product) : null;
 
   const onToggleFav = async () => {
     if (!product) return;
@@ -337,15 +344,17 @@ export default function ProductDetailScreen() {
 
           {/* top controls */}
           <View style={[styles.heroTop, { paddingTop: Math.max(insets.top, 16) + 8 }]}>
-            <Pressable
+            <PressableScale
               style={[styles.iconBtn, { backgroundColor: colors.surface }]}
+              scaleTo={0.9}
               onPress={() => router.back()}
               hitSlop={8}
               accessibilityLabel="Retour">
               <ArrowLeft size={20} color={colors.text} strokeWidth={LUCIDE_STROKE} />
-            </Pressable>
-            <Pressable
+            </PressableScale>
+            <PressableScale
               style={[styles.iconBtn, { backgroundColor: colors.surface }]}
+              scaleTo={0.9}
               onPress={() => void onToggleFav()}
               hitSlop={8}
               accessibilityLabel={isFav ? 'Retirer des favoris' : 'Ajouter aux favoris'}>
@@ -355,7 +364,7 @@ export default function ProductDetailScreen() {
                 fill={isFav ? colors.error : 'none'}
                 strokeWidth={LUCIDE_STROKE}
               />
-            </Pressable>
+            </PressableScale>
           </View>
 
           {/* gallery badge */}
@@ -427,6 +436,15 @@ export default function ProductDetailScreen() {
                   {formatFcfa(Number(product.prix))}
                 </ThemedText>
               )}
+              {condition ? (
+                <View
+                  style={[
+                    styles.condBadge,
+                    { backgroundColor: getProductConditionColor(condition.key, colors) },
+                  ]}>
+                  <ThemedText style={styles.condBadgeTxt}>{condition.label}</ThemedText>
+                </View>
+              ) : null}
             </View>
           </View>
 
@@ -569,7 +587,7 @@ export default function ProductDetailScreen() {
               ]}
               value={note}
               onChangeText={setNote}
-              placeholder="Ex. sans piment, livré à 18h…"
+              placeholder="Ex. sans piment, appelez à l'arrivée…"
               placeholderTextColor={colors.placeholder}
               multiline
             />
@@ -622,18 +640,19 @@ export default function ProductDetailScreen() {
                 />
               </Pressable>
             </View>
-            <Pressable
+            <PressableScale
               style={[styles.addBtn, { backgroundColor: colors.primary }]}
+              scaleTo={0.98}
               onPress={() => router.navigate('/(tabs)/cart')}
               accessibilityLabel="Voir le panier">
               <ShoppingCart size={20} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
               <ThemedText style={[styles.addBtnTxt, { color: colors.onPrimary }]}>
                 Voir le panier · {formatFcfa(cartLine.quantite * unitPrice)}
               </ThemedText>
-            </Pressable>
+            </PressableScale>
           </>
         ) : (
-          <Pressable
+          <PressableScale
             style={[
               styles.addBtn,
               {
@@ -641,6 +660,7 @@ export default function ProductDetailScreen() {
                 opacity: orderable ? 1 : 0.5,
               },
             ]}
+            scaleTo={0.98}
             onPress={() => (orderable ? onAddToCart() : null)}
             disabled={!orderable}
             accessibilityLabel="Ajouter au panier">
@@ -656,7 +676,7 @@ export default function ProductDetailScreen() {
                   ? "Fermé pour le moment"
                   : 'Indisponible'}
             </ThemedText>
-          </Pressable>
+          </PressableScale>
         )}
         </View>
       </View>
@@ -735,6 +755,14 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   promoChipTxt: { color: '#FFF', fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
+  condBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  condBadgeTxt: { color: '#FFF', fontSize: 11, fontWeight: '800' },
   vendorRow: {
     flexDirection: 'row',
     alignItems: 'center',

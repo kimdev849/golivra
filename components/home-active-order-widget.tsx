@@ -5,11 +5,11 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { LUCIDE_STROKE } from '@/constants/icons';
-import { ZoomableImage } from '@/components/zoomable-image';
+
 import { useAppColors } from '@/hooks/use-app-colors';
 import { type ClientOrderListItemZod } from '@/lib/schemas';
 import { resolveRemoteImageUrl } from '@/lib/images';
-import { orderEtaMinutes, compactOrderRef } from '@/lib/order-status';
+import { orderEtaMinutes, compactOrderRef, normalizeStatusForProgress } from '@/lib/order-status';
 import { orderStatusLabel } from '@/lib/ux-copy';
 
 type Props = {
@@ -19,12 +19,35 @@ type Props = {
   merchantType?: 'restaurant' | 'boutique';
 };
 
+/** Progression 0→1 du widget d'accueil selon l'état de la commande. */
+function statusProgress(statut: string | null | undefined): number {
+  const key = normalizeStatusForProgress(statut);
+  const map: Record<string, number> = {
+    en_attente: 0.12,
+    commande_creee: 0.12,
+    en_attente_vendeur: 0.12,
+    partiellement_acceptee: 0.35,
+    acceptee: 0.35,
+    a_preparer: 0.35,
+    en_preparation: 0.5,
+    prete: 0.68,
+    collectee: 0.68,
+    livreur_en_route_pickup: 0.68,
+    en_collecte: 0.68,
+    en_livraison: 0.85,
+    en_route: 0.85,
+    livree: 1,
+  };
+  return map[key] ?? 0.2;
+}
+
 export function HomeActiveOrderWidget({ order, merchantName, merchantImage, merchantType }: Props) {
   const router = useRouter();
   const colors = useAppColors();
   const img = resolveRemoteImageUrl(merchantImage);
   const eta = orderEtaMinutes(order.statut);
   const subtitle = eta != null ? `Suivi en cours · ~${eta} min` : orderStatusLabel(order.statut);
+  const progress = statusProgress(order.statut);
 
   return (
     <Pressable
@@ -54,6 +77,18 @@ export function HomeActiveOrderWidget({ order, merchantName, merchantImage, merc
         <ThemedText style={[styles.meta, { color: colors.textMuted }]} numberOfLines={1}>
           #{compactOrderRef(order.id)} · {orderStatusLabel(order.statut)}
         </ThemedText>
+        {/* Barre de progression */}
+        <View style={[styles.progressTrack, { backgroundColor: colors.surfaceMuted }]}>
+          <View
+            style={[
+              styles.progressFill,
+              {
+                backgroundColor: progress >= 1 ? colors.success : colors.primary,
+                width: `${Math.round(progress * 100)}%`,
+              },
+            ]}
+          />
+        </View>
       </View>
       <View style={styles.trailing}>
         <MapPin size={16} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
@@ -100,5 +135,12 @@ const styles = StyleSheet.create({
   kicker: { fontSize: 12, fontWeight: '800', letterSpacing: 0.2 },
   title: { fontSize: 15 },
   meta: { fontSize: 12 },
+  progressTrack: {
+    height: 4,
+    borderRadius: 2,
+    marginTop: 7,
+    overflow: 'hidden',
+  },
+  progressFill: { height: '100%', borderRadius: 2 },
   trailing: { alignItems: 'center', gap: 4 },
 });

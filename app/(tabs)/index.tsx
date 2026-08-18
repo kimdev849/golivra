@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import {
+  ArrowUp,
   BadgePercent,
   Bell,
   ChevronRight,
@@ -35,6 +36,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { HomeActiveOrderWidget } from '@/components/home-active-order-widget';
 import { HomeCampaignBanner } from '@/components/home-campaign-banner';
+import { PressableScale } from '@/components/ui/pressable-scale';
 import { ThemedView } from '@/components/themed-view';
 import { HomeFeedSkeleton } from '@/components/ui/skeleton';
 import { LUCIDE_STROKE } from '@/constants/icons';
@@ -59,7 +61,7 @@ import { resolveRemoteImageUrl, type ResizeOptions } from '@/lib/images';
 import { enterprisePrepMinutes } from '@/lib/pricing';
 import { toggleFavoriteProduct } from '@/lib/favorites';
 import { productDetailHref } from '@/lib/listing-utils';
-import { getEffectiveUnitPrice } from '@/lib/product-promo';
+import { getEffectiveUnitPrice, resolveProductPricing } from '@/lib/product-promo';
 import { formatFcfa } from '@/lib/format';
 import { fetchActiveCampaigns } from '@/lib/campaigns';
 import { trackInteraction } from '@/lib/tracking';
@@ -99,13 +101,11 @@ function categoryToSearchType(category: FilterTab): CatalogSearchType {
 }
 
 function isPromoProduct(p: ProductPublic): boolean {
-  // Sans prix promo (null), Number(null) vaudrait 0 : il faut tester la présence
-  // AVANT de convertir, sinon TOUT produit sans promo serait classé « en promo »
-  // et affiché à 0 FCFA sur l'accueil.
-  if (p.prix_promo == null) return false;
-  const promo = Number(p.prix_promo);
-  const base = Number(getEffectiveUnitPrice(p) ?? p.prix);
-  return Number.isFinite(promo) && promo > 0 && promo < base;
+  // Basé sur resolveProductPricing : prix promo comparé au prix de BASE et
+  // fenêtres de dates respectées — exactement comme la fiche produit. Avant,
+  // le prix promo était comparé au prix EFFECTIF (déjà réduit) : la promo
+  // disparaissait de la liste dès qu'elle devenait active.
+  return resolveProductPricing(p).promoActive;
 }
 
 function unitPrice(p: ProductPublic): number {
@@ -121,10 +121,8 @@ function sortProducts(list: ProductPublic[], sort: SortKey): ProductPublic[] {
 }
 
 function promoPercent(p: ProductPublic): number | null {
-  const base = Number(p.prix);
-  const promo = Number(p.prix_promo);
-  if (!isPromoProduct(p) || !base) return null;
-  return Math.round(((base - promo) / base) * 100);
+  const pct = resolveProductPricing(p).discountPercent;
+  return pct != null && pct > 0 ? pct : null;
 }
 
 // ─── Premium Product Card ─────────────────────────────────────────
@@ -135,24 +133,33 @@ const PremiumCard = memo(function PremiumCard({
   isFav,
   onToggleFav,
   colors,
+  enterpriseImageUrl,
 }: {
   product: ProductPublic;
   onPress: () => void;
   isFav: boolean;
   onToggleFav: () => void;
   colors: ReturnType<typeof useAppColors>;
+  /** Photo de profil du commerce (repli local si absente du feed). */
+  enterpriseImageUrl?: string | null;
 }) {
   const imageUrl = resolveRemoteImageUrl(
     product.images_urls?.[0] ?? product.image_url,
     { width: 400, format: 'webp', quality: 80 },
+  );
+  // Logo du commerce visible dès la liste (plus besoin d'entrer dans le produit).
+  const vendorAvatar = resolveRemoteImageUrl(
+    product.enterprise_image_url ?? enterpriseImageUrl,
+    { width: 96, format: 'webp', quality: 80 },
   );
   const isPromo = isPromoProduct(product);
   const pct = promoPercent(product);
   const price = isPromo ? Number(product.prix_promo) : unitPrice(product);
 
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
+      scaleTo={0.97}
       style={({ pressed }) => [
         styles.premiumCard,
         { backgroundColor: colors.surface, opacity: pressed ? 0.93 : 1 },
@@ -199,6 +206,9 @@ const PremiumCard = memo(function PremiumCard({
 
         {/* Rating + vendor + time */}
         <View style={styles.premiumCardMeta}>
+          {vendorAvatar ? (
+            <Image source={{ uri: vendorAvatar }} style={styles.premiumCardAvatar} contentFit="cover" transition={150} />
+          ) : null}
           {product.enterprise_nom ? (
             <Text style={[styles.premiumCardVendor, { color: colors.textMuted }]} numberOfLines={1}>
               {product.enterprise_nom}
@@ -218,7 +228,7 @@ const PremiumCard = memo(function PremiumCard({
           ) : null}
         </View>
       </View>
-    </Pressable>
+    </PressableScale>
   );
 });
 
@@ -239,8 +249,9 @@ const EnterpriseCard = memo(function EnterpriseCard({
   const imgUrl = resolveRemoteImageUrl(enterprise.image_url, { width: 300, format: 'webp', quality: 80 });
 
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
+      scaleTo={0.97}
       style={({ pressed }) => [
         styles.enterpriseCard,
         { backgroundColor: colors.surface, opacity: pressed ? 0.93 : 1 },
@@ -282,7 +293,7 @@ const EnterpriseCard = memo(function EnterpriseCard({
           ~{enterprisePrepMinutes(enterprise) + deliveryMinutes} min
         </Text>
       ) : null}
-    </Pressable>
+    </PressableScale>
   );
 });
 
@@ -304,9 +315,10 @@ export default function HomeScreen() {
   const { data: activeCampaigns = [] } = useQuery({
     queryKey: ['active-campaigns'],
     queryFn: () => fetchActiveCampaigns(),
-    staleTime: 0,
+    // staleTime court mais non nul : la bannière se met à jour en quelques
+    // dizaines de secondes sans requête réseau à CHAQUE retour sur l'accueil.
+    staleTime: 1000 * 60,
     gcTime: 1000 * 60 * 2,
-    refetchOnMount: 'always',
   });
 
   const flatListRef = useRef<FlatList>(null);
@@ -438,6 +450,13 @@ export default function HomeScreen() {
     [restaurants, boutiques],
   );
 
+  /** Photo de profil par commerce (repli si le feed ne l'hydrate pas). */
+  const enterpriseImageById = useMemo(() => {
+    const m = new Map<string, string | null>();
+    for (const e of [...restaurants, ...boutiques]) m.set(e.id, e.image_url ?? null);
+    return m;
+  }, [restaurants, boutiques]);
+
   const showProductGrid =
     !searchActive ? category !== 'restaurant' && category !== 'boutique' : true;
 
@@ -490,19 +509,26 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      // Commandes actives + commerces : la moyenne d'étoiles d'un commerce
-      // noté après livraison doit être visible dès le retour sur l'accueil.
+      // Commandes actives : toujours rafraîchies au retour (suivi en direct).
       void refetchOrders();
-      void refetchRestaurants();
-      void refetchBoutiques();
-    }, [refetchOrders, refetchRestaurants, refetchBoutiques]),
+      // Commerces : ne refetch QUE si les données sont périmées (> 2 min).
+      // Avant, on forçait le réseau à chaque focus → l'app paraissait lente
+      // et brûlait la batterie dès qu'on revenait sur l'accueil.
+      const shouldRefetch = (type: 'restaurant' | 'boutique') => {
+        const state = queryClient.getQueryState<EnterprisePublic[]>(['enterprises', type]);
+        if (!state?.dataUpdatedAt) return true;
+        return Date.now() - state.dataUpdatedAt > 1000 * 60 * 2;
+      };
+      if (shouldRefetch('restaurant')) void refetchRestaurants();
+      if (shouldRefetch('boutique')) void refetchBoutiques();
+    }, [queryClient, refetchOrders, refetchRestaurants, refetchBoutiques]),
   );
 
   useEffect(() => {
     if (debouncedSearch.length >= 3) {
       void trackInteraction({ type: 'search', metadata: { query: debouncedSearch, category } });
     }
-  }, [debouncedSearch]);
+  }, [debouncedSearch, category]);
 
   // ── Handlers ──────────────────────────────────────────────────
 
@@ -574,10 +600,11 @@ export default function HomeScreen() {
           isFav={favProductKeys.has(`${item.kind === 'article' ? 'article' : 'plat'}:${item.id}`)}
           onToggleFav={() => void onToggleFav(item)}
           colors={colors}
+          enterpriseImageUrl={enterpriseImageById.get(item.entreprise_id) ?? null}
         />
       </View>
     ),
-    [favProductKeys, onToggleFav, router, colors],
+    [favProductKeys, onToggleFav, router, colors, enterpriseImageById],
   );
 
   const loading = searchActive
@@ -1022,7 +1049,9 @@ export default function HomeScreen() {
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           }}
           hitSlop={12}>
-          <Text style={{ color: colors.primary, fontSize: 18 }}>↑</Text>
+          {/* Icône vectorielle (le glyphe texte « ↑ » s'affichait « ij » sur
+              certains appareils dont la police système ne le contient pas). */}
+          <ArrowUp size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
         </Pressable>
       ) : null}
     </ThemedView>
@@ -1297,6 +1326,12 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   premiumCardVendor: { fontSize: 11 },
+  premiumCardAvatar: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#E5E7EB',
+  },
   premiumCardPriceRow: {
     flexDirection: 'row',
     alignItems: 'center',

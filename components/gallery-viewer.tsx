@@ -212,6 +212,10 @@ function GalleryItem({
   const savedY = useSharedValue(0);
 
   const resetTransform = useCallback(() => {
+    // Worklet : appelé aussi depuis les callbacks de gestes (thread UI). Sans
+    // cette directive, Reanimated crash au zoom / swipe (appel synchrone d'une
+    // fonction JS non-worklet depuis le thread UI).
+    'worklet';
     scale.value = withTiming(1, { duration: 200 });
     savedScale.value = 1;
     translateX.value = withTiming(0, { duration: 200 });
@@ -237,6 +241,9 @@ function GalleryItem({
   const panGesture = Gesture.Pan()
     .averageTouches(true)
     .enableTrackpadTwoFingerGesture(false)
+    // Ne s'active que sur un glissement VERTICAL : les swipes horizontaux sont
+    // laissés au FlatList (changement de photo) au lieu d'être volés par le pan.
+    .activeOffsetY([-10, 10])
     .onUpdate((e) => {
       if (scale.value <= 1.02) {
         // hors zoom : autorise un swipe vertical pour fermer (translateY libre)

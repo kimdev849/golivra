@@ -223,7 +223,7 @@ export default function CourierMissionDetailScreen() {
           ) : isDone ? (
             <ThemedText style={[styles.hint, { color: palette.muted }]}>Course terminée.</ThemedText>
           ) : !canAccept ? (
-            <ThemedText style={[styles.hint, { color: palette.muted }]}>Course assignée — récupérez la commande puis validez la livraison.</ThemedText>
+            <ThemedText style={[styles.hint, { color: palette.muted }]}>Vous avez une course — récupérez la commande puis confirmez la livraison.</ThemedText>
           ) : null}
           </AppContentWidth>
         </ScrollView>

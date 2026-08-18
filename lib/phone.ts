@@ -184,7 +184,9 @@ function formatGroups(digits: string, groups: number[]): string {
 
 /**
  * Convertit un numéro formaté en E164 (+242060001234).
- * Retourne null si le nombre de chiffres nationaux est incorrect.
+ * Retourne null si le nombre de chiffres nationaux est incorrect — y compris
+ * quand il y en a TROP (collage / numéro faux) : on refuse de tronquer
+ * silencieusement, sinon un OTP pourrait partir vers un numéro tronqué.
  */
 export function toE164(value: string): string | null {
   const activeIndicatif = detectCountryCode(value);
@@ -197,6 +199,8 @@ export function toE164(value: string): string | null {
     ? allDigits.slice(prefixDigits.length, prefixDigits.length + expectedDigits)
     : allDigits.slice(0, expectedDigits);
 
+  // Trop de chiffres saisis → invalide (au lieu de tronquer à la longueur attendue).
+  if (allDigits.length > prefixDigits.length + expectedDigits) return null;
   if (nationalDigits.length !== expectedDigits) return null;
   return `${activeIndicatif}${nationalDigits}`;
 }

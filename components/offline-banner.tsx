@@ -32,7 +32,7 @@ export function OfflineBanner({ topInset }: Props) {
       ]}>
       <WifiOff size={14} color={colors.warning} strokeWidth={LUCIDE_STROKE} />
       <ThemedText style={[styles.text, { color: colors.textSecondary }]} numberOfLines={2}>
-        Connexion indisponible — certaines informations peuvent ne pas être à jour
+        Connexion indisponible
       </ThemedText>
     </View>
   );

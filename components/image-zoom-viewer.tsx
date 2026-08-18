@@ -71,6 +71,10 @@ export function ImageZoomViewer({ visible, source, onClose, caption }: Props) {
   const [errored, setErrored] = useState(false);
 
   const resetTransform = useCallback(() => {
+    // Worklet : appelé aussi depuis les callbacks de gestes (thread UI). Sans
+    // cette directive, Reanimated crash au zoom / swipe (appel synchrone d'une
+    // fonction JS non-worklet depuis le thread UI).
+    'worklet';
     scale.value = withTiming(1, { duration: 200 });
     savedScale.value = 1;
     translateX.value = withTiming(0, { duration: 200 });

@@ -6,10 +6,19 @@ export type OtpRequestResult = {
   otpCode?: string;
 };
 
-export async function requestOtp(telephone: string): Promise<OtpRequestResult> {
+/**
+ * Demande un code OTP.
+ * @param purpose `'register'` (défaut) ou `'reset_password'` — pour la
+ * réinitialisation, le serveur vérifie d'abord que le numéro est lié à un
+ * compte existant AVANT d'envoyer le code.
+ */
+export async function requestOtp(
+  telephone: string,
+  purpose: 'register' | 'reset_password' = 'register',
+): Promise<OtpRequestResult> {
   return apiFetch<OtpRequestResult>('/api/otp/request', {
     method: 'POST',
-    jsonBody: { telephone },
+    jsonBody: purpose === 'reset_password' ? { telephone, purpose } : { telephone },
   });
 }
 

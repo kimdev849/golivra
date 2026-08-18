@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
+import { useVendor } from '@/contexts/vendor-context';
 
 /**
  * Barre de navigation vendeur — pleine largeur, épurée et professionnelle,
@@ -34,6 +35,7 @@ function TabItem({
   colors,
   onPress,
   onLongPress,
+  badge,
 }: {
   route: { key: string; name: string };
   isFocused: boolean;
@@ -47,6 +49,8 @@ function TabItem({
   colors: ReturnType<typeof useAppColors>;
   onPress: () => void;
   onLongPress: () => void;
+  /** Nombre d'actions en attente (commandes à accepter) affiché en badge rouge. */
+  badge?: number;
 }) {
   const active = useSharedValue(isFocused ? 1 : 0);
   const pressed = useSharedValue(0);
@@ -99,6 +103,11 @@ function TabItem({
             strokeWidth={isFocused ? 2.4 : LUCIDE_STROKE}
           />
         ) : null}
+        {badge != null && badge > 0 ? (
+          <View style={[styles.badge, { backgroundColor: colors.error, borderColor: colors.surfaceElevated }]}>
+            <Text style={styles.badgeText}>{badge > 99 ? '99+' : String(badge)}</Text>
+          </View>
+        ) : null}
       </Animated.View>
       <Text
         style={[
@@ -116,6 +125,12 @@ export function VendorTabBar({ state, descriptors, navigation }: BottomTabBarPro
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 10);
+  const { orders } = useVendor();
+
+  const pendingCount = React.useMemo(
+    () => orders.filter((o) => o.statut === 'en_attente').length,
+    [orders],
+  );
 
   const orderedRoutes = TAB_ORDER.map((name) => state.routes.find((r) => r.name === name)).filter(
     (r): r is (typeof state.routes)[number] => r != null,
@@ -170,6 +185,7 @@ export function VendorTabBar({ state, descriptors, navigation }: BottomTabBarPro
               colors={colors}
               onPress={onPress}
               onLongPress={onLongPress}
+              badge={route.name === 'orders' ? pendingCount : undefined}
             />
           );
         })}
@@ -207,5 +223,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+  },
+  badgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
   label: { fontSize: 11, letterSpacing: -0.2 },
 });

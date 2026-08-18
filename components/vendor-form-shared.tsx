@@ -2,7 +2,16 @@ import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  StyleSheet,
+  View,
+  type DimensionValue,
+  type LayoutChangeEvent,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -146,6 +155,7 @@ function DraggableTile({
   onDrag,
   onDragStateChange,
   onRemove,
+  wrapStyle,
 }: {
   image: VendorImageAsset;
   index: number;
@@ -161,6 +171,8 @@ function DraggableTile({
   onDrag: (to: number) => void;
   onDragStateChange: (uri: string | null) => void;
   onRemove: () => void;
+  /** Dimensions explicites de la tuile (grille mesurée) — évite l'étirement. */
+  wrapStyle?: StyleProp<ViewStyle>;
 }) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -228,7 +240,7 @@ function DraggableTile({
   }));
 
   return (
-    <View style={styles.tileWrap}>
+    <View style={[styles.tileWrap, wrapStyle]}>
       <GestureDetector gesture={composed}>
         <Animated.View
           style={[
@@ -286,9 +298,30 @@ export function VendorPhotoGalleryField({
   const isEmpty = images.length === 0;
   const [viewIndex, setViewIndex] = useState<number | null>(null);
   const [draggingUri, setDraggingUri] = useState<string | null>(null);
+  // Mesurée dès le premier rendu (même grille vide) : la taille des tuiles est
+  // donc TOUJOURS en pixels précis, aucun pourcentage ne transite à l'écran.
   const [gridWidth, setGridWidth] = useState(0);
 
   const tileSize = gridWidth > 0 ? (gridWidth - (GRID_COLS - 1) * GRID_GAP) / GRID_COLS : 0;
+
+  // Taille EXPLICITE de chaque tuile : JAMAIS de flexGrow (qui étirait la
+  // tuile « ajouter » à 100 % de la largeur quand elle était seule sur sa
+  // rangée → énorme carte vide dans le formulaire). Chaque tuile fait
+  // exactement 1/3 de la grille, qu'elle soit seule ou non, mesurée ou non.
+  const tileStyle = (gridWidth > 0
+    ? {
+        width: tileSize,
+        height: tileSize,
+        flexGrow: 0,
+        flexShrink: 0,
+        flexBasis: tileSize as DimensionValue,
+      }
+    : {
+        flexBasis: '30%' as DimensionValue,
+        flexGrow: 0,
+        flexShrink: 0,
+        maxWidth: '30%' as DimensionValue,
+      }) as ViewStyle;
 
   // La position source est recalculée à partir de l'URI à l'appel (jamais
   // d'index périmé : le tableau `images` est toujours le plus récent).
@@ -342,6 +375,7 @@ export function VendorPhotoGalleryField({
             onDrag={handleDrag}
             onDragStateChange={setDraggingUri}
             onRemove={() => onRemove(i)}
+            wrapStyle={tileStyle}
           />
         ))}
 
@@ -349,12 +383,13 @@ export function VendorPhotoGalleryField({
           <Pressable
             style={[
               isEmpty ? styles.addTileEmpty : styles.addTile,
+              isEmpty ? null : tileStyle,
               { borderColor: accent, backgroundColor: colors.surface },
             ]}
             onPress={() => void onAdd()}
             accessibilityRole="button"
             accessibilityLabel="Ajouter des photos">
-            <Plus size={isEmpty ? 30 : 24} color={accent} strokeWidth={LUCIDE_STROKE} />
+            <Plus size={isEmpty ? 18 : 24} color={accent} strokeWidth={LUCIDE_STROKE} />
             <ThemedText style={[styles.addTxt, { color: isEmpty ? colors.text : colors.textMuted }]}>
               {isEmpty ? 'Ajouter des photos' : 'ajouter'}
             </ThemedText>
@@ -384,16 +419,19 @@ const styles = StyleSheet.create({
   },
   headerLabel: { fontSize: 15, fontWeight: '700' },
   counter: { fontSize: 12, fontWeight: '600' },
-  hint: { fontSize: 12, lineHeight: 17, marginBottom: 2 },
+  hint: { fontSize: 12, lineHeight: 16, marginBottom: 0 },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: GRID_GAP,
-    marginTop: 6,
+    marginTop: 4,
+    // Hauteur minimale même vide : garantit que la largeur de la grille est
+    // mesurée dès le premier rendu (aucun rendu en pourcentage intermédiaire).
+    minHeight: 52,
   },
   tileWrap: {
-    flexBasis: '30%',
-    flexGrow: 1,
+    flexGrow: 0,
+    flexShrink: 0,
     position: 'relative',
   },
   tile: {
@@ -427,8 +465,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addTile: {
-    flexBasis: '30%',
-    flexGrow: 1,
     aspectRatio: 1,
     borderRadius: 12,
     borderWidth: 1.5,
@@ -439,13 +475,14 @@ const styles = StyleSheet.create({
   },
   addTileEmpty: {
     width: '100%',
-    height: 120,
-    borderRadius: 14,
+    height: 52,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderStyle: 'dashed',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
   },
-  addTxt: { fontSize: 11, fontWeight: '600' },
+  addTxt: { fontSize: 13, fontWeight: '600' },
 });

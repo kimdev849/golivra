@@ -4,6 +4,7 @@ import {
   fetchEnterprisesByType,
   fetchProductsForEnterpriseCached,
 } from '@/lib/client-data';
+import { fetchCached } from '@/lib/request-cache';
 import { getSessionToken } from '@/lib/auth';
 
 export type EnterprisePublic = {
@@ -78,6 +79,8 @@ export type ProductPublic = {
   options?: ProductOptionGroup[] | null;
   /** Tags / catégories secondaires (utile pour la fiche produit). */
   tags?: string[] | null;
+  /** État du produit (articles boutique) : neuf | occasion | reconditionne. */
+  etat_produit?: string | null;
   /** Catégorie de produit (FK categorie_id resolue cote API). */
   categorie_id?: string | null;
   /** Hydratation par le feed cross-commerces (optionnel sur l'endpoint /enterprise/:id). */
@@ -138,6 +141,9 @@ function isPromoProduct(p: ProductPublic): boolean {
 
 function applyFeedFilters(items: ProductPublic[], params: ProductFeedParams): ProductPublic[] {
   let list = items;
+  // Un produit marqué indisponible par le vendeur ne doit JAMAIS apparaître
+  // sur la marketplace publique (feed + recherche + repli local).
+  list = list.filter((p) => p.est_disponible !== false);
   if (params.type === 'plat') list = list.filter((p) => p.kind !== 'article');
   if (params.type === 'article') list = list.filter((p) => p.kind === 'article');
   if (params.promo) list = list.filter(isPromoProduct);
@@ -180,20 +186,24 @@ function shouldFallbackFeed(error: unknown): boolean {
   );
 }
 
-/**
- * Feed public de produits/dishes, agrege depuis TOUS les commerces actifs.
- */
-export async function fetchProductFeed(params: ProductFeedParams = {}): Promise<ProductPublic[]> {
-  const search = new URLSearchParams();
-  if (params.type) search.set('type', params.type);
-  if (params.promo) search.set('promo', 'true');
-  if (params.limit != null) search.set('limit', String(params.limit));
-  if (params.offset != null) search.set('offset', String(params.offset));
-  const qs = search.toString();
+/** Cache disque + mémoire pour le feed : l'accueil s'affiche instantanément
+ *  au réveil de l'app (les données de la dernière session sont déjà là),
+ *  puis se rafraîchit en arrière-plan. TTL court pour ne pas figer le
+ *  catalogue trop longtemps (un produit rendu indisponible disparaît vite). */
+const FEED_CACHE_TTL_MS = 60_000;
+
+async function fetchProductFeedNetwork(params: ProductFeedParams, qs: string): Promise<ProductPublic[]> {
   try {
-    return await apiFetch<ProductPublic[]>(`/products/feed${qs ? `?${qs}` : ''}`, {
+    const list = await apiFetch<ProductPublic[]>(`/products/feed${qs ? `?${qs}` : ''}`, {
       skipIncidentReport: true,
+      // Cold start Render : le premier appel après une pause peut prendre
+      // ~30 s. On laisse le feed respirer plutôt que d'échouer à 15 s.
+      timeoutMs: 30_000,
     });
+    // Filet de sécurité avant mise en cache : même si le serveur (ou un cache
+    // intermédiaire) renvoyait un produit indisponible, il ne sera JAMAIS
+    // affiché ni persisté côté client.
+    return Array.isArray(list) ? list.filter((p) => p.est_disponible !== false) : [];
   } catch (error) {
     if (shouldFallbackFeed(error)) {
       return fetchProductFeedFromEnterprises(params);
@@ -205,6 +215,20 @@ export async function fetchProductFeed(params: ProductFeedParams = {}): Promise<
       throw error;
     }
   }
+}
+
+/**
+ * Feed public de produits/dishes, agrege depuis TOUS les commerces actifs.
+ */
+export async function fetchProductFeed(params: ProductFeedParams = {}): Promise<ProductPublic[]> {
+  const search = new URLSearchParams();
+  if (params.type) search.set('type', params.type);
+  if (params.promo) search.set('promo', 'true');
+  if (params.limit != null) search.set('limit', String(params.limit));
+  if (params.offset != null) search.set('offset', String(params.offset));
+  const qs = search.toString();
+  const cacheKey = `feed:${qs || 'all'}`;
+  return fetchCached(cacheKey, () => fetchProductFeedNetwork(params, qs), FEED_CACHE_TTL_MS);
 }
 
 /** Recherche serveur unifiée (produits + commerces). */
@@ -222,9 +246,17 @@ export async function searchCatalog(
   search.set('limit', String(limit));
 
   try {
-    return await apiFetch<CatalogSearchResult>(`/products/search?${search.toString()}`, {
+    const results = await apiFetch<CatalogSearchResult>(`/products/search?${search.toString()}`, {
       skipIncidentReport: true,
+      // Cold start Render : la recherche au réveil de l'app peut être lente.
+      timeoutMs: 25_000,
     });
+    // Filet de sécurité : même si l'API renvoyait un produit indisponible
+    // (cache serveur), on ne l'affiche jamais côté client.
+    return {
+      products: results.products.filter((p) => p.est_disponible !== false),
+      enterprises: results.enterprises,
+    };
   } catch {
     const [feed, restaurants, boutiques] = await Promise.all([
       fetchProductFeedFromEnterprises({ limit: 200 }),

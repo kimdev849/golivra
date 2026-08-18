@@ -48,9 +48,12 @@ export function ThemedText({
     };
   }
 
+  // `style` après `{ color }` : la couleur explicite passée par l'appelant doit
+  // gagner sur la couleur du thème. Avant, l'ordre inverse écrasait par ex. le
+  // blanc du slogan du landing (rendu noir sur l'image en mode clair).
   return (
     <Text
-      style={[base, style, { color }, scaled]}
+      style={[base, { color }, style, scaled]}
       {...rest}
     />
   );

@@ -21,7 +21,6 @@ import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState } from 'react';
 
-import { ThemedText } from '@/components/themed-text';
 import { COURIER_TAB_BAR_PADDING_BOTTOM } from '@/constants/courier-layout';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useCourier } from '@/contexts/courier-context';
@@ -244,7 +243,7 @@ export default function CourierProfileScreen() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.dispoTitle, { color: palette.primaryDeep }]}>Disponible pour les courses</Text>
               <Text style={[styles.dispoHint, { color: palette.muted }]}>
-                {disponible ? 'Vous êtes en ligne, GoLivra peut vous attribuer des missions.' : 'Hors ligne pour le moment.'}
+                {disponible ? 'Vous êtes en ligne, GoLivra peut vous envoyer des courses.' : 'Hors ligne pour le moment.'}
               </Text>
             </View>
             <Switch

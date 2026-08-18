@@ -1,13 +1,39 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { ArrowLeft, Bike, CheckCircle2, Clock, ExternalLink, MapPin, Package, PhoneCall, Smartphone, Sparkles, Star } from 'lucide-react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
+import {
+  ArrowLeft,
+  Bike,
+  CheckCircle2,
+  ChefHat,
+  Clock,
+  ExternalLink,
+  MapPin,
+  Package,
+  PhoneCall,
+  ShoppingBag,
+  Smartphone,
+  Star,
+} from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { EventTimeline } from '@/components/event-timeline';
+import { LivePulseDot } from '@/components/live-pulse-dot';
+import { OrderProgressStepper, type OrderStep } from '@/components/order-progress-stepper';
+import { GOLIVRA_BRAND_SHADOW } from '@/constants/app-palette';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useFeatureEnabled } from '@/hooks/use-feature-enabled';
@@ -44,9 +70,6 @@ type OrderDetail = {
   adresse_livraison?: string;
   cree_le: string;
   sousCommandes?: SousCommandeDetail[];
-  /**
-   * Estimation d'arrivée calculée par l'API (préparation + zone de livraison).
-   */
   eta?: {
     prepMinutes: number;
     deliveryMinutes: number | null;
@@ -56,11 +79,6 @@ type OrderDetail = {
     totalMinutes: number | null;
     arriveeEstimeeAt: string | null;
   };
-  /**
-   * Nouveau parcours « paiement après acceptation » : statut du paiement,
-   * délai de paiement (5 min), montant réellement dû (segments acceptés),
-   * délai d'acceptation et motif d'annulation éventuel.
-   */
   paiement_statut?: string | null;
   paiement_limite_at?: string | null;
   acceptation_limite_at?: string | null;
@@ -73,7 +91,10 @@ type OrderDetail = {
     telephone: string;
     image_url?: string;
     note_moyenne?: number;
+    position_actuelle?: { latitude: number; longitude: number; at: string | null } | null;
   };
+  /** Distance du livreur jusqu'à l'adresse (calculée côté API, si coordonnées connues). */
+  distance_km?: number | null;
   timeline?: {
     commande?: LocalTimelineStep[];
     livraisons?: { timeline?: LocalTimelineStep[] }[];
@@ -85,9 +106,20 @@ function formatHeure(iso: string | null | undefined): string | null {
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return null;
-    return `vers ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+    return `${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
   } catch {
     return null;
+  }
+}
+
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
   }
 }
 
@@ -112,20 +144,75 @@ function mmss(totalSecs: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+/** Ton visuel d'un statut de sous-commande (pastille colorée, sans émoji). */
+const SC_STATUS_TONE: Record<string, 'success' | 'progress' | 'warn' | 'danger' | 'neutral'> = {
+  en_attente: 'warn',
+  acceptee: 'success',
+  en_preparation: 'progress',
+  prete: 'progress',
+  collectee: 'progress',
+  livree: 'success',
+  refusee: 'danger',
+  remboursee: 'danger',
+  annulee: 'neutral',
+};
+
 const SC_STATUS_LABEL: Record<string, string> = {
-  en_attente: '⏳ En attente',
-  acceptee: '✅ Acceptée',
-  en_preparation: '👨‍🍳 En préparation',
-  prete: '📦 Prête',
-  collectee: '🛵 Récupérée',
-  livree: '✅ Livrée',
-  refusee: '❌ Refusée',
-  remboursee: '⏱️ Expirée',
-  annulee: '❌ Annulée',
+  en_attente: 'En attente',
+  acceptee: 'Acceptée',
+  en_preparation: 'En préparation',
+  prete: 'Prête',
+  collectee: 'Récupérée',
+  livree: 'Livrée',
+  refusee: 'Refusée',
+  remboursee: 'Expirée',
+  annulee: 'Annulée',
 };
 
 function scStatusLabel(statut: string): string {
   return SC_STATUS_LABEL[statut] ?? statut;
+}
+
+/** Étapes du suivi (style Glovo/Uber) : position courante. */
+function stepperPosition(statut: string): { done: number; active: number } {
+  switch (statut) {
+    case 'livree':
+      return { done: 4, active: -1 };
+    case 'en_livraison':
+      return { done: 2, active: 2 };
+    case 'prete':
+    case 'collectee':
+      return { done: 2, active: 2 };
+    case 'en_preparation':
+    case 'a_preparer':
+      return { done: 1, active: 1 };
+    case 'acceptee':
+    case 'partiellement_acceptee':
+      return { done: 1, active: 1 };
+    case 'en_attente':
+      return { done: 0, active: 0 };
+    default:
+      return { done: 0, active: 0 };
+  }
+}
+
+/** Carte avec animation d'entrée en cascade. */
+function FadeCard({
+  children,
+  index,
+  style,
+}: {
+  children: React.ReactNode;
+  index: number;
+  style?: object;
+}) {
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(index * 70).duration(320)}
+      style={[styles.card, style]}>
+      {children}
+    </Animated.View>
+  );
 }
 
 export default function OrderTrackingScreen() {
@@ -245,6 +332,13 @@ export default function OrderTrackingScreen() {
     router.replace('/(tabs)/explore');
   };
 
+  const callCourier = () => {
+    const raw = order?.livreur?.telephone;
+    if (!raw) return;
+    const digits = String(raw).replace(/[^\d+]/g, '');
+    if (digits) void Linking.openURL(`tel:${digits}`);
+  };
+
   if (loading) {
     return (
       <ThemedView style={styles.center} lightColor={colors.background} darkColor={colors.background}>
@@ -286,8 +380,7 @@ export default function OrderTrackingScreen() {
       ? `${acceptedNames.slice(0, -1).join(', ')} et ${acceptedNames[acceptedNames.length - 1]} ont accepté votre commande.`
       : `${acceptedNames[0] || 'La boutique'} a accepté votre commande.`;
 
-  // Histoire de la commande annulée, racontée en mots simples (null si la
-  // commande n'est pas annulée / refusée / remboursée).
+  // Histoire de la commande annulée, racontée en mots simples.
   const annulationMotif = order?.annulation_motif ? String(order.annulation_motif) : null;
   const refusedSc = scs.find((s) => s.statut === 'refusee');
   const cancelInfo = orderCancelledInfo({
@@ -344,8 +437,60 @@ export default function OrderTrackingScreen() {
   const quartierLivraison = eta?.quartierLivraison || null;
   const zoneLabel = zoneTierLabel || quartierLivraison || null;
 
+  // Position du stepper (Commande → Préparation → En route → Livrée).
+  const { done: doneSteps, active: activeStep } = stepperPosition(order?.statut ?? '');
+
+  // Pastille de statut dans le header.
+  const headerPill = (() => {
+    if (waitingConfirmation) return { label: 'En attente', bg: colors.warningSoft, txt: colors.warning };
+    if (readyToPay) return { label: 'À payer', bg: colors.successSoft, txt: colors.success };
+    if (order?.statut === 'en_livraison') return { label: 'En route', bg: colors.primarySoft, txt: colors.primary };
+    if (isDelivered) return { label: 'Livrée', bg: colors.successSoft, txt: colors.success };
+    return { label: 'En cours', bg: colors.surfaceMuted, txt: colors.textSecondary };
+  })();
+
+  // Suivi en direct : distance du livreur jusqu'à l'adresse (pendant la livraison).
+  const courierDistanceKm = order?.distance_km ?? null;
+  const courierProche =
+    order?.statut === 'en_livraison' && courierDistanceKm != null && courierDistanceKm > 0 && courierDistanceKm < 0.5;
+  const courierDistanceLabel =
+    courierDistanceKm == null
+      ? null
+      : courierDistanceKm < 1
+        ? `${Math.round(courierDistanceKm * 1000)} m`
+        : `${Number(courierDistanceKm).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km`;
+
+  // Titre + sous-titre du hero selon l'état.
+  const heroTitle = (() => {
+    if (order?.statut === 'en_livraison') return courierProche ? 'Votre livreur est proche' : 'En route vers vous';
+    if (waitingConfirmation) return 'Commande envoyée';
+    if (readyToPay) return 'Commande confirmée';
+    if (order?.statut === 'a_preparer' || order?.statut === 'en_preparation') return 'En préparation';
+    return 'Commande confirmée';
+  })();
+
+  const heroSub = (() => {
+    if (order?.statut === 'en_livraison') {
+      return zoneLabel ? `Livraison · ${zoneLabel}` : 'Votre livreur est en chemin';
+    }
+    if (waitingConfirmation) return `Envoyée à ${commerceLabel}`;
+    if (readyToPay) return acceptedLabel;
+    if (eta?.totalMinutes != null) return `Arrivée estimée ${arriveeLabel ? `vers ${arriveeLabel}` : `dans ~${eta.totalMinutes} min`}`;
+    return 'Recherche d’un livreur pour votre commande…';
+  })();
+
+  const isLive = !isDelivered && !isRefunded && order?.statut !== 'annulee';
+
+  const stepperSteps: OrderStep[] = [
+    { key: 'commande', label: 'Commande', icon: ShoppingBag },
+    { key: 'preparation', label: 'Préparation', icon: ChefHat },
+    { key: 'route', label: 'En route', icon: Bike },
+    { key: 'livree', label: 'Livrée', icon: CheckCircle2 },
+  ];
+
   return (
     <ThemedView style={styles.screen} lightColor={colors.backgroundAlt} darkColor={colors.backgroundAlt}>
+      {/* ── Header ── */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 10), backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
           <ArrowLeft size={24} color={colors.text} strokeWidth={LUCIDE_STROKE} />
@@ -353,40 +498,129 @@ export default function OrderTrackingScreen() {
         <ThemedText style={[styles.headerTitle, { color: colors.text }]}>
           {isDelivered ? 'Détails de commande' : 'Suivi de commande'}
         </ThemedText>
-        <View style={{ width: 24 }} />
+        <View style={[styles.headerPill, { backgroundColor: headerPill.bg }]}>
+          <ThemedText style={[styles.headerPillText, { color: headerPill.txt }]}>{headerPill.label}</ThemedText>
+        </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 20 }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
 
-        {/* CARTE REMBOURSEMENT - commande expirée / annulée (message humain) */}
-        {isRefunded && cancelInfo && (
-          <View
-            style={[
-              styles.mapPreviewCard,
-              { backgroundColor: colors.surface, borderColor: colors.warning },
-            ]}>
-            <View style={[styles.refundContainer, { backgroundColor: colors.warningSoft }]}>
-              <View style={[styles.etaIconBox, { backgroundColor: colors.warning }]}>
-                <Clock size={26} color="#FFFFFF" strokeWidth={LUCIDE_STROKE} />
+        {/* ── HERO STATUT + STEPPER (non livrée, non remboursée) ── */}
+        {!isDelivered && !isRefunded ? (
+          <Animated.View entering={FadeInDown.duration(350)}>
+            <LinearGradient
+              colors={[colors.primaryDeep, colors.primary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.heroCard}>
+              {/* Badge live + ETA */}
+              <View style={styles.heroTopRow}>
+                <View style={styles.liveBadge}>
+                  <LivePulseDot color="#FFFFFF" size={8} active={isLive} />
+                  <ThemedText style={styles.liveBadgeText}>
+                    {order?.statut === 'en_livraison' ? 'En direct' : 'Suivi en direct'}
+                  </ThemedText>
+                </View>
+                {order?.statut === 'en_livraison' ? (
+                  <View style={styles.heroEtaBlock}>
+                    <ThemedText style={styles.heroEta}>
+                      {restantMin != null && restantMin > 0 ? `~${restantMin}` : '—'}
+                    </ThemedText>
+                    <ThemedText style={styles.heroEtaUnit}>min</ThemedText>
+                    <ThemedText style={styles.heroEtaLabel}>Arrivée estimée</ThemedText>
+                    {courierDistanceLabel ? (
+                      <View style={styles.heroDistancePill}>
+                        <ThemedText style={styles.heroDistancePillText}>
+                          {courierProche ? 'Proche 🛵' : `à ~${courierDistanceLabel}`}
+                        </ThemedText>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : null}
               </View>
-              <ThemedText style={[styles.etaTime, { color: colors.text, textAlign: 'center' }]}>
+
+              {/* Titre / sous-titre */}
+              <View style={styles.heroBody}>
+                <ThemedText style={styles.heroTitle}>{heroTitle}</ThemedText>
+                <ThemedText style={styles.heroSub}>{heroSub}</ThemedText>
+              </View>
+
+              {/* Compte à rebours confirmation */}
+              {waitingConfirmation ? (
+                <View style={styles.heroCountdown}>
+                  <View style={styles.heroCountdownRow}>
+                    <Clock size={16} color="#FFE9B8" strokeWidth={2.4} />
+                    <ThemedText style={styles.heroCountdownLabel}>
+                      En attente de confirmation {commerceDe}
+                    </ThemedText>
+                  </View>
+                  <ThemedText style={styles.heroCountdownTime}>
+                    {acceptCountdown ?? '05:00'}
+                  </ThemedText>
+                  {acceptanceMsg ? (
+                    <ThemedText style={styles.heroCountdownMsg}>{acceptanceMsg}</ThemedText>
+                  ) : null}
+                  <ThemedText style={styles.heroCountdownReassure}>
+                    Pas d’inquiétude, vous ne serez débité qu’après l’acceptation de votre commande.
+                  </ThemedText>
+                </View>
+              ) : null}
+            </LinearGradient>
+
+            {/* Stepper de progression */}
+            <View style={[styles.stepperCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowColor: GOLIVRA_BRAND_SHADOW }]}>
+              <OrderProgressStepper
+                steps={stepperSteps}
+                done={doneSteps}
+                active={activeStep}
+                colors={{
+                  primary: colors.primary,
+                  primarySoft: colors.primarySoft,
+                  success: colors.success,
+                  surfaceMuted: colors.surfaceMuted,
+                  border: colors.border,
+                  text: colors.text,
+                  textMuted: colors.textMuted,
+                }}
+              />
+            </View>
+          </Animated.View>
+        ) : null}
+
+        {/* ── CARTE REMBOURSEMENT / ANNULATION ── */}
+        {isRefunded && cancelInfo ? (
+          <Animated.View entering={FadeInDown.duration(350)} style={[styles.card, styles.refundCard, { backgroundColor: colors.surface, borderColor: colors.warning }]}>
+            <View style={styles.refundBody}>
+              <View style={[styles.refundIconWrap, { backgroundColor: colors.warningSoft }]}>
+                <Clock size={26} color={colors.warning} strokeWidth={LUCIDE_STROKE} />
+              </View>
+              <ThemedText style={[styles.refundTitle, { color: colors.text }]}>
                 {cancelInfo.title}
               </ThemedText>
               {cancelInfo.intro ? (
-                <ThemedText style={[styles.refundBody, { color: colors.text, textAlign: 'center' }]}>
+                <ThemedText style={[styles.refundText, { color: colors.text }]}>
                   {cancelInfo.intro}
                 </ThemedText>
               ) : null}
-              <ThemedText style={[styles.refundBody, { color: colors.textMuted, textAlign: 'center' }]}>
+              <ThemedText style={[styles.refundText, { color: colors.textMuted }]}>
                 {cancelInfo.body}
               </ThemedText>
 
               {/* Toute l'histoire, dans l'ordre */}
-              <View style={[styles.storyBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={[styles.storyBox, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
                 {cancelInfo.steps.map((s, i) => (
                   <View key={i} style={styles.storyRow}>
-                    <ThemedText style={[styles.storyEmoji, { color: colors.text }]}>{s.emoji}</ThemedText>
-                    <View style={{ flex: 1 }}>
+                    <View style={styles.storyRail}>
+                      <View style={[styles.storyDot, { backgroundColor: colors.surface, borderColor: colors.borderStrong }]}>
+                        <ThemedText style={styles.storyEmoji}>{s.emoji}</ThemedText>
+                      </View>
+                      {i < cancelInfo.steps.length - 1 ? (
+                        <View style={[styles.storyLine, { backgroundColor: colors.border }]} />
+                      ) : null}
+                    </View>
+                    <View style={{ flex: 1, paddingBottom: i < cancelInfo.steps.length - 1 ? 14 : 0 }}>
                       <ThemedText style={[styles.storyTitle, { color: colors.text }]}>{s.title}</ThemedText>
                       <ThemedText style={[styles.storyDetail, { color: colors.textMuted }]}>{s.detail}</ThemedText>
                     </View>
@@ -395,196 +629,33 @@ export default function OrderTrackingScreen() {
               </View>
 
               {cancelInfo.note ? (
-                <ThemedText style={[styles.refundHint, { color: colors.textMuted, textAlign: 'center' }]}>
+                <ThemedText style={[styles.refundHint, { color: colors.textMuted }]}>
                   {cancelInfo.note}
                 </ThemedText>
               ) : null}
 
-              <Pressable style={[styles.refundCta, { backgroundColor: colors.primary }]} onPress={goHome}>
-                <ThemedText style={[styles.refundCtaText, { color: colors.onPrimary }]}>
+              <Pressable
+                style={[styles.primaryCta, { backgroundColor: colors.primary }]}
+                onPress={goHome}
+                android_ripple={{ color: colors.primaryMuted }}>
+                <ThemedText style={[styles.primaryCtaText, { color: colors.onPrimary }]}>
                   Retourner à l’accueil
                 </ThemedText>
               </Pressable>
             </View>
-          </View>
-        )}
+          </Animated.View>
+        ) : null}
 
-        {/* CARTE STATUT / PREVIEW - Uniquement si non livrée et non remboursée */}
-        {!isDelivered && !isRefunded && (
-          <View style={[styles.mapPreviewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.staticMapContainer, { backgroundColor: colors.primarySoft }]}>
-              <View style={[styles.artHalo, styles.artHaloA, { backgroundColor: colors.accentSoft }]} />
-              <View style={[styles.artHalo, styles.artHaloB, { backgroundColor: colors.surface }]} />
-              <View style={[styles.artRing, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <View style={styles.artIconBox}>
-                  {order?.statut === 'en_livraison' ? (
-                    <Bike size={42} color="#FFFFFF" strokeWidth={2} />
-                  ) : (
-                    <Package size={42} color="#FFFFFF" strokeWidth={2} />
-                  )}
-                </View>
-              </View>
-              <View style={[styles.artBadge, styles.artBadgeA, { backgroundColor: colors.surface }]}>
-                <Clock size={15} color={colors.primary} strokeWidth={2.4} />
-              </View>
-              <View style={[styles.artBadge, styles.artBadgeB, { backgroundColor: colors.surface }]}>
-                <MapPin size={15} color={colors.primary} strokeWidth={2.4} />
-              </View>
-              <View style={[styles.artBadge, styles.artBadgeC, { backgroundColor: colors.surface }]}>
-                <Sparkles size={14} color={colors.accent} strokeWidth={2.4} />
-              </View>
-              <View style={[styles.artDot, styles.artDotA, { backgroundColor: colors.accent }]} />
-              <View style={[styles.artDot, styles.artDotB, { backgroundColor: colors.primary }]} />
-              <View style={[styles.artDot, styles.artDotC, { backgroundColor: colors.borderStrong }]} />
-
-              {/* Overlay état : attente de confirmation / paiement / préparation / en livraison */}
-              <View style={[styles.mapOverlay, { backgroundColor: colors.surface }]}>
-                {order?.statut === 'en_livraison' ? (
-                  <>
-                    <View style={styles.etaRow}>
-                      <View style={[styles.etaIconBox, { backgroundColor: colors.primarySoft }]}>
-                        <Bike size={24} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <ThemedText style={[styles.etaLabel, { color: colors.textMuted }]}>Arrivée estimée</ThemedText>
-                        <ThemedText style={[styles.etaTime, { color: colors.text }]}>
-                          {restantMin != null && restantMin > 0
-                            ? `~${restantMin} min`
-                            : arriveeLabel || 'Arrivée en cours'}
-                        </ThemedText>
-                      </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <ThemedText style={[styles.distanceLabel, { color: colors.textMuted }]}>
-                          {zoneTierLabel ? 'Zone' : quartierLivraison ? 'Quartier' : 'Arrivée'}
-                        </ThemedText>
-                        <ThemedText style={[styles.distanceValue, { color: colors.primaryDeep }]} numberOfLines={1}>
-                          {zoneTierLabel || quartierLivraison || arriveeLabel || '—'}
-                        </ThemedText>
-                      </View>
-                    </View>
-                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
-                    <ThemedText style={[styles.statusHighlight, { color: colors.primary }]}>En route vers vous</ThemedText>
-                  </>
-                ) : waitingConfirmation ? (
-                  <>
-                    <View style={styles.statusRow}>
-                      <View style={[styles.etaIconBox, { backgroundColor: colors.warningSoft }]}>
-                        <Clock size={24} color={colors.warning} strokeWidth={LUCIDE_STROKE} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <ThemedText style={[styles.etaTime, { color: colors.text }]}>Commande envoyée 🛍️</ThemedText>
-                        <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 2, lineHeight: 18 }]}>
-                          Nous avons envoyé votre commande à {commerceLabel}.
-                        </ThemedText>
-                        <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 2, lineHeight: 18 }]}>
-                          {commerceWho} est en train de vérifier votre commande.
-                        </ThemedText>
-                      </View>
-                    </View>
-
-                    <View style={[styles.countdownBox, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
-                      <ThemedText style={[styles.countdownTime, { color: colors.warning }]}>
-                        {acceptCountdown ?? '05:00'}
-                      </ThemedText>
-                      <ThemedText style={[styles.countdownLabel, { color: colors.textMuted }]}>
-                        En attente de confirmation {commerceDe}
-                      </ThemedText>
-                      {acceptanceMsg ? (
-                        <ThemedText style={[styles.countdownMsg, { color: colors.text }]}>
-                          {acceptanceMsg}
-                        </ThemedText>
-                      ) : null}
-                    </View>
-
-                    <ThemedText style={[styles.reassureText, { color: colors.textMuted }]}>
-                      Pas d’inquiétude, vous ne serez débité qu’après l’acceptation de votre commande.
-                    </ThemedText>
-                  </>
-                ) : readyToPay ? (
-                  <>
-                    <View style={styles.statusRow}>
-                      <View style={[styles.etaIconBox, { backgroundColor: colors.successSoft }]}>
-                        <CheckCircle2 size={24} color={colors.success} strokeWidth={LUCIDE_STROKE} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <ThemedText style={[styles.etaTime, { color: colors.text }]}>Bonne nouvelle ! 🎉</ThemedText>
-                        <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 2, lineHeight: 18 }]}>
-                          {acceptedLabel}
-                        </ThemedText>
-                        <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 2, lineHeight: 18 }]}>
-                          Votre commande est maintenant confirmée. Vous pouvez procéder au paiement pour que la préparation commence.
-                        </ThemedText>
-                        {payCountdown != null ? (
-                          <ThemedText style={[styles.deadlineText, { color: paymentDeadlineExpired ? colors.error : colors.warning }]}>
-                            ⏱️ Il vous reste {payCountdown} pour payer
-                          </ThemedText>
-                        ) : null}
-                      </View>
-                    </View>
-
-                    {/* Répartition par commerce : acceptés / refusés / expirés */}
-                    {scs.length > 1 ? (
-                      <View style={[styles.breakdownBox, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
-                        {scs.map((sc) => (
-                          <View key={sc.id} style={styles.scRow}>
-                            <ThemedText style={[styles.scName, { color: colors.text }]} numberOfLines={1}>
-                              {sc.commerce_nom || 'Commerce'}
-                            </ThemedText>
-                            <ThemedText
-                              style={[
-                                styles.scStatut,
-                                {
-                                  color: ['refusee', 'remboursee', 'annulee'].includes(sc.statut) ? colors.error : colors.primaryDeep,
-                                },
-                              ]}>
-                              {scStatusLabel(sc.statut)}
-                            </ThemedText>
-                          </View>
-                        ))}
-                      </View>
-                    ) : null}
-                    {refusedScs.length > 0 ? (
-                      <ThemedText style={[styles.refusedHint, { color: colors.textMuted, lineHeight: 18 }]}>
-                        {refusedScs.length > 1
-                          ? `${refusedScs.length} commerces n'ont pas pu confirmer votre commande — ils ne seront pas facturés.`
-                          : "Un commerce n'a pas pu confirmer votre commande — il ne sera pas facturé."}
-                      </ThemedText>
-                    ) : null}
-                  </>
-                ) : (
-                  <View style={styles.statusRow}>
-                    <View style={[styles.etaIconBox, { backgroundColor: colors.primarySoft }]}>
-                      <Package size={24} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <ThemedText style={[styles.etaTime, { color: colors.text }]}>
-                        {paid ? 'Commande confirmée ✅' : '🍳 Préparation en cours'}
-                      </ThemedText>
-                      <ThemedText style={[styles.etaLabel, { color: colors.textMuted, marginTop: 2 }]}>
-                        {eta?.totalMinutes != null
-                          ? `Arrivée estimée ${arriveeLabel || `dans ~${eta.totalMinutes} min`} · ${zoneLabel || 'livraison GoLivra'}`
-                          : 'Votre livreur sera assigné prochainement.'}
-                      </ThemedText>
-                    </View>
-                  </View>
-                )}
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* CARTE PAIEMENT - dédiée, aérée, avec compte à rebours */}
-        {readyToPay && (
-          <View style={[styles.payCard, { backgroundColor: colors.surface, borderColor: colors.success }]}>
-            <View style={styles.payCardHead}>
-              <View style={[styles.payIcon, { backgroundColor: colors.successSoft }]}>
+        {/* ── CARTE PAIEMENT ── */}
+        {readyToPay ? (
+          <FadeCard index={1} style={{ backgroundColor: colors.surface, borderColor: colors.success }}>
+            <View style={styles.cardHead}>
+              <View style={[styles.cardIcon, { backgroundColor: colors.successSoft }]}>
                 <Smartphone size={22} color={colors.success} strokeWidth={LUCIDE_STROKE} />
               </View>
               <View style={{ flex: 1 }}>
-                <ThemedText style={[styles.payCardTitle, { color: colors.text }]}>
-                  Confirmer le paiement
-                </ThemedText>
-                <ThemedText style={[styles.payCardSub, { color: colors.textMuted }]}>
+                <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Confirmer le paiement</ThemedText>
+                <ThemedText style={[styles.cardSub, { color: colors.textMuted }]}>
                   {formatFcfa(totalAPayer)} — demande envoyée sur votre téléphone
                 </ThemedText>
               </View>
@@ -605,7 +676,7 @@ export default function OrderTrackingScreen() {
               </ThemedText>
             </View>
 
-            <ThemedText style={[styles.payHint, { color: colors.textMuted }]}>
+            <ThemedText style={[styles.cardSub, { color: colors.textMuted, lineHeight: 19 }]}>
               Ouvrez votre compte Mobile Money et validez la demande{' '}
               {payMethod === 'airtel' ? 'Airtel Money' : 'MTN MoMo'} avec votre code PIN. L’argent
               partira automatiquement.
@@ -649,13 +720,14 @@ export default function OrderTrackingScreen() {
               </View>
             ) : (
               <Pressable
-                style={[styles.payCta, { backgroundColor: colors.primary }]}
+                style={[styles.primaryCta, { backgroundColor: colors.primary }]}
                 onPress={() => void payNow()}
-                disabled={paying || paymentDeadlineExpired}>
+                disabled={paying || paymentDeadlineExpired}
+                android_ripple={{ color: colors.primaryMuted }}>
                 {paying ? (
                   <ActivityIndicator color={colors.onPrimary} size="small" />
                 ) : (
-                  <ThemedText style={[styles.payCtaText, { color: colors.onPrimary }]}>
+                  <ThemedText style={[styles.primaryCtaText, { color: colors.onPrimary }]}>
                     {paymentDeadlineExpired ? 'Délai expiré' : 'Payer ma commande'}
                   </ThemedText>
                 )}
@@ -669,97 +741,215 @@ export default function OrderTrackingScreen() {
                 Annuler toute la commande
               </ThemedText>
             </Pressable>
-          </View>
-        )}
+          </FadeCard>
+        ) : null}
 
-        {/* INFO COMMANDE (Numéro, Date, Total) */}
-        <View style={[styles.orderInfoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.orderInfoRow}>
-            <View style={{ flex: 1 }}>
-              <ThemedText style={[styles.orderLabel, { color: colors.textMuted }]}>Commande n°</ThemedText>
-              <ThemedText style={[styles.orderValue, { color: colors.text }]}>{order?.numero || order?.id.slice(0, 8).toUpperCase()}</ThemedText>
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <ThemedText style={[styles.orderLabel, { color: colors.textMuted }]}>Total</ThemedText>
-              <ThemedText style={[styles.orderValue, { color: colors.primaryDeep, fontWeight: '700' }]}>{formatFcfa(order?.total ?? 0)}</ThemedText>
-            </View>
-          </View>
-          {isDelivered && (
-            <View style={[styles.statusBanner, { backgroundColor: colors.successSoft }]}>
-              <CheckCircle2 size={16} color={colors.success} strokeWidth={LUCIDE_STROKE} />
-              <ThemedText style={[styles.statusBannerText, { color: colors.success }]}>Cette commande a été livrée avec succès.</ThemedText>
-            </View>
-          )}
-        </View>
-
-        {/* ARTICLES */}
-        {allArticles.length > 0 && (
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={styles.cardHead}>
-              <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Articles</ThemedText>
-            </View>
-            {allArticles.map((a, idx) => (
-              <View key={`${a.id}-${idx}`} style={styles.articleRow}>
-                <ThemedText style={[styles.articleQty, { color: colors.textSecondary }]}>{a.quantite}x</ThemedText>
-                <ThemedText style={[styles.articleName, { color: colors.text }]}>{a.nom}</ThemedText>
-                <ThemedText style={[styles.articlePrice, { color: colors.textMuted }]}>{formatFcfa(a.prix_unitaire * a.quantite)}</ThemedText>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* INFO LIVREUR */}
+        {/* ── LIVREUR ── */}
         {order?.livreur ? (
-          <View style={[styles.courierCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <FadeCard index={2} style={{ backgroundColor: colors.surface, borderColor: colors.border, shadowColor: GOLIVRA_BRAND_SHADOW }}>
+            <View style={styles.cardHead}>
+              <View style={[styles.cardIcon, { backgroundColor: colors.primarySoft }]}>
+                <Bike size={22} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+              </View>
+              <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Votre livreur</ThemedText>
+              {order.statut === 'en_livraison' ? (
+                <View style={styles.liveInline}>
+                  <LivePulseDot color={colors.success} size={7} />
+                  <ThemedText style={[styles.liveInlineText, { color: colors.success }]}>En route</ThemedText>
+                </View>
+              ) : null}
+            </View>
             <View style={styles.courierRow}>
               <View style={[styles.courierAvatar, { backgroundColor: colors.primarySoft }]}>
                 {order.livreur.image_url ? (
                   <Image source={{ uri: order.livreur.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
                 ) : (
-                  <ThemedText style={{ color: colors.primary, fontSize: 20, fontWeight: '800' }}>
+                  <ThemedText style={{ color: colors.primary, fontSize: 22, fontWeight: '900' }}>
                     {order.livreur.nom.charAt(0).toUpperCase()}
                   </ThemedText>
                 )}
               </View>
-              <View style={styles.courierInfo}>
+              <View style={{ flex: 1 }}>
                 <ThemedText style={[styles.courierName, { color: colors.text }]}>{order.livreur.nom}</ThemedText>
                 <View style={styles.courierRatingRow}>
                   <Star size={14} color={colors.warning} fill={colors.warning} strokeWidth={LUCIDE_STROKE} />
                   <ThemedText style={[styles.courierRating, { color: colors.textMuted }]}>{order.livreur.note_moyenne || 'Nouveau'}</ThemedText>
                 </View>
               </View>
-              <Pressable style={[styles.callBtn, { backgroundColor: colors.successSoft }]} onPress={() => {}}>
-                <PhoneCall size={20} color={colors.success} strokeWidth={LUCIDE_STROKE} />
-              </Pressable>
+              {order.livreur.telephone ? (
+                <Pressable
+                  style={[styles.callBtn, { backgroundColor: colors.successSoft }]}
+                  onPress={callCourier}
+                  android_ripple={{ color: colors.primaryMuted }}>
+                  <PhoneCall size={20} color={colors.success} strokeWidth={LUCIDE_STROKE} />
+                </Pressable>
+              ) : null}
             </View>
-          </View>
+          </FadeCard>
         ) : null}
 
-        {/* TIMELINE DE LIVRAISON */}
+        {/* ── ARTICLES ── */}
+        {allArticles.length > 0 ? (
+          <FadeCard index={3} style={{ backgroundColor: colors.surface, borderColor: colors.border }}>
+            <View style={styles.cardHead}>
+              <View style={[styles.cardIcon, { backgroundColor: colors.primarySoft }]}>
+                <Package size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+              </View>
+              <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Articles</ThemedText>
+            </View>
+            {allArticles.map((a, idx) => (
+              <View key={`${a.id}-${idx}`} style={styles.articleRow}>
+                <View style={[styles.articleQtyBadge, { backgroundColor: colors.primarySoft }]}>
+                  <ThemedText style={[styles.articleQty, { color: colors.primaryDeep }]}>{a.quantite}×</ThemedText>
+                </View>
+                <ThemedText style={[styles.articleName, { color: colors.text }]} numberOfLines={2}>{a.nom}</ThemedText>
+                <ThemedText style={[styles.articlePrice, { color: colors.textMuted }]}>{formatFcfa(a.prix_unitaire * a.quantite)}</ThemedText>
+              </View>
+            ))}
+          </FadeCard>
+        ) : null}
+
+        {/* ── INFO COMMANDE (n°, date, total, adresse) ── */}
+        <FadeCard index={4} style={{ backgroundColor: colors.surface, borderColor: colors.border }}>
+          <View style={styles.cardHead}>
+            <View style={[styles.cardIcon, { backgroundColor: colors.primarySoft }]}>
+              <CheckCircle2 size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+            </View>
+            <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Commande</ThemedText>
+            {isDelivered ? (
+              <View style={[styles.deliveredPill, { backgroundColor: colors.successSoft }]}>
+                <ThemedText style={[styles.deliveredPillText, { color: colors.success }]}>Livrée</ThemedText>
+              </View>
+            ) : null}
+          </View>
+          <View style={styles.infoGrid}>
+            <View style={styles.infoCol}>
+              <ThemedText style={[styles.infoLabel, { color: colors.textMuted }]}>Commande n°</ThemedText>
+              <ThemedText style={[styles.infoValue, { color: colors.text }]} numberOfLines={1}>
+                {order?.numero || order?.id.slice(0, 8).toUpperCase()}
+              </ThemedText>
+            </View>
+            <View style={styles.infoCol}>
+              <ThemedText style={[styles.infoLabel, { color: colors.textMuted }]}>Date</ThemedText>
+              <ThemedText style={[styles.infoValue, { color: colors.text }]} numberOfLines={1}>
+                {formatDate(order?.cree_le)}
+              </ThemedText>
+            </View>
+            <View style={[styles.infoCol, { alignItems: 'flex-end' }]}>
+              <ThemedText style={[styles.infoLabel, { color: colors.textMuted }]}>Total</ThemedText>
+              <ThemedText style={[styles.infoValue, { color: colors.primaryDeep, fontWeight: '800' }]}>
+                {formatFcfa(order?.total ?? 0)}
+              </ThemedText>
+            </View>
+          </View>
+          {order?.adresse_livraison ? (
+            <View style={[styles.addrRow, { borderTopColor: colors.border }]}>
+              <View style={[styles.addrIcon, { backgroundColor: colors.primarySoft }]}>
+                <MapPin size={14} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+              </View>
+              <ThemedText style={[styles.addrText, { color: colors.text }]} numberOfLines={2}>
+                {order.adresse_livraison}
+              </ThemedText>
+            </View>
+          ) : null}
+          {isDelivered ? (
+            <View style={[styles.deliveredBanner, { backgroundColor: colors.successSoft }]}>
+              <CheckCircle2 size={16} color={colors.success} strokeWidth={LUCIDE_STROKE} />
+              <ThemedText style={[styles.deliveredBannerText, { color: colors.success }]}>
+                Cette commande a été livrée avec succès.
+              </ThemedText>
+            </View>
+          ) : null}
+        </FadeCard>
+
+        {/* ── RÉPARTITION PAR COMMERCE (multi-commandes) ── */}
+        {scs.length > 1 ? (
+          <FadeCard index={5} style={{ backgroundColor: colors.surface, borderColor: colors.border }}>
+            <View style={styles.cardHead}>
+              <View style={[styles.cardIcon, { backgroundColor: colors.primarySoft }]}>
+                <Package size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+              </View>
+              <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Vos commerces</ThemedText>
+            </View>
+            {scs.map((sc) => {
+              const tone = SC_STATUS_TONE[sc.statut] ?? 'neutral';
+              const toneColor =
+                tone === 'success'
+                  ? colors.success
+                  : tone === 'danger'
+                    ? colors.error
+                    : tone === 'warn'
+                      ? colors.warning
+                      : tone === 'progress'
+                        ? colors.primaryDeep
+                        : colors.textMuted;
+              const toneBg =
+                tone === 'success'
+                  ? colors.successSoft
+                  : tone === 'danger'
+                    ? colors.errorSoft
+                    : tone === 'warn'
+                      ? colors.warningSoft
+                      : tone === 'progress'
+                        ? colors.primarySoft
+                        : colors.surfaceMuted;
+              return (
+                <View key={sc.id} style={styles.scRow}>
+                  <ThemedText style={[styles.scName, { color: colors.text }]} numberOfLines={1}>
+                    {sc.commerce_nom || 'Commerce'}
+                  </ThemedText>
+                  <View style={[styles.scPill, { backgroundColor: toneBg }]}>
+                    <View style={[styles.scDot, { backgroundColor: toneColor }]} />
+                    <ThemedText style={[styles.scStatut, { color: toneColor }]}>
+                      {scStatusLabel(sc.statut)}
+                    </ThemedText>
+                  </View>
+                </View>
+              );
+            })}
+            {refusedScs.length > 0 ? (
+              <ThemedText style={[styles.refusedHint, { color: colors.textMuted, lineHeight: 18, marginTop: 8 }]}>
+                {refusedScs.length > 1
+                  ? `${refusedScs.length} commerces n'ont pas pu confirmer votre commande — ils ne seront pas facturés.`
+                  : "Un commerce n'a pas pu confirmer votre commande — il ne sera pas facturé."}
+              </ThemedText>
+            ) : null}
+          </FadeCard>
+        ) : null}
+
+        {/* ── TIMELINE DE LIVRAISON ── */}
         {steps.length > 0 ? (
-          <View style={[styles.timelineCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={styles.timelineHead}>
-              <MapPin size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-              <ThemedText style={[styles.timelineTitle, { color: colors.text }]}>{"Détails de l'acheminement"}</ThemedText>
+          <FadeCard index={6} style={{ backgroundColor: colors.surface, borderColor: colors.border }}>
+            <View style={styles.cardHead}>
+              <View style={[styles.cardIcon, { backgroundColor: colors.primarySoft }]}>
+                <MapPin size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+              </View>
+              <ThemedText style={[styles.cardTitle, { color: colors.text }]}>{"Détails de l'acheminement"}</ThemedText>
             </View>
             <EventTimeline steps={steps} title="" />
-          </View>
+          </FadeCard>
         ) : null}
 
-        {/* LIEN VERS LE DETAIL COMPLET DE LA LIVRAISON */}
+        {/* ── LIEN VERS LE DÉTAIL COMPLET DE LA LIVRAISON ── */}
         {primaryDeliveryId ? (
           <Pressable
             onPress={() => router.push(`/delivery/${primaryDeliveryId}`)}
             style={({ pressed }) => [
-              styles.deliveryLink,
-              { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 },
+              styles.card,
+              styles.linkCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                shadowColor: GOLIVRA_BRAND_SHADOW,
+                opacity: pressed ? 0.85 : 1,
+              },
             ]}>
-            <View style={[styles.deliveryLinkIcon, { backgroundColor: colors.primarySoft }]}>
+            <View style={[styles.cardIcon, { backgroundColor: colors.primarySoft }]}>
               <Bike size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
             </View>
             <View style={{ flex: 1 }}>
-              <ThemedText style={[styles.deliveryLinkTitle, { color: colors.text }]}>Détail de la livraison</ThemedText>
-              <ThemedText style={[styles.deliveryLinkSub, { color: colors.textMuted }]}>
+              <ThemedText style={[styles.cardTitle, { color: colors.text }]}>Détail de la livraison</ThemedText>
+              <ThemedText style={[styles.cardSub, { color: colors.textMuted }]}>
                 Livreur, adresses, articles, paiement, étapes…
               </ThemedText>
             </View>
@@ -785,159 +975,147 @@ const styles = StyleSheet.create({
   },
   backBtn: { padding: 4 },
   headerTitle: { fontSize: 18, fontWeight: '800' },
-  scroll: { padding: 16, gap: 16 },
+  headerPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
+  headerPillText: { fontSize: 12, fontWeight: '800' },
+  scroll: { padding: 16, gap: 14 },
 
-  mapPreviewCard: {
+  // ── Cartes unifiées ──
+  card: {
     borderRadius: 20,
+    padding: 16,
     borderWidth: 1,
-    overflow: 'hidden',
-  },
-  staticMapContainer: {
-    height: 270,
     width: '100%',
-    justifyContent: 'flex-end',
-    padding: 12,
-  },
-  artHalo: { position: 'absolute', borderRadius: 999 },
-  artHaloA: { width: 200, height: 200, top: -70, left: -50 },
-  artHaloB: { width: 150, height: 150, bottom: -60, right: -40 },
-  artRing: {
-    position: 'absolute',
-    alignSelf: 'center',
-    top: 26,
-    width: 98,
-    height: 98,
-    borderRadius: 49,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
     shadowRadius: 12,
-    elevation: 4,
-  },
-  artIconBox: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0C4F36',
-  },
-  artBadge: {
-    position: 'absolute',
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
     elevation: 2,
   },
-  artBadgeA: { top: 22, right: 52 },
-  artBadgeB: { top: 96, left: 40 },
-  artBadgeC: { bottom: 142, left: 112 },
-  artDot: { position: 'absolute', width: 9, height: 9, borderRadius: 4.5 },
-  artDotA: { top: 40, left: 60 },
-  artDotB: { top: 56, right: 74 },
-  artDotC: { bottom: 92, right: 116 },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  mapOverlay: {
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  etaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  etaIconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  cardIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  etaLabel: { fontSize: 13, marginBottom: 2 },
-  etaTime: { fontSize: 18, fontWeight: '900' },
-  distanceLabel: { fontSize: 13, marginBottom: 2 },
-  distanceValue: { fontSize: 16, fontWeight: '800' },
-  divider: { height: 1, marginVertical: 12, opacity: 0.6 },
-  statusHighlight: { fontSize: 16, fontWeight: '800', textAlign: 'center' },
-  deadlineText: { fontSize: 13, fontWeight: '800', marginTop: 4 },
+  cardTitle: { fontSize: 16, fontWeight: '800' },
+  cardSub: { fontSize: 13, marginTop: 2, fontWeight: '500' },
 
-  countdownBox: {
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingVertical: 14,
+  // ── Hero statut (dégradé) ──
+  heroCard: {
+    borderRadius: 24,
+    padding: 20,
+    width: '100%',
+    gap: 18,
+    overflow: 'hidden',
+  },
+  heroTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  liveBadgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800', letterSpacing: 0.3 },
+  heroEtaBlock: { alignItems: 'flex-end' },
+  heroEta: { color: '#FFFFFF', fontSize: 26, fontWeight: '900', lineHeight: 28 },
+  heroEtaUnit: { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '800', marginTop: -2 },
+  heroEtaLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600', marginTop: 2 },
+  heroDistancePill: {
+    marginTop: 6,
+    backgroundColor: 'rgba(0,0,0,0.22)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  heroDistancePillText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
+  heroBody: { gap: 4 },
+  heroTitle: { color: '#FFFFFF', fontSize: 24, fontWeight: '900', letterSpacing: -0.3 },
+  heroSub: { color: 'rgba(255,255,255,0.88)', fontSize: 14, fontWeight: '600', lineHeight: 20 },
+
+  // ── Compte à rebours (hero) ──
+  heroCountdown: {
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.22)',
+    paddingVertical: 16,
+    paddingHorizontal: 18,
     alignItems: 'center',
     gap: 6,
   },
-  countdownTime: {
+  heroCountdownRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  heroCountdownLabel: { color: '#FFE9B8', fontSize: 13, fontWeight: '700', flexShrink: 1, textAlign: 'center' },
+  heroCountdownTime: {
+    color: '#FFFFFF',
     fontSize: 40,
     fontWeight: '900',
-    letterSpacing: 2,
+    letterSpacing: 3,
     fontVariant: ['tabular-nums'],
   },
-  countdownLabel: { fontSize: 13, fontWeight: '700' },
-  countdownMsg: { fontSize: 13, fontWeight: '500', textAlign: 'center', paddingHorizontal: 12 },
-  reassureText: { fontSize: 13, fontWeight: '600', textAlign: 'center', lineHeight: 19 },
+  heroCountdownMsg: { color: 'rgba(255,255,255,0.92)', fontSize: 13, fontWeight: '600', textAlign: 'center', lineHeight: 19 },
+  heroCountdownReassure: { color: 'rgba(255,255,255,0.65)', fontSize: 12, fontWeight: '600', textAlign: 'center', lineHeight: 17 },
 
-  refundContainer: { padding: 24, alignItems: 'center', gap: 10 },
-  refundBody: { fontSize: 14, lineHeight: 21, fontWeight: '500' },
-  refundCta: {
-    borderRadius: 12,
-    paddingVertical: 13,
-    paddingHorizontal: 28,
-    marginTop: 6,
-    alignSelf: 'center',
-  },
-  refundCtaText: { fontWeight: '800', fontSize: 15 },
-  refundHint: { fontSize: 13, fontWeight: '600' },
-
-  storyBox: {
-    width: '100%',
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 14,
-    gap: 12,
-  },
-  storyRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  storyEmoji: { fontSize: 18, width: 28, textAlign: 'center' },
-  storyTitle: { fontSize: 14, fontWeight: '800' },
-  storyDetail: { fontSize: 13, marginTop: 1, lineHeight: 18 },
-
-  breakdownBox: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 4, gap: 2 },
-  scRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5 },
-  scName: { flex: 1, fontSize: 14, fontWeight: '700', paddingRight: 10 },
-  scStatut: { fontSize: 13, fontWeight: '800' },
-  refusedHint: { fontSize: 12, fontWeight: '600' },
-
-  payCard: {
+  // ── Stepper ──
+  stepperCard: {
     borderRadius: 20,
+    paddingVertical: 18,
+    paddingHorizontal: 12,
     borderWidth: 1,
-    padding: 18,
-    gap: 14,
+    marginTop: 14,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
   },
-  payCardHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  payIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+
+  // ── Remboursement ──
+  refundCard: { borderWidth: 1.5 },
+  refundBody: { alignItems: 'center', gap: 10 },
+  refundIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  payCardTitle: { fontSize: 17, fontWeight: '900' },
-  payCardSub: { fontSize: 13, marginTop: 2, fontWeight: '600' },
+  refundTitle: { fontSize: 18, fontWeight: '900', textAlign: 'center' },
+  refundText: { fontSize: 14, lineHeight: 21, fontWeight: '500', textAlign: 'center' },
+  refundHint: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  storyBox: {
+    width: '100%',
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+  },
+  storyRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  storyRail: { width: 34, alignItems: 'center' },
+  storyDot: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  storyEmoji: { fontSize: 15 },
+  storyLine: { width: 2, flex: 1, marginTop: 4, borderRadius: 1, minHeight: 20 },
+  storyTitle: { fontSize: 14, fontWeight: '800', marginTop: 6 },
+  storyDetail: { fontSize: 13, marginTop: 1, lineHeight: 18 },
+
+  // ── Boutons ──
+  primaryCta: {
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    marginTop: 4,
+  },
+  primaryCtaText: { fontWeight: '800', fontSize: 15 },
+
+  // ── Paiement ──
   payDeadlineBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -946,7 +1124,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   payDeadlineText: { fontSize: 13, fontWeight: '800', flex: 1 },
-  payHint: { fontSize: 13, fontWeight: '500', lineHeight: 19 },
   payMethodRow: { flexDirection: 'row', gap: 8 },
   payMethodBtn: {
     flex: 1,
@@ -954,18 +1131,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingVertical: 11,
+    borderRadius: 12,
     borderWidth: 1,
   },
   payMethodLabel: { fontSize: 13, fontWeight: '800' },
-  payCta: {
-    borderRadius: 12,
-    paddingVertical: 13,
-    alignItems: 'center',
-  },
-  payCtaText: { fontWeight: '800', fontSize: 15 },
-  payErr: { fontSize: 12, fontWeight: '700' },
+  payErr: { fontSize: 12, fontWeight: '700', textAlign: 'center' },
   payBlocked: {
     borderRadius: 12,
     borderWidth: 1,
@@ -976,81 +1147,90 @@ const styles = StyleSheet.create({
   cancelLink: { alignSelf: 'center', paddingVertical: 4 },
   cancelLinkText: { fontSize: 13, fontWeight: '800', textDecorationLine: 'underline' },
 
-  courierCard: {
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-  },
-  courierRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
+  // ── Livreur ──
+  liveInline: { flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 'auto' },
+  liveInlineText: { fontSize: 12, fontWeight: '800' },
+  courierRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   courierAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  courierInfo: { flex: 1 },
   courierName: { fontSize: 16, fontWeight: '800', marginBottom: 4 },
   courierRatingRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   courierRating: { fontSize: 14, fontWeight: '600' },
   callBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  timelineCard: {
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-  },
-  timelineHead: {
+  // ── Multi-commerces ──
+  scRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 7 },
+  scName: { flex: 1, fontSize: 14, fontWeight: '700', paddingRight: 10 },
+  scPill: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  scDot: { width: 7, height: 7, borderRadius: 3.5 },
+  scStatut: { fontSize: 12.5, fontWeight: '800' },
+  refusedHint: { fontSize: 12, fontWeight: '600' },
+
+  // ── Info commande ──
+  infoGrid: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
+  infoCol: { flex: 1 },
+  infoLabel: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3, fontWeight: '600' },
+  infoValue: { fontSize: 15, fontWeight: '700' },
+  addrRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: 10,
-    marginBottom: 20,
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  timelineTitle: { fontSize: 16, fontWeight: '800' },
-  deliveryLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  deliveryLinkIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  addrIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deliveryLinkTitle: { fontSize: 15, fontWeight: '800' },
-  deliveryLinkSub: { fontSize: 12, marginTop: 2 },
-
-  card: {
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
+  addrText: { flex: 1, fontSize: 13.5, fontWeight: '600', lineHeight: 19, paddingTop: 4 },
+  deliveredPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, marginLeft: 'auto' },
+  deliveredPillText: { fontSize: 12, fontWeight: '800' },
+  deliveredBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 14,
+    padding: 12,
+    borderRadius: 12,
   },
-  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
-  cardTitle: { fontSize: 16, fontWeight: '700' },
-  orderInfoCard: { padding: 16, borderRadius: 16, borderWidth: 1 },
-  orderInfoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  orderLabel: { fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
-  orderValue: { fontSize: 16, fontWeight: '600' },
-  statusBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, padding: 10, borderRadius: 8 },
-  statusBannerText: { fontSize: 13, fontWeight: '500' },
-  articleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
-  articleQty: { fontSize: 14, fontWeight: '600', width: 24 },
-  articleName: { flex: 1, fontSize: 14 },
-  articlePrice: { fontSize: 14, fontWeight: '500' },
+  deliveredBannerText: { fontSize: 13, fontWeight: '700', flex: 1 },
+
+  // ── Articles ──
+  articleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 7 },
+  articleQtyBadge: {
+    minWidth: 32,
+    height: 28,
+    borderRadius: 9,
+    paddingHorizontal: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  articleQty: { fontSize: 13, fontWeight: '800' },
+  articleName: { flex: 1, fontSize: 14, fontWeight: '500' },
+  articlePrice: { fontSize: 14, fontWeight: '600' },
+
+  linkCard: { flexDirection: 'row', alignItems: 'center', gap: 12 },
 });

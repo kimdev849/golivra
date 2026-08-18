@@ -22,6 +22,10 @@ expo-env.d.ts
 .metro-health-check*
 .metro-*.log
 
+# Artefacts temporaires de sessions EAS / logs de build locaux
+.tmp-*
+export-*.log
+
 # debug
 npm-debug.*
 yarn-debug.*
@@ -33,6 +37,11 @@ yarn-error.*
 
 # local env files
 .env*.local
+
+# Firebase service account key (SECRET — jamais committer)
+golivra-*.json
+# Config Firebase (clés publiques de l'app, mais config locale)
+google-services.json
 
 # typescript
 *.tsbuildinfo

@@ -97,7 +97,7 @@ export default function VendorPreparationScreen() {
       <VendorScreenHeader title={labels.preparationHeader} />
       <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: insets.bottom + 20 }}>
         <ThemedText style={styles.ruleHint}>
-          Préparez la commande, puis marquez-la prête : un livreur GoLivra est assigné automatiquement via
+          Préparez la commande, puis marquez-la prête : un livreur GoLivra viendra la récupérer automatiquement via
           l’application.
         </ThemedText>
 

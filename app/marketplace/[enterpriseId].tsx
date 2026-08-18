@@ -26,6 +26,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { GalleryViewer } from '@/components/gallery-viewer';
 import { ProductPrice } from '@/components/product-price';
 import { ScreenEmptyState, ScreenLoadState } from '@/components/screen-load-state';
+import { PressableScale } from '@/components/ui/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { ZoomableImage } from '@/components/zoomable-image';
@@ -228,7 +229,7 @@ export default function EnterpriseDetailScreen() {
   if (!id) {
     return (
       <ThemedView style={styles.center}>
-        <ThemedText>Identifiant commerce manquant.</ThemedText>
+        <ThemedText>Commerce introuvable.</ThemedText>
       </ThemedView>
     );
   }
@@ -289,15 +290,17 @@ export default function EnterpriseDetailScreen() {
 
           {/* top controls custom header */}
           <View style={[styles.heroTop, { paddingTop: Math.max(insets.top, 16) + 8 }]}>
-            <Pressable
+            <PressableScale
               style={[styles.iconBtn, { backgroundColor: colors.surface }]}
+              scaleTo={0.9}
               onPress={() => router.back()}
               hitSlop={8}
               accessibilityLabel="Retour">
               <ArrowLeft size={20} color={colors.text} strokeWidth={LUCIDE_STROKE} />
-            </Pressable>
-            <Pressable
+            </PressableScale>
+            <PressableScale
               style={[styles.iconBtn, { backgroundColor: colors.surface }]}
+              scaleTo={0.9}
               onPress={handleToggleFavorite}
               hitSlop={8}
               accessibilityLabel={isFavorited ? 'Retirer des favoris' : 'Ajouter aux favoris'}>
@@ -307,7 +310,7 @@ export default function EnterpriseDetailScreen() {
                 fill={isFavorited ? colors.error : 'none'}
                 strokeWidth={LUCIDE_STROKE}
               />
-            </Pressable>
+            </PressableScale>
           </View>
 
           <View style={styles.heroBadge}>
@@ -372,7 +375,7 @@ export default function EnterpriseDetailScreen() {
                 <View style={styles.etaHeadRow}>
                   <Truck size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
                   <ThemedText type="defaultSemiBold" style={styles.etaHeadline}>
-                    Livraison prévue dans environ {formatHumanMinutes(prepMin + deliveryMin)}
+                    Estimation : livraison dans environ {formatHumanMinutes(prepMin + deliveryMin)}
                   </ThemedText>
                 </View>
                 <ThemedText style={styles.etaBody}>
@@ -418,7 +421,7 @@ export default function EnterpriseDetailScreen() {
                 <View style={styles.etaHeadRow}>
                   <Clock size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
                   <ThemedText type="defaultSemiBold" style={styles.etaHeadline}>
-                    Votre commande sera prête dans environ {prepMin} min
+                    Estimation : préparation en environ {prepMin} min
                   </ThemedText>
                 </View>
                 <ThemedText style={styles.etaBody}>
@@ -560,20 +563,20 @@ export default function EnterpriseDetailScreen() {
                     <ThemedText style={styles.stock}>{stockLabel}</ThemedText>
                   ) : null}
                 </View>
-                <Pressable
+                <PressableScale
                   style={[styles.addBtn, disabled && styles.addBtnDisabled]}
+                  scaleTo={0.88}
                   disabled={disabled}
                   onPress={(e) => {
                     e.stopPropagation();
                     addProduct(p);
-                  }}
-                  android_ripple={{ color: colors.primaryMuted }}>
+                  }}>
                   <ShoppingCart
                     size={22}
                     color={disabled ? colors.textMuted : colors.onPrimary}
                     strokeWidth={LUCIDE_STROKE}
                   />
-                </Pressable>
+                </PressableScale>
               </Pressable>
             );
           })

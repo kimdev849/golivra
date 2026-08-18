@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -21,25 +20,30 @@ import {
 type GateReason = 'maintenance' | 'disabled' | 'version';
 
 type GateState =
-  | { kind: 'loading' }
   | { kind: 'checked'; reason: GateReason; status: AppStatus }
   | { kind: 'ok' };
 
 /**
- * Écran de garde au-dessus de toute l'application :
+ * Écran de garde NON-BLOQUANT au-dessus de toute l'application :
  *  - mode maintenance      → « GoLivra est temporairement indisponible »
  *  - kill switch (app coupée) → « Application désactivée »
  *  - version minimale      → « Nouvelle version disponible »
  *
- * Tant que le statut serveur n'est pas connu, un splash léger est affiché.
- * En cas d'échec réseau, l'app reste utilisable (jamais bloquée hors-ligne).
+ * Performance : l'app se lance IMMÉDIATEMENT (les enfants sont rendus tout de
+ * suite) et le statut serveur est vérifié en ARRIÈRE-PLAN. On ne bascule sur
+ * l'écran de blocage que si le serveur répond vraiment « bloqué » (maintenance,
+ * kill switch, version). En cas d'échec réseau, l'app reste utilisable.
+ * Avant, cette vérification bloquait le démarrage (spinner) tant que l'API
+ * n'avait pas répondu — parfois plus d'une minute sur une connexion lente.
  */
 export function AppStatusGate({ children }: { children: React.ReactNode }) {
   const { colors, isDark } = useAppTheme();
-  const [state, setState] = useState<GateState>({ kind: 'loading' });
+  // Démarre déverrouillé : jamais d'attente réseau au lancement.
+  const [state, setState] = useState<GateState>({ kind: 'ok' });
   const [refreshing, setRefreshing] = useState(false);
 
-  const check = async () => {
+  const check = async (force = false) => {
+    if (force) await fetchAppStatus({ force: true });
     const gate = await resolveAppGate();
     if (!gate.blocked) {
       setState({ kind: 'ok' });
@@ -60,14 +64,6 @@ export function AppStatusGate({ children }: { children: React.ReactNode }) {
       mounted = false;
     };
   }, []);
-
-  if (state.kind === 'loading') {
-    return (
-      <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <ActivityIndicator color={colors.primary} size="large" />
-      </View>
-    );
-  }
 
   if (state.kind === 'ok') {
     return <>{children}</>;
@@ -92,8 +88,7 @@ export function AppStatusGate({ children }: { children: React.ReactNode }) {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      await fetchAppStatus({ force: true });
-      await check();
+      await check(true);
     } finally {
       setRefreshing(false);
     }

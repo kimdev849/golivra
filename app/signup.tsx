@@ -45,7 +45,7 @@ import { requestOtp } from '@/lib/otp';
 import { formatPhone, initPhoneCountries, toE164 } from '@/lib/phone';
 import { VENDOR_HREF } from '@/lib/vendor-nav';
 import { friendlyErrorMessage } from '@/lib/ux-copy';
-import { validateAddress, validateCommerceName, validateOtp, validatePassword, validatePersonName, validatePhone } from '@/lib/form-validation';
+import { validateAddress, validateCommerceName, validateOtp, validatePassword, validatePersonName, validatePhone, type ValidationResult } from '@/lib/form-validation';
 
 // Animations d'entrée du header et du stepper uniquement (aucun champ de
 // saisie dedans : les Animated.View autour des TextInput faisaient perdre le
@@ -161,7 +161,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
     }
     const e2 = validatePhone(phone, phoneIndicatif);
     if (!e2.ok) { next.phone = e2.message; setFieldErrors(next); return e2.message; }
-    if (!phoneE164) { next.phone = 'Numéro invalide.'; setFieldErrors(next); return 'Numéro invalide.'; }
+    if (!phoneE164) { next.phone = 'Ce numéro ne semble pas complet. Vérifiez-le, par exemple +242 06 123 45 67.'; setFieldErrors(next); return next.phone; }
     next.phone = null;
     const e3 = validatePassword(password);
     if (!e3.ok) { next.password = e3.message; setFieldErrors(next); return e3.message; }
@@ -181,6 +181,15 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
     }
     setFieldErrors({});
     return null;
+  };
+
+  // Validation douce à la sortie de chaque champ : l'erreur s'affiche
+  // directement sous le champ concerné, sans attendre l'appui sur le bouton.
+  const handleBlurField = (name: string, validator: () => ValidationResult) => {
+    if (otpSent) return;
+    setFieldErrors((prev) => ({ ...prev, [name]: null }));
+    const r = validator();
+    if (!r.ok) setFieldErrors((prev) => ({ ...prev, [name]: r.message }));
   };
 
   const canSendOtp = !isSubmitting && !otpSent && Boolean(phoneE164) && Boolean(password) && password.length >= 6 && (profile === 'vendeur' || Boolean(fullName.trim()));
@@ -364,8 +373,11 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
                     <ThemedText style={[styles.fieldLabel, { color: colors.textSecondary }]}>Nom complet</ThemedText>
                     <View style={[styles.inputCard, { borderColor: fieldBorder('fullName'), backgroundColor: colors.inputBg }]}>
                       <User size={20} color={colors.primary} strokeWidth={2.2} />
-                      <TextInput style={[styles.inputField, { color: colors.text }]} placeholder="Ex. : Jean Claude" placeholderTextColor={colors.placeholder} selectionColor={colors.primary} value={fullName} editable={!otpSent} onChangeText={setFullName} />
+                      <TextInput style={[styles.inputField, { color: colors.text }]} placeholder="Ex. : Jean Claude" placeholderTextColor={colors.placeholder} selectionColor={colors.primary} value={fullName} editable={!otpSent} onChangeText={(t) => { setFullName(t); if (fieldErrors.fullName) setFieldErrors((prev) => ({ ...prev, fullName: null })); }} onBlur={() => handleBlurField('fullName', () => validatePersonName(fullName))} />
                     </View>
+                    <ThemedText style={[styles.helperText, { color: colors.textMuted }]}>
+                      Votre prénom et votre nom, par exemple « Jean Claude ».
+                    </ThemedText>
                     <InlineFormError message={fieldErrors.fullName} colors={colors} />
                   </View>
                 ) : null}
@@ -374,7 +386,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
                   <ThemedText style={[styles.fieldLabel, { color: colors.textSecondary }]}>Numéro de téléphone</ThemedText>
                   <View style={[styles.inputCard, { borderColor: fieldBorder('phone'), backgroundColor: colors.inputBg }]}>
                     <Smartphone size={20} color={colors.primary} strokeWidth={2.2} />
-                    <TextInput style={[styles.inputField, { color: colors.text }]} placeholder="+242 06 XXX XX XX" keyboardType="phone-pad" placeholderTextColor={colors.placeholder} selectionColor={colors.primary} value={phone} editable={!otpSent} autoCapitalize="none" autoCorrect={false} onChangeText={(text) => setPhone(formatPhone(text, phoneIndicatif))} />
+                    <TextInput style={[styles.inputField, { color: colors.text }]} placeholder="+242 06 XXX XX XX" keyboardType="phone-pad" placeholderTextColor={colors.placeholder} selectionColor={colors.primary} value={phone} editable={!otpSent} autoCapitalize="none" autoCorrect={false} onChangeText={(text) => { setPhone(formatPhone(text, phoneIndicatif)); if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: null })); }} onBlur={() => handleBlurField('phone', () => validatePhone(phone, phoneIndicatif))} />
                   </View>
                   <ThemedText style={[styles.helperText, { color: colors.textMuted }]}>
                     Un code de vérification sera envoyé par SMS.
@@ -386,7 +398,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
                   <ThemedText style={[styles.fieldLabel, { color: colors.textSecondary }]}>Mot de passe</ThemedText>
                   <View style={[styles.inputCard, { borderColor: fieldBorder('password'), backgroundColor: colors.inputBg }]}>
                     <Lock size={20} color={colors.primary} strokeWidth={2.2} />
-                    <TextInput style={[styles.inputField, { color: colors.text }]} placeholder="Minimum 6 caractères" secureTextEntry={!passwordVisible} placeholderTextColor={colors.placeholder} selectionColor={colors.primary} autoCapitalize="none" autoCorrect={false} textContentType="newPassword" value={password} editable={!otpSent} onChangeText={setPassword} />
+                    <TextInput style={[styles.inputField, { color: colors.text }]} placeholder="Minimum 8 caractères" secureTextEntry={!passwordVisible} placeholderTextColor={colors.placeholder} selectionColor={colors.primary} autoCapitalize="none" autoCorrect={false} textContentType="newPassword" value={password} editable={!otpSent} onChangeText={(t) => { setPassword(t); if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: null })); }} onBlur={() => handleBlurField('password', () => validatePassword(password))} />
                     <Pressable style={styles.eyeButton} onPress={() => setPasswordVisible((v) => !v)} hitSlop={10}>
                       {passwordVisible ? (
                         <EyeOff size={20} color={colors.textMuted} strokeWidth={2.2} />
@@ -395,6 +407,9 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
                       )}
                     </Pressable>
                   </View>
+                  <ThemedText style={[styles.helperText, { color: colors.textMuted }]}>
+                    Au moins 8 caractères, avec 1 lettre et 1 chiffre.
+                  </ThemedText>
                   <InlineFormError message={fieldErrors.password} colors={colors} />
                 </View>
 
@@ -429,8 +444,11 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
                       ) : (
                         <Store size={20} color={colors.primary} strokeWidth={2.2} />
                       )}
-                      <TextInput style={[styles.inputField, { color: colors.text }]} placeholder={vc.namePlaceholder} placeholderTextColor={colors.placeholder} selectionColor={colors.primary} value={businessName} editable={!otpSent} onChangeText={setBusinessName} />
+                      <TextInput style={[styles.inputField, { color: colors.text }]} placeholder={vc.namePlaceholder} placeholderTextColor={colors.placeholder} selectionColor={colors.primary} value={businessName} editable={!otpSent} onChangeText={(t) => { setBusinessName(t); if (fieldErrors.businessName) setFieldErrors((prev) => ({ ...prev, businessName: null })); }} onBlur={() => handleBlurField('businessName', () => validateCommerceName(businessName))} />
                     </View>
+                    <ThemedText style={[styles.helperText, { color: colors.textMuted }]}>
+                      Un nom clair que vos clients reconnaîtront.
+                    </ThemedText>
                     <InlineFormError message={fieldErrors.businessName} colors={colors} />
                   </View>
 
@@ -454,7 +472,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
                     </ThemedText>
                     <View style={[styles.inputCard, { borderColor: fieldBorder('businessAddress'), backgroundColor: colors.inputBg }]}>
                       <MapPin size={20} color={colors.primary} strokeWidth={2.2} />
-                      <TextInput style={[styles.inputField, { color: colors.text }]} placeholder={vc.addressPlaceholder} placeholderTextColor={colors.placeholder} selectionColor={colors.primary} value={businessAddress} editable={!otpSent} onChangeText={setBusinessAddress} />
+                      <TextInput style={[styles.inputField, { color: colors.text }]} placeholder={vc.addressPlaceholder} placeholderTextColor={colors.placeholder} selectionColor={colors.primary} value={businessAddress} editable={!otpSent} onChangeText={(t) => { setBusinessAddress(t); if (fieldErrors.businessAddress) setFieldErrors((prev) => ({ ...prev, businessAddress: null })); }} onBlur={() => handleBlurField('businessAddress', () => validateAddress(businessAddress, commerceKind === 'restaurant'))} />
                     </View>
                     <InlineFormError message={fieldErrors.businessAddress} colors={colors} />
                   </View>
@@ -493,7 +511,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
                 <ThemedText style={[styles.secondaryButtonText, { color: colors.primary }]}>{"J'ai déjà un compte"}</ThemedText>
               </Pressable>
 
-              <ThemedText style={[styles.formHint, { color: colors.textMuted }]}>Vos données sont traitées conformément à notre politique de confidentialité.</ThemedText>
+              <ThemedText style={[styles.formHint, { color: colors.textMuted }]}>Vos informations restent privées et sécurisées. Consultez notre politique de confidentialité pour en savoir plus.</ThemedText>
             </View>
           </View>
         </ScrollView>

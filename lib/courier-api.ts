@@ -18,6 +18,10 @@ export type CourierMission = {
   note?: string | null;
   /** Course en attente d'acceptation (non encore assignée au livreur). */
   ouverte?: boolean;
+  /** Coordonnées de l'adresse de livraison (si connues) : permettent d'adapter
+   *  la fréquence de partage de position quand le livreur approche. */
+  latitude_livraison?: number | null;
+  longitude_livraison?: number | null;
 };
 
 export type CourierProfile = {
@@ -68,6 +72,23 @@ export async function setCourierAvailability(token: string, disponible: boolean)
     method: 'PATCH',
     token,
     jsonBody: { disponible },
+  });
+}
+
+/**
+ * Partage de position pendant une course (léger : un point toutes les ~12 s,
+ * uniquement tant que la course est active — l'app coupe le partage dès que la
+ * livraison est terminée).
+ */
+export async function sendCourierPosition(
+  token: string,
+  latitude: number,
+  longitude: number,
+): Promise<void> {
+  await apiFetch('/api/delivery/courier/position', {
+    method: 'POST',
+    token,
+    jsonBody: { latitude, longitude },
   });
 }
 

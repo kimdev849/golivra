@@ -21,6 +21,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AuthBackdrop } from '@/components/auth-backdrop';
 import { FormErrorBanner } from '@/components/form-error-banner';
+import { InlineFormError } from '@/components/inline-form-error';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { resetPassword } from '@/lib/auth';
 import { requestOtp } from '@/lib/otp';
@@ -51,6 +52,12 @@ export default function ForgotPasswordScreen() {
   const [testOtp, setTestOtp] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    phone?: string | null;
+    otp?: string | null;
+    newPassword?: string | null;
+    confirmPassword?: string | null;
+  }>({});
   const otpRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
   const confirmRef = useRef<TextInput>(null);
@@ -66,17 +73,20 @@ export default function ForgotPasswordScreen() {
     setError(null);
     const e = validatePhone(phone);
     if (!e.ok) {
-      setError(e.message);
+      setFieldErrors({ phone: e.message });
       return;
     }
     if (!phoneE164) {
-      setError('Numéro invalide.');
+      setFieldErrors({ phone: 'Ce numéro ne semble pas complet. Vérifiez-le, par exemple +242 06 123 45 67.' });
       return;
     }
+    setFieldErrors({});
     setLoading(true);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
-      const res = await requestOtp(phoneE164);
+      // Purpose « reset_password » : le serveur vérifie d'abord que le numéro
+      // est bien lié à un compte avant d'envoyer le code.
+      const res = await requestOtp(phoneE164, 'reset_password');
       setTestOtp(res.testMode && res.otpCode ? res.otpCode : null);
       setStep('otp');
       setTimeout(() => otpRef.current?.focus(), 250);
@@ -89,25 +99,31 @@ export default function ForgotPasswordScreen() {
 
   const handleReset = async () => {
     setError(null);
+    const next: Record<string, string | null> = {};
     if (!phoneE164) {
-      setError('Numéro invalide.');
-      return;
+      next.phone = 'Ce numéro ne semble pas complet. Vérifiez-le, par exemple +242 06 123 45 67.';
     }
     const e1 = validateOtp(otpCode);
     if (!e1.ok) {
-      setError(e1.message);
-      return;
+      next.otp = e1.message;
     }
     const e2 = validatePassword(newPassword);
     if (!e2.ok) {
-      setError(e2.message);
-      return;
+      next.newPassword = e2.message;
     }
     const e3 = validatePasswordConfirmation(confirmPassword, newPassword);
     if (!e3.ok) {
-      setError(e3.message);
+      next.confirmPassword = e3.message;
+    }
+    if (Object.values(next).some(Boolean)) {
+      setFieldErrors(next);
       return;
     }
+    if (!phoneE164) {
+      setFieldErrors({ phone: 'Ce numéro ne semble pas complet. Vérifiez-le, par exemple +242 06 123 45 67.' });
+      return;
+    }
+    setFieldErrors({});
     setLoading(true);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
@@ -225,12 +241,19 @@ export default function ForgotPasswordScreen() {
                     <ThemedText style={[styles.fieldLabel, { color: colors.textSecondary }]}>
                       Numéro de téléphone
                     </ThemedText>
-                    <View style={[styles.inputCard, { backgroundColor: colors.inputBg }]}>
+                    <View
+                      style={[
+                        styles.inputCard,
+                        { backgroundColor: colors.inputBg, borderColor: fieldErrors.phone ? colors.error : colors.border },
+                      ]}>
                       <Smartphone size={20} color={colors.primary} strokeWidth={2.2} />
                       <TextInput
                         style={[styles.inputField, { color: colors.text }]}
                         value={phone}
-                        onChangeText={(t) => setPhone(formatPhone(t))}
+                        onChangeText={(t) => {
+                          setPhone(formatPhone(t));
+                          if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: null }));
+                        }}
                         keyboardType="phone-pad"
                         placeholder="+242 06 XXX XX XX"
                         placeholderTextColor={colors.placeholder}
@@ -238,6 +261,7 @@ export default function ForgotPasswordScreen() {
                         onSubmitEditing={() => void handleRequestOtp()}
                       />
                     </View>
+                    <InlineFormError message={fieldErrors.phone} colors={colors} />
                   </View>
                   <Pressable
                     style={({ pressed }) => [
@@ -267,13 +291,20 @@ export default function ForgotPasswordScreen() {
                     <ThemedText style={[styles.fieldLabel, { color: colors.textSecondary }]}>
                       Code SMS
                     </ThemedText>
-                    <View style={[styles.inputCard, { backgroundColor: colors.inputBg }]}>
+                    <View
+                      style={[
+                        styles.inputCard,
+                        { backgroundColor: colors.inputBg, borderColor: fieldErrors.otp ? colors.error : colors.border },
+                      ]}>
                       <MessageCircle size={20} color={colors.primary} strokeWidth={2.2} />
                       <TextInput
                         ref={otpRef}
                         style={[styles.inputField, { color: colors.text }]}
                         value={otpCode}
-                        onChangeText={setOtpCode}
+                        onChangeText={(t) => {
+                          setOtpCode(t);
+                          if (fieldErrors.otp) setFieldErrors((prev) => ({ ...prev, otp: null }));
+                        }}
                         keyboardType="number-pad"
                         placeholder="123456"
                         placeholderTextColor={colors.placeholder}
@@ -281,37 +312,53 @@ export default function ForgotPasswordScreen() {
                         onSubmitEditing={() => passwordRef.current?.focus()}
                       />
                     </View>
+                    <InlineFormError message={fieldErrors.otp} colors={colors} />
                   </View>
                   <View style={styles.field}>
                     <ThemedText style={[styles.fieldLabel, { color: colors.textSecondary }]}>
                       Nouveau mot de passe
                     </ThemedText>
-                    <View style={[styles.inputCard, { backgroundColor: colors.inputBg }]}>
+                    <View
+                      style={[
+                        styles.inputCard,
+                        { backgroundColor: colors.inputBg, borderColor: fieldErrors.newPassword ? colors.error : colors.border },
+                      ]}>
                       <Lock size={20} color={colors.primary} strokeWidth={2.2} />
                       <TextInput
                         ref={passwordRef}
                         style={[styles.inputField, { color: colors.text }]}
                         value={newPassword}
-                        onChangeText={setNewPassword}
+                        onChangeText={(t) => {
+                          setNewPassword(t);
+                          if (fieldErrors.newPassword) setFieldErrors((prev) => ({ ...prev, newPassword: null }));
+                        }}
                         secureTextEntry
-                        placeholder="Minimum 6 caractères"
+                        placeholder="Minimum 8 caractères"
                         placeholderTextColor={colors.placeholder}
                         returnKeyType="next"
                         onSubmitEditing={() => confirmRef.current?.focus()}
                       />
                     </View>
+                    <InlineFormError message={fieldErrors.newPassword} colors={colors} />
                   </View>
                   <View style={styles.field}>
                     <ThemedText style={[styles.fieldLabel, { color: colors.textSecondary }]}>
                       Confirmer
                     </ThemedText>
-                    <View style={[styles.inputCard, { backgroundColor: colors.inputBg }]}>
+                    <View
+                      style={[
+                        styles.inputCard,
+                        { backgroundColor: colors.inputBg, borderColor: fieldErrors.confirmPassword ? colors.error : colors.border },
+                      ]}>
                       <KeyRound size={20} color={colors.primary} strokeWidth={2.2} />
                       <TextInput
                         ref={confirmRef}
                         style={[styles.inputField, { color: colors.text }]}
                         value={confirmPassword}
-                        onChangeText={setConfirmPassword}
+                        onChangeText={(t) => {
+                          setConfirmPassword(t);
+                          if (fieldErrors.confirmPassword) setFieldErrors((prev) => ({ ...prev, confirmPassword: null }));
+                        }}
                         secureTextEntry
                         placeholder="Répétez le mot de passe"
                         placeholderTextColor={colors.placeholder}
@@ -319,6 +366,7 @@ export default function ForgotPasswordScreen() {
                         onSubmitEditing={() => void handleReset()}
                       />
                     </View>
+                    <InlineFormError message={fieldErrors.confirmPassword} colors={colors} />
                   </View>
                   <Pressable
                     style={({ pressed }) => [

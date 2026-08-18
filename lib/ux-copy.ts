@@ -4,16 +4,16 @@
  */
 
 export const UX_ERRORS: Readonly<Record<string, string>> = {
-  network: 'Problème de connexion. Vérifiez votre internet.',
-  generic: 'Une erreur est survenue. Réessayez.',
-  auth: 'Numéro ou mot de passe incorrect.',
-  otp: 'Code invalide ou expiré.',
-  session: 'Reconnectez-vous pour continuer.',
-  notFound: 'Élément introuvable.',
-  forbidden: 'Action non autorisée.',
+  network: 'Problème de connexion. Vérifiez votre internet, puis réessayez.',
+  generic: 'Une erreur est survenue. Réessayez dans un instant.',
+  auth: 'Numéro ou mot de passe incorrect. Vérifiez vos informations, puis réessayez.',
+  otp: 'Ce code est invalide ou a expiré. Demandez un nouveau code.',
+  session: 'Votre session a expiré. Reconnectez-vous pour continuer.',
+  notFound: 'Nous n\'avons pas trouvé ce que vous cherchez.',
+  forbidden: 'Vous n\'avez pas la permission de faire cette action.',
   /** Réponse 404 « Cannot GET/PUT… » d'une API pas encore redéployée. */
   serverOutdated:
-    "Cette fonction n'est pas encore disponible : le serveur n'est pas à jour. L'équipe doit redéployer l'API.",
+    "Cette fonction n'est pas encore disponible. Réessayez dans quelques instants — si le problème persiste, contactez l'assistance.",
 };
 
 export const UX_ONBOARDING = [

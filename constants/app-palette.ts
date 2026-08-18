@@ -54,6 +54,14 @@ export type AppPalette = {
 export const GOLIVRA_GREEN = '#0B6B45';
 export const GOLIVRA_GREEN_DEEP = '#0C4F36';
 
+/**
+ * Vert profond quasi-noir — fond du splash (démarrage) harmonisé avec le
+ * logo `app.icon.png` (analyse de l'image : coins ≈ #03291A, centre ≈ #206020).
+ * Le vert vif de la marque (#0B6B45) jurait avec le logo sombre.
+ */
+export const GOLIVRA_GREEN_SPLASH = '#062A1B';
+export const GOLIVRA_GREEN_SPLASH_DEEP = '#03160D';
+
 /** Jaune/orange du logo (évoque la couleur "LIVRA" et le teardrop du pin). */
 export const GOLIVRA_YELLOW = '#F5A524';
 export const GOLIVRA_YELLOW_DEEP = '#D27A09';

@@ -245,7 +245,7 @@ export default function VendorOrderDetailScreen() {
 
         <View style={styles.sumBox}>
           <View style={styles.sumRow}>
-            <ThemedText style={styles.sumLab}>Sous-total</ThemedText>
+            <ThemedText style={styles.sumLab}>Total articles</ThemedText>
             <ThemedText style={styles.sumVal}>{formatFcfa(o.prixTotal)}</ThemedText>
           </View>
           <View style={styles.sumRow}>
@@ -315,7 +315,11 @@ export default function VendorOrderDetailScreen() {
         {showDelivery ? (
           <Pressable
             style={[styles.outlineBtn, { borderColor: palette.primary }]}
-            onPress={() => router.push('/vendor/delivery')}>
+            onPress={() =>
+              o.livraison_id
+                ? router.push({ pathname: '/vendor/delivery/[id]', params: { id: o.livraison_id } })
+                : router.push('/vendor/delivery')
+            }>
             <ThemedText style={[styles.outlineTxt, { color: palette.primary }]}>Suivre la livraison GoLivra</ThemedText>
           </Pressable>
         ) : null}

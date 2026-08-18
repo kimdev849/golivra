@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -99,7 +99,8 @@ export function LocationPicker({
       })
       .finally(() => { if (alive) setDetecting(false); });
     return () => { alive = false; };
-  }, [autoDetect]);
+    // tant qu'aucun pays n'est choisi (guard `value.pays` ci-dessus).
+  }, [autoDetect, onChange, value.pays]);
 
   // Charger les villes quand le pays change
   useEffect(() => {
@@ -118,7 +119,7 @@ export function LocationPicker({
       })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [value.pays?.id]);
+  }, [value.pays?.id, value.pays]);
 
   const selectPays = useCallback((p: Pays) => {
     onChange({ pays: p, ville: null });

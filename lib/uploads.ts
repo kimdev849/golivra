@@ -18,6 +18,9 @@ export async function uploadImageBase64(
     method: 'POST',
     token,
     jsonBody: params,
+    // Les photos (base64) peuvent être lourdes : un timeout par défaut de 15 s
+    // ferait échouer l'upload sur une connexion lente.
+    timeoutMs: 120_000,
   });
 }
 
@@ -29,6 +32,7 @@ export async function uploadImageBase64Public(params: {
     return await apiFetch<UploadImageResult>('/api/uploads/public-image', {
       method: 'POST',
       jsonBody: params,
+      timeoutMs: 120_000,
     });
   } catch {
     return null;

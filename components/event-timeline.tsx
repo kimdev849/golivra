@@ -29,11 +29,25 @@ export function EventTimeline({ steps, title, emptyMessage = 'Aucun horaire enre
           return (
             <View key={`${step.key}-${step.at}`} style={styles.row}>
               <View style={styles.rail}>
-                <View style={[styles.dot, { backgroundColor: colors.primary, borderColor: colors.primarySoft }]} />
+                <View
+                  style={[
+                    styles.dot,
+                    {
+                      backgroundColor: isLast ? colors.primary : colors.surface,
+                      borderColor: isLast ? colors.primary : colors.borderStrong,
+                    },
+                  ]}
+                />
                 {!isLast ? <View style={[styles.line, { backgroundColor: colors.border }]} /> : null}
               </View>
               <View style={styles.body}>
-                <ThemedText style={[styles.label, { color: colors.text }]}>{step.label}</ThemedText>
+                <ThemedText
+                  style={[
+                    styles.label,
+                    { color: isLast ? colors.primaryDeep : colors.text, fontWeight: isLast ? '800' : '600' },
+                  ]}>
+                  {step.label}
+                </ThemedText>
                 <ThemedText style={[styles.when, { color: colors.textMuted }]}>
                   {step.label_fr || formatDateTimeFr(step.at)}
                 </ThemedText>
@@ -50,19 +64,19 @@ const styles = StyleSheet.create({
   wrap: {
     borderRadius: 16,
     borderWidth: 1,
-    padding: 14,
+    padding: 16,
     gap: 10,
   },
   title: { fontSize: 15, marginBottom: 4 },
   empty: { fontSize: 13, lineHeight: 18 },
-  row: { flexDirection: 'row', gap: 12, minHeight: 44 },
-  rail: { width: 16, alignItems: 'center' },
+  row: { flexDirection: 'row', gap: 14, minHeight: 46 },
+  rail: { width: 18, alignItems: 'center' },
   dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     borderWidth: 2,
-    marginTop: 4,
+    marginTop: 3,
   },
   line: {
     flex: 1,
@@ -71,7 +85,7 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     minHeight: 24,
   },
-  body: { flex: 1, gap: 2, paddingBottom: 8 },
-  label: { fontSize: 14, fontWeight: '700' },
+  body: { flex: 1, gap: 2, paddingBottom: 10 },
+  label: { fontSize: 14, lineHeight: 19 },
   when: { fontSize: 12, fontWeight: '600' },
 });

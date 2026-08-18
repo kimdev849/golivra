@@ -15,7 +15,6 @@ import { useVendorTheme } from '@/hooks/use-vendor-theme';
 import { useRealtimeOrders } from '@/hooks/use-realtime-orders';
 import { useVendorHoraires } from '@/hooks/use-vendor-horaires';
 import { formatFcfa } from '@/lib/format';
-import { getSessionToken } from '@/lib/auth';
 import { livraisonStatutLabel } from '@/lib/vendor-api';
 import type { VendorOrder, VendorOrderStatus } from '@/lib/vendor-types';
 import { vendorOrderStatusLabel } from '@/lib/ux-copy';
@@ -59,6 +58,21 @@ function formatHeureLimite(iso: string | null | undefined): string {
   }
 }
 
+/** Secondes restantes avant une échéance (borné ≥ 0), ou null si indéterminée. */
+function remainingSeconds(iso: string | null | undefined, nowMs: number): number | null {
+  if (!iso) return null;
+  const at = new Date(iso).getTime();
+  if (!Number.isFinite(at)) return null;
+  return Math.max(0, Math.ceil((at - nowMs) / 1000));
+}
+
+/** « 04:32 » depuis un nombre de secondes (compte à rebours vivant). */
+function mmss(totalSecs: number): string {
+  const m = Math.floor(totalSecs / 60);
+  const s = totalSecs % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
 function matchesFilter(o: VendorOrder, f: FilterKey): boolean {
   if (f === 'all') return true;
   if (f === 'prep')
@@ -80,21 +94,24 @@ export default function VendorOrdersTabScreen() {
   const { labels } = useVendorTheme();
   const horaires = useVendorHoraires(shop?.id);
   const [filter, setFilter] = useState<FilterKey>('all');
-  const [token, setToken] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const bottom = Math.max(insets.bottom, 10) + VENDOR_TAB_BAR_PADDING_BOTTOM;
 
-  // Récupérer le token au montage
+  // Horloge locale : fait tourner le compte à rebours d'acceptation (MM:SS)
+  // tant qu'au moins une commande attend une réponse (délai 5 min).
   useEffect(() => {
-    getSessionToken().then(setToken);
-  }, []);
+    const hasPending = orders.some((o) => o.statut === 'en_attente' && !!o.acceptation_limite_at);
+    if (!hasPending) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [orders]);
 
-  // --- REALTIME: Écoute les nouvelles commandes ---
+  // --- Rafraîchissement périodique des commandes (polling 20 s) ---
   // Refresh silencieux (commandes seules, sans écran de chargement) :
-  // chaque changement reçu ne doit pas faire clignoter la liste.
+  // chaque rafraîchissement ne doit pas faire clignoter la liste.
   useRealtimeOrders({
     enterpriseId: shop?.id || null,
     refreshOrders,
-    token,
   });
 
   const counts = useMemo(() => {
@@ -155,6 +172,10 @@ export default function VendorOrdersTabScreen() {
           <View style={{ gap: 12 }}>
             {list.map((o) => {
               const st = statusStyle(o.statut, colors);
+              const acceptRemaining =
+                o.statut === 'en_attente' ? remainingSeconds(o.acceptation_limite_at, now) : null;
+              const acceptUrgent = acceptRemaining != null && acceptRemaining > 0 && acceptRemaining <= 60;
+              const acceptExpired = acceptRemaining === 0;
               return (
                 <Pressable
                   key={o.id}
@@ -183,10 +204,21 @@ export default function VendorOrdersTabScreen() {
                   </View>
 
                   {o.statut === 'en_attente' && o.acceptation_limite_at ? (
-                    <View style={[styles.deliveryBadge, { backgroundColor: colors.warningSoft }]}>
-                      <ThemedText style={[styles.deliveryHint, { color: colors.warning }]} numberOfLines={2}>
-                        À accepter avant {formatHeureLimite(o.acceptation_limite_at)} — sinon la commande
-                        expire automatiquement.
+                    <View style={[styles.deliveryBadge, { backgroundColor: acceptUrgent || acceptExpired ? colors.errorSoft : colors.warningSoft }]}>
+                      <View style={styles.acceptRow}>
+                        <Clock size={13} color={acceptUrgent || acceptExpired ? colors.error : colors.warning} strokeWidth={2.4} />
+                        <ThemedText style={[styles.deliveryHint, { color: acceptUrgent || acceptExpired ? colors.error : colors.warning }]} numberOfLines={1}>
+                          {acceptExpired
+                            ? 'Commande expirée'
+                            : acceptRemaining != null
+                              ? `Acceptation dans ${mmss(acceptRemaining)}`
+                              : `À accepter avant ${formatHeureLimite(o.acceptation_limite_at)}`}
+                        </ThemedText>
+                      </View>
+                      <ThemedText style={[styles.acceptHint, { color: acceptUrgent || acceptExpired ? colors.error : colors.warning }]} numberOfLines={2}>
+                        {acceptExpired
+                          ? 'La commande sera annulée automatiquement.'
+                          : 'Sinon la commande expire automatiquement.'}
                       </ThemedText>
                     </View>
                   ) : null}
@@ -272,8 +304,10 @@ const styles = StyleSheet.create({
   client: { fontSize: 16, marginBottom: 6, fontWeight: '700' },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   infoText: { fontSize: 13 },
-  deliveryBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, marginBottom: 12 },
-  deliveryHint: { fontSize: 11, fontWeight: '800' },
+  deliveryBadge: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, marginBottom: 12, gap: 3 },
+  deliveryHint: { fontSize: 12, fontWeight: '800' },
+  acceptRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  acceptHint: { fontSize: 10.5, fontWeight: '600', lineHeight: 14, marginTop: 1 },
   cardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(0,0,0,0.05)' },
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   time: { fontSize: 12, fontWeight: '600' },

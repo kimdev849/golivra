@@ -9,12 +9,12 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useEffect, useState } from 'react';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { GOLIVRA_GREEN_SPLASH } from '@/constants/app-palette';
 import {
-  getBiometricLockEnabled,
-  promptBiometricUnlock,
-} from '@/lib/biometric-lock';
-import { markOnboardingComplete, resolveBootstrapTarget } from '@/lib/app-bootstrap';
+  markOnboardingComplete,
+  resolveBootstrapTarget,
+  signalBootstrapSettled,
+} from '@/lib/app-bootstrap';
 
 const SLOGAN = 'On vous apporte ce dont vous avez besoin ..';
 /** Orange marque GoLivra (utilisé dans le logo, le t-shirt et la casquette). */
@@ -44,26 +44,25 @@ export default function LandingScreen() {
         if (!isMounted) return;
 
         if (target.kind === 'home') {
-          const bio = await getBiometricLockEnabled();
-          if (bio) {
-            const ok = await promptBiometricUnlock('Déverrouiller GoLivra');
-            if (!ok) {
-              router.replace('/auth');
-              return;
-            }
-          }
+          // Le déverrouillage biométrique est géré UNIQUEMENT par
+          // BiometricAppGate (démarrage + retour au premier plan). Ici, aucun
+          // prompt : demander aussi ici doublait la demande à chaque ouverture.
           router.replace(target.href);
+          signalBootstrapSettled();
           return;
         }
 
         if (target.kind === 'auth') {
           router.replace('/auth');
+          signalBootstrapSettled();
           return;
         }
 
         setIsCheckingFirstLaunch(false);
+        signalBootstrapSettled();
       } catch {
         if (isMounted) setIsCheckingFirstLaunch(false);
+        signalBootstrapSettled();
       }
     };
 
@@ -75,7 +74,11 @@ export default function LandingScreen() {
   }, [router]);
 
   if (isCheckingFirstLaunch) {
-    return <ThemedView style={styles.container} />;
+    // Fond identique au splash (vert profond) : la disparition du splash JS se
+    // fond dans l'écran de bootstrap → plus d'écran noir/blanc entre les deux.
+    return (
+      <View style={[styles.container, { backgroundColor: GOLIVRA_GREEN_SPLASH }]} />
+    );
   }
 
   const buttonWidth = Math.min(width - 32, 480);
@@ -86,7 +89,7 @@ export default function LandingScreen() {
 
       {/* Photo plein écran */}
       <Image
-        source={require('@/assets/images/home2.png')}
+        source={require('@/assets/images/home2.jpg')}
         style={StyleSheet.absoluteFill}
         contentFit="cover"
         contentPosition="center"
@@ -135,7 +138,7 @@ export default function LandingScreen() {
             styles.cta,
             { backgroundColor: GOLIVRA_ORANGE, width: buttonWidth, opacity: pressed ? 0.92 : 1 },
           ]}>
-          <ThemedText style={styles.ctaText}>Connexion</ThemedText>
+          <ThemedText style={styles.ctaText}>Se connecter</ThemedText>
         </Pressable>
 
         <View style={styles.betaBadge}>

@@ -95,7 +95,7 @@ export default function OrderDeliveriesSummaryScreen() {
         </ThemedText>
         <ThemedText style={[styles.sub, { color: colors.textSecondary }]}>
           {n === 1
-            ? 'Votre commande est en cours de traitement.'
+            ? 'Votre commande a bien été envoyée !'
             : `Votre commande est divisée en ${n} livraisons :`}
         </ThemedText>
 

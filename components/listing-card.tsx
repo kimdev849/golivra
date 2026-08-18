@@ -10,13 +10,15 @@ import { useAppColors } from '@/hooks/use-app-colors';
 import type { ProductPublic } from '@/lib/catalog';
 import { formatFcfa } from '@/lib/format';
 import {
+  getProductCondition,
+  getProductConditionColor,
   getProductGalleryUrls,
   getProductPhotoCount,
   getProductPrimaryImage,
   productKind,
 } from '@/lib/listing-utils';
-import { getEffectiveUnitPrice } from '@/lib/product-promo';
-import type { ResizeOptions } from '@/lib/images';
+import { resolveProductPricing } from '@/lib/product-promo';
+import { resolveRemoteImageUrl, type ResizeOptions } from '@/lib/images';
 
 type Props = {
   product: ProductPublic;
@@ -44,10 +46,19 @@ export function ListingCard({ product, onPress, isFav = false, onToggleFav, vari
   const imgOpts: ResizeOptions = { width: imgWidth, format: 'webp', quality: 80 };
   const image = getProductPrimaryImage(product, imgOpts);
   const photoCount = getProductPhotoCount(product, imgOpts);
-  const basePrice = Number(getEffectiveUnitPrice(product) ?? product.prix ?? 0);
-  const isPromo =
-    product.prix_promo != null && Number(product.prix_promo) < Number(product.prix);
+  // Même logique promo que la fiche produit (prix de base + fenêtres de dates) :
+  // le badge ne disparaît plus de la liste quand la promo est active.
+  const pricing = resolveProductPricing(product);
+  const isPromo = pricing.promoActive;
+  const basePrice = pricing.basePrice;
   const PlaceholderIcon = kind === 'article' ? Store : UtensilsCrossed;
+  // État du produit (neuf / occasion / reconditionné) — affiché dès la liste.
+  const condition = getProductCondition(product);
+  // Photo de profil du commerce, visible dès la liste (pas besoin d'entrer
+  // dans le produit pour la voir).
+  const vendorAvatar = product.enterprise_image_url
+    ? resolveRemoteImageUrl(product.enterprise_image_url, { width: 96, format: 'webp', quality: 80 })
+    : null;
 
   return (
     <Pressable
@@ -96,8 +107,26 @@ export function ListingCard({ product, onPress, isFav = false, onToggleFav, vari
             <ThemedText style={styles.photoBadgeTxt}>{photoCount}</ThemedText>
           </View>
         ) : null}
+        {condition ? (
+          <View
+            style={[
+              styles.condBadge,
+              isGrid && styles.condBadgeGrid,
+              isFeed && styles.condBadgeFeed,
+              { backgroundColor: getProductConditionColor(condition.key, colors) },
+            ]}>
+            <ThemedText style={styles.condBadgeTxt}>{condition.label}</ThemedText>
+          </View>
+        ) : null}
         {isPromo ? (
-          <View style={[styles.promoBadge, isGrid && styles.promoBadgeGrid, { backgroundColor: colors.error }]}>
+          <View
+            style={[
+              styles.promoBadge,
+              isGrid && styles.promoBadgeGrid,
+              isFeed && styles.promoBadgeFeed,
+              condition ? styles.promoBadgeWithCond : null,
+              { backgroundColor: colors.error },
+            ]}>
             <ThemedText style={styles.promoBadgeTxt}>Promo</ThemedText>
           </View>
         ) : null}
@@ -125,11 +154,11 @@ export function ListingCard({ product, onPress, isFav = false, onToggleFav, vari
           <ThemedText
             style={[styles.price, isGrid && styles.priceGrid, isFeed && styles.priceFeed, { color: isPromo ? colors.primary : colors.text }]}
             numberOfLines={1}>
-            {isPromo ? formatFcfa(Number(product.prix_promo)) : formatFcfa(basePrice)}
+            {formatFcfa(isPromo && pricing.promoPrice != null ? pricing.promoPrice : basePrice)}
           </ThemedText>
           {isPromo && !isGrid ? (
             <ThemedText style={[styles.oldPrice, { color: colors.textMuted }]} numberOfLines={1}>
-              {formatFcfa(Number(product.prix))}
+              {formatFcfa(basePrice)}
             </ThemedText>
           ) : null}
         </View>
@@ -139,9 +168,19 @@ export function ListingCard({ product, onPress, isFav = false, onToggleFav, vari
           {product.nom || 'Produit'}
         </ThemedText>
         {product.enterprise_nom ? (
-          <ThemedText style={[styles.vendor, isGrid && styles.vendorGrid, isFeed && styles.vendorFeed, { color: colors.textMuted }]} numberOfLines={1}>
-            {product.enterprise_nom}
-          </ThemedText>
+          <View style={styles.vendorRow}>
+            {vendorAvatar ? (
+              <Image
+                source={{ uri: vendorAvatar }}
+                style={[styles.vendorAvatar, isGrid && styles.vendorAvatarGrid, isFeed && styles.vendorAvatarFeed]}
+                contentFit="cover"
+                transition={150}
+              />
+            ) : null}
+            <ThemedText style={[styles.vendor, isGrid && styles.vendorGrid, isFeed && styles.vendorFeed, { color: colors.textMuted }]} numberOfLines={1}>
+              {product.enterprise_nom}
+            </ThemedText>
+          </View>
         ) : null}
         {!isGrid && !isFeed && product.description ? (
           <ThemedText style={[styles.snippet, { color: colors.textSecondary }]} numberOfLines={2}>
@@ -232,6 +271,17 @@ const styles = StyleSheet.create({
   },
   zoomBtnGrid: { bottom: 6, right: 6, width: 26, height: 26, borderRadius: 13 },
   zoomBtnFeed: { bottom: 6, right: 6, width: 24, height: 24, borderRadius: 12 },
+  condBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+  },
+  condBadgeGrid: { top: 6, left: 6 },
+  condBadgeFeed: { top: 6, left: 6 },
+  condBadgeTxt: { color: '#FFF', fontSize: 9, fontWeight: '800' },
   promoBadge: {
     position: 'absolute',
     top: 8,
@@ -241,6 +291,9 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   promoBadgeGrid: { top: 6, left: 6 },
+  promoBadgeFeed: { top: 6, left: 6 },
+  /** Quand l'état est affiché à gauche, la promo se centre pour ne pas se chevaucher. */
+  promoBadgeWithCond: { left: '50%', marginLeft: -22 },
   promoBadgeTxt: { color: '#FFF', fontSize: 9, fontWeight: '800' },
   favBtn: {
     position: 'absolute',
@@ -282,7 +335,16 @@ const styles = StyleSheet.create({
   title: { fontSize: 15, fontWeight: '600', lineHeight: 19 },
   titleGrid: { fontSize: 13, fontWeight: '600', lineHeight: 17 },
   titleFeed: { fontSize: 14, lineHeight: 18 },
-  vendor: { fontSize: 13, marginTop: 2 },
+  vendorRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  vendorAvatar: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#E5E7EB',
+  },
+  vendorAvatarGrid: { width: 15, height: 15, borderRadius: 7.5 },
+  vendorAvatarFeed: { width: 16, height: 16, borderRadius: 8 },
+  vendor: { fontSize: 13, marginTop: 2, flexShrink: 1 },
   vendorGrid: { fontSize: 11, marginTop: 1 },
   vendorFeed: { fontSize: 12, marginTop: 1 },
   snippet: { fontSize: 13, lineHeight: 18, marginTop: 2 },

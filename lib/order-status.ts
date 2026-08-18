@@ -62,6 +62,11 @@ export function orderEtaMinutes(statut: string | null | undefined): number | nul
   return map[key] ?? null;
 }
 
+/** Clé normalisée pour les calculs de progression (accueil, widgets). */
+export function normalizeStatusForProgress(statut: string | null | undefined): string {
+  return normalizeStatutKey(statut);
+}
+
 export function compactOrderRef(id: string): string {
   const clean = id.replace(/-/g, '');
   const slice = clean.slice(0, 8).toUpperCase();

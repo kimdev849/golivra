@@ -35,7 +35,9 @@ export function useActiveOrders() {
     },
     refetchInterval: (q) => {
       const data = q.state.data;
-      if (!data?.length) return 30_000;
+      // Aucune commande active : inutile de poller toutes les 30 s (le focus
+      // écran rafraîchit au retour). 5 min suffisent à garder la liste à jour.
+      if (!data?.length) return 5 * 60_000;
       return fastestPollingInterval(data);
     },
     staleTime: 10_000,

@@ -22,6 +22,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AuthBackdrop } from '@/components/auth-backdrop';
 import { FormErrorBanner } from '@/components/form-error-banner';
+import { InlineFormError } from '@/components/inline-form-error';
 import { accentGradient2, type AppPalette } from '@/constants/app-palette';
 import { useAppTheme } from '@/contexts/app-theme-context';
 import { useAppColors } from '@/hooks/use-app-colors';
@@ -51,6 +52,7 @@ export default function AuthScreen() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ phone?: string | null; password?: string | null }>({});
   const [keyboardInset, setKeyboardInset] = useState(0);
 
   // Android (edge-to-edge) : le clavier peut recouvrir les champs bas du
@@ -102,23 +104,28 @@ export default function AuthScreen() {
 
   const handleLogin = async () => {
     setError(null);
+    const next: Record<string, string | null> = {};
     const e1 = validatePhone(loginPhone);
     if (!e1.ok) {
-      setError(e1.message);
+      next.phone = e1.message;
+    } else if (!phoneE164) {
+      next.phone = 'Ce numéro ne semble pas complet. Vérifiez-le, par exemple +242 06 123 45 67.';
+    }
+    const e2 = validatePassword(password);
+    if (!e2.ok) {
+      next.password = e2.message;
+    }
+    if (next.phone || next.password) {
+      setFieldErrors(next);
       triggerShake();
       return;
     }
     if (!phoneE164) {
-      setError('Numéro invalide.');
+      setFieldErrors({ phone: 'Ce numéro ne semble pas complet. Vérifiez-le, par exemple +242 06 123 45 67.' });
       triggerShake();
       return;
     }
-    const e2 = validatePassword(password);
-    if (!e2.ok) {
-      setError(e2.message);
-      triggerShake();
-      return;
-    }
+    setFieldErrors({});
 
     setIsSubmitting(true);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -140,6 +147,20 @@ export default function AuthScreen() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Validation douce à la sortie du champ : l'erreur s'affiche sous le champ
+  // concerné, sans bloquer la saisie ni attendre l'appui sur « Se connecter ».
+  const handleBlurPhone = () => {
+    setFieldErrors((prev) => ({ ...prev, phone: null }));
+    const r = validatePhone(loginPhone);
+    if (!r.ok) setFieldErrors((prev) => ({ ...prev, phone: r.message }));
+  };
+
+  const handleBlurPassword = () => {
+    setFieldErrors((prev) => ({ ...prev, password: null }));
+    const r = validatePassword(password);
+    if (!r.ok) setFieldErrors((prev) => ({ ...prev, password: r.message }));
   };
 
   return (
@@ -230,10 +251,11 @@ export default function AuthScreen() {
                   <ThemedText style={[styles.fieldLabel, { color: colors.textSecondary }]}>
                     Numéro de téléphone
                   </ThemedText>
-                  {/* Même structure que l'inscription : pas de onFocus/onBlur ni de
-                      style dynamique au focus — le re-render + elevation sur le
-                      parent faisaient perdre le focus au TextInput sur Android. */}
-                  <View style={[styles.inputCard, { backgroundColor: colors.inputBg }]}>
+                  <View
+                    style={[
+                      styles.inputCard,
+                      { backgroundColor: colors.inputBg, borderColor: fieldErrors.phone ? colors.error : colors.border },
+                    ]}>
                     <Smartphone size={20} color={colors.primary} strokeWidth={2.2} />
                     <TextInput
                       style={[styles.inputField, { color: colors.text }]}
@@ -244,11 +266,16 @@ export default function AuthScreen() {
                       autoCapitalize="none"
                       autoCorrect={false}
                       value={loginPhone}
-                      onChangeText={(text) => setLoginPhone(formatPhone(text))}
+                      onChangeText={(text) => {
+                        setLoginPhone(formatPhone(text));
+                        if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: null }));
+                      }}
+                      onBlur={handleBlurPhone}
                       returnKeyType="next"
                       onSubmitEditing={() => passwordRef.current?.focus()}
                     />
                   </View>
+                  <InlineFormError message={fieldErrors.phone} colors={colors} />
                 </View>
 
                 {/* ── Mot de passe ── */}
@@ -256,7 +283,11 @@ export default function AuthScreen() {
                   <ThemedText style={[styles.fieldLabel, { color: colors.textSecondary }]}>
                     Mot de passe
                   </ThemedText>
-                  <View style={[styles.inputCard, { backgroundColor: colors.inputBg }]}>
+                  <View
+                    style={[
+                      styles.inputCard,
+                      { backgroundColor: colors.inputBg, borderColor: fieldErrors.password ? colors.error : colors.border },
+                    ]}>
                     <Lock size={20} color={colors.primary} strokeWidth={2.2} />
                     <TextInput
                       ref={passwordRef}
@@ -269,7 +300,11 @@ export default function AuthScreen() {
                       autoCorrect={false}
                       textContentType="password"
                       value={password}
-                      onChangeText={setPassword}
+                      onChangeText={(text) => {
+                        setPassword(text);
+                        if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: null }));
+                      }}
+                      onBlur={handleBlurPassword}
                       returnKeyType="go"
                       onSubmitEditing={() => {
                         if (canSubmit) void handleLogin();
@@ -286,6 +321,7 @@ export default function AuthScreen() {
                       )}
                     </Pressable>
                   </View>
+                  <InlineFormError message={fieldErrors.password} colors={colors} />
                 </View>
 
                 <Pressable

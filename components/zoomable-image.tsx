@@ -23,6 +23,11 @@ type Props = Omit<ImageProps, 'source'> & {
  * - N'ouvre pas le viewer si la source est vide / placeholder
  * - Le zoom s'effectue dans une `Modal` plein écran pour éviter les conflits
  *   avec les gestes des listes parentes
+ *
+ * ⚠️ Le style (dimensions, borderRadius…) s'applique au CONTENEUR externe :
+ *    c'est lui qui donne sa taille au Pressable et à l'Image (100 %). Appliquer
+ *    un style en pourcentage directement à l'Image sans conteneur dimensionné
+ *    crée une boucle de mesure → l'image est rendue invisible (vignettes vides).
  */
 export function ZoomableImage({ source, style, caption, disabled, onPress, ...rest }: Props) {
   const [open, setOpen] = useState(false);
@@ -38,14 +43,14 @@ export function ZoomableImage({ source, style, caption, disabled, onPress, ...re
   const hasSource = source != null && source !== '';
 
   return (
-    <View>
+    <View style={[style, styles.container]}>
       <Pressable
         onPress={hasSource && !disabled ? onPressWrapped : undefined}
         accessibilityRole={hasSource && !disabled ? 'imagebutton' : undefined}
         accessibilityLabel={hasSource && !disabled ? 'Agrandir l’image' : undefined}
         disabled={!hasSource || disabled}
         style={styles.touch}>
-        <Image source={source as ImageSource} style={style} {...rest} />
+        <Image source={source as ImageSource} style={styles.fill} {...rest} />
       </Pressable>
       <ImageZoomViewer
         visible={open}
@@ -58,5 +63,8 @@ export function ZoomableImage({ source, style, caption, disabled, onPress, ...re
 }
 
 const styles = StyleSheet.create({
+  /** Rogue l'image aux coins arrondis du conteneur (borderRadius du style). */
+  container: { overflow: 'hidden' },
   touch: { width: '100%', height: '100%' },
+  fill: { width: '100%', height: '100%' },
 });

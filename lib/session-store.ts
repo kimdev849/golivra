@@ -2,10 +2,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { AuthSession } from '@/lib/auth';
 
-const SESSION_SNAPSHOT_KEY = 'golivra_session_snapshot_v1';
+// v2 : le token a été RETIRÉ du snapshot (il dupliquait le secret en clair dans
+// AsyncStorage — il vit uniquement dans SecureStore via lib/auth.ts).
+const SESSION_SNAPSHOT_KEY = 'golivra_session_snapshot_v2';
+// Ancienne clé v1 : contenait le token en clair. Purge au premier démarrage.
+const LEGACY_SESSION_SNAPSHOT_KEY = 'golivra_session_snapshot_v1';
 
 export type SessionSnapshot = {
-  token: string;
   userId: string;
   nom: string | null;
   telephone: string;
@@ -24,9 +27,20 @@ export function getSessionSnapshotSync(): SessionSnapshot | null {
 export async function hydrateSessionSnapshot(): Promise<SessionSnapshot | null> {
   if (snapshotHydrated) return memorySnapshot;
   try {
+    // Purge de l'ancien snapshot v1 qui contenait le token en clair.
+    await AsyncStorage.removeItem(LEGACY_SESSION_SNAPSHOT_KEY);
+
     const raw = await AsyncStorage.getItem(SESSION_SNAPSHOT_KEY);
     if (raw) {
-      memorySnapshot = JSON.parse(raw) as SessionSnapshot;
+      const parsed = JSON.parse(raw) as Partial<SessionSnapshot>;
+      // Si un snapshot v2 (ou futur) contient encore un champ token, on l'ignore
+      // et on le purge : le token ne doit JAMAIS être persisté hors SecureStore.
+      if ('token' in parsed) {
+        await AsyncStorage.removeItem(SESSION_SNAPSHOT_KEY);
+        memorySnapshot = null;
+      } else {
+        memorySnapshot = parsed as SessionSnapshot;
+      }
     }
   } catch {
     memorySnapshot = null;
@@ -37,7 +51,6 @@ export async function hydrateSessionSnapshot(): Promise<SessionSnapshot | null> 
 
 export async function saveSessionSnapshot(session: AuthSession): Promise<void> {
   const snap: SessionSnapshot = {
-    token: session.token,
     userId: session.user.id,
     nom: session.user.nom,
     telephone: session.user.telephone,

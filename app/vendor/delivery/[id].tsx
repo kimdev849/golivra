@@ -8,6 +8,7 @@ import {
   Circle,
   CreditCard,
   MapPin,
+  Navigation,
   PackageCheck,
   Phone,
   Store,
@@ -90,6 +91,30 @@ export default function VendorDeliveryDetailScreen() {
           ? liv.methode_paiement
           : 'Mobile Money';
   const paye = liv?.paiement_statut === 'valide';
+
+  // ── Suivi en direct : distance du livreur + arrivée estimée (côté commerce) ──
+  const distanceKm = detail?.distance_km ?? null;
+  const positionAt = livreur?.position_actuelle?.at || null;
+  const isEnRoute = liv?.statut === 'en_route' || liv?.statut === 'collectee';
+  const isProche = distanceKm != null && distanceKm > 0 && distanceKm < 0.5;
+  const distanceLabel =
+    distanceKm == null
+      ? null
+      : distanceKm < 1
+        ? `${Math.round(distanceKm * 1000)} m`
+        : `${Number(distanceKm).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km`;
+  // Vitesse moyenne en ville (~20 km/h) : arrivée estimée indicative, jamais une promesse.
+  const etaFromDistance = isEnRoute && distanceKm != null ? Math.max(2, Math.round((distanceKm / 20) * 60)) : null;
+  const positionFreshness =
+    positionAt == null
+      ? null
+      : (() => {
+          const mins = Math.floor((Date.now() - new Date(positionAt).getTime()) / 60_000);
+          if (!Number.isFinite(mins) || mins < 0) return null;
+          if (mins < 1) return "à l'instant";
+          if (mins < 60) return `il y a ${mins} min`;
+          return `il y a ${Math.floor(mins / 60)} h`;
+        })();
 
   return (
     <ThemedView style={styles.screen}>
@@ -263,10 +288,37 @@ export default function VendorDeliveryDetailScreen() {
                   </Pressable>
                 ) : null}
               </View>
-              {liv.statut === 'en_route' || liv.statut === 'collectee' ? (
-                <ThemedText style={[styles.livreurHint, { color: palette.primary }]}>
-                  🛵 Votre commande est en route vers le client…
-                </ThemedText>
+
+              {/* Suivi en direct : position du livreur pendant la course */}
+              {positionAt || distanceKm != null ? (
+                <View style={[styles.liveBox, { backgroundColor: colors.primarySoft, borderColor: colors.border }]}>
+                  <View style={[styles.liveBoxIcon, { backgroundColor: colors.surface }]}>
+                    <Navigation size={18} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <ThemedText style={[styles.liveBoxTitle, { color: palette.primaryDeep }]}>
+                      {isProche
+                        ? 'Le livreur est proche du destinataire'
+                        : distanceLabel
+                          ? `Le livreur est à ~${distanceLabel} du destinataire`
+                          : 'Le livreur est en chemin'}
+                    </ThemedText>
+                    {isProche ? (
+                      <ThemedText style={[styles.liveBoxSub, { color: palette.primary }]}>
+                        Livraison imminente 👋
+                      </ThemedText>
+                    ) : etaFromDistance != null ? (
+                      <ThemedText style={[styles.liveBoxSub, { color: palette.primary }]}>
+                        Arrivée estimée dans ~{etaFromDistance} min
+                      </ThemedText>
+                    ) : null}
+                  </View>
+                  {positionFreshness ? (
+                    <ThemedText style={[styles.liveBoxFresh, { color: colors.textMuted }]}>
+                      {positionFreshness}
+                    </ThemedText>
+                  ) : null}
+                </View>
               ) : null}
             </View>
           ) : null}
@@ -434,7 +486,25 @@ const styles = StyleSheet.create({
   livreurNom: { fontSize: 15.5, fontWeight: '800' },
   livreurMeta: { fontSize: 12.5, marginTop: 2 },
   callBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  livreurHint: { fontSize: 13, fontWeight: '700' },
+  liveBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    marginTop: 4,
+  },
+  liveBoxIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  liveBoxTitle: { fontSize: 13.5, fontWeight: '800' },
+  liveBoxSub: { fontSize: 12.5, fontWeight: '700' },
+  liveBoxFresh: { fontSize: 11, fontWeight: '600' },
 
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   infoText: { fontSize: 14, lineHeight: 20 },

@@ -69,6 +69,8 @@ export type VendorOrder = {
   lignes: VendorOrderLine[];
   livreur?: { nom: string; tel: string };
   livraison_statut?: string | null;
+  /** Id de la livraison GoLivra — ouvre le suivi temps réel du livreur. */
+  livraison_id?: string | null;
   /**
    * Nouveau parcours : statut du paiement client (en_attente / valide / echoue).
    * La commande n'est « réellement confirmée » qu'une fois le paiement validé —
@@ -155,6 +157,7 @@ export type VendorEngagementInput = {
 
 export function countsFromOrders(orders: VendorOrder[]) {
   const all = orders.length;
+  const pending = orders.filter((o) => o.statut === 'en_attente').length;
   const prep = orders.filter(
     (o) =>
       o.statut === 'en_attente' ||
@@ -170,6 +173,7 @@ export function countsFromOrders(orders: VendorOrder[]) {
     prep,
     ship,
     prete,
+    pending,
   };
 }
 

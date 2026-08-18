@@ -236,7 +236,10 @@ export default function VendorShopInfoScreen() {
 
   const infoTitle = commerceType === 'restaurant' ? 'Informations restaurant' : 'Informations boutique';
   const nomLabel = commerceType === 'restaurant' ? 'Nom du restaurant' : 'Nom de la boutique';
-  const displayLogo = resolveRemoteImageUrl(logoUri);
+  // Photo choisie localement (URI file://) → affichage direct. URL distante →
+  // résolution (redimensionnement Supabase). Le fallback sur l'URI brute évite
+  // que la photo sélectionnée n'apparaisse qu'après enregistrement.
+  const displayLogo = logoUri ? (resolveRemoteImageUrl(logoUri) ?? logoUri) : null;
 
   return (
     <ThemedView style={styles.screen}>

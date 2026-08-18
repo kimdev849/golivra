@@ -10,10 +10,6 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { isAuthErrorMessage } from '@/lib/app-bootstrap';
 import { hydrateSessionToken } from '@/lib/auth';
-import {
-  getBiometricLockEnabled,
-  promptBiometricUnlock,
-} from '@/lib/biometric-lock';
 import { fetchAuthMe, prefetchClientCatalog } from '@/lib/client-data';
 import { isMerchantRole } from '@/lib/roles';
 import { VENDOR_HREF } from '@/lib/vendor-nav';
@@ -41,22 +37,6 @@ export default function TabLayout() {
     },
     [router],
   );
-
-  useEffect(() => {
-    let alive = true;
-    void (async () => {
-      const bio = await getBiometricLockEnabled();
-      if (!bio || !alive) return;
-      const ok = await promptBiometricUnlock('Déverrouiller GoLivra');
-      if (!ok && alive) {
-        setSessionOk(false);
-        router.replace('/auth');
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [router]);
 
   useEffect(() => {
     let alive = true;

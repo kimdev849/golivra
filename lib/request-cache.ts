@@ -29,6 +29,7 @@ function shouldPersistToDisk(key: string): boolean {
     key.startsWith('products:') ||
     key.startsWith('product:') ||
     key.startsWith('categories:') ||
+    key.startsWith('feed:') ||
     key.startsWith('auth:me:') ||
     key.startsWith('orders:')
   );

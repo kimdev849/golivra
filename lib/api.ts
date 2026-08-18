@@ -22,7 +22,15 @@ export type ApiFetchOptions<T = unknown> = RequestInit & {
   schema?: z.ZodSchema<T>;
   /** Ne pas remonter l'incident à l'admin (ex. rapport observability). */
   skipIncidentReport?: boolean;
+  /** Timeout en ms avant abandon de la requête (AbortController). Défaut 15 s. */
+  timeoutMs?: number;
 };
+
+/**
+ * Timeout réseau par défaut. Sans lui, un serveur lent (ex. cold start Render)
+ * laisse l'app bloquée sur un écran de chargement pendant 1 min et plus.
+ */
+const DEFAULT_TIMEOUT_MS = 15_000;
 
 function extractErrorMessage(parsed: unknown, text: string, status: number): string {
   if (typeof parsed === 'object' && parsed !== null && 'message' in parsed) {
@@ -73,16 +81,26 @@ function notifySlowConnection(): void {
   if (AppState.currentState !== 'active') return;
   lastSlowToastAt = now;
   showToast({
-    message: 'Connexion lente… les données peuvent mettre un moment à s\u2019afficher.',
+    message: 'Connexion lente…',
     variant: 'info',
     duration: 2600,
   });
 }
 
 export async function apiFetch<T = unknown>(path: string, options: ApiFetchOptions<T> = {}): Promise<T> {
-  const { token, jsonBody, headers: initHeaders, body, schema, skipIncidentReport, ...rest } = options;
+  const { token, jsonBody, headers: initHeaders, body, schema, skipIncidentReport, timeoutMs = DEFAULT_TIMEOUT_MS, ...rest } = options;
   const headers = new Headers(initHeaders);
   const requestId = createRequestId();
+
+  // Abandonne la requête après timeoutMs : évite les écrans de chargement
+  // infinis quand l'API est lente ou injoignable (l'app doit rester utilisable).
+  let controller: AbortController | null = null;
+  let abortTimer: ReturnType<typeof setTimeout> | null = null;
+  if (timeoutMs > 0) {
+    controller = new AbortController();
+    abortTimer = setTimeout(() => controller?.abort(), timeoutMs);
+    (rest as { signal?: AbortSignal }).signal = controller.signal;
+  }
 
   headers.set('X-Request-Id', requestId);
   headers.set('X-Client-Source', 'mobile');
@@ -102,6 +120,12 @@ export async function apiFetch<T = unknown>(path: string, options: ApiFetchOptio
   const url = apiUrl(path);
   const method = (rest.method || 'GET').toUpperCase();
   const fetchStart = Date.now();
+  const clearTimer = () => {
+    if (abortTimer) {
+      clearTimeout(abortTimer);
+      abortTimer = null;
+    }
+  };
   let res: Response;
   try {
     res = await fetch(url, {
@@ -109,12 +133,22 @@ export async function apiFetch<T = unknown>(path: string, options: ApiFetchOptio
       headers,
       body: finalBody,
     });
+    clearTimer();
   } catch (cause) {
-    const message = networkErrorMessage(cause);
+    clearTimer();
+    const aborted =
+      typeof cause === 'object' &&
+      cause !== null &&
+      ((cause as Error).name === 'AbortError' ||
+        (cause as { aborted?: boolean }).aborted === true ||
+        /abort/i.test((cause as Error).message ?? ''));
+    const message = aborted
+      ? 'Connexion lente. Réessayez.'
+      : networkErrorMessage(cause);
     if (!skipIncidentReport) {
       void reportAppIncident({
         requestId,
-        title: 'API injoignable',
+        title: aborted ? 'API trop lente (timeout)' : 'API injoignable',
         message,
         category: 'network',
         httpMethod: method,

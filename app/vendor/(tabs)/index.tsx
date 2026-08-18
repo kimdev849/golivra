@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   ArrowRight,
@@ -307,6 +308,8 @@ export default function VendorDashboardScreen() {
   );
 
   // ── « À faire » : la réponse à « qu'est-ce que je dois faire maintenant ? » ──
+  // Priorité absolue : les commandes à ACCEPTER (elles expirent en 5 min) —
+  // elles sont listées en premier, en rouge, avec leur délai restant.
   const actions = useMemo(() => {
     const list: {
       key: string;
@@ -318,6 +321,18 @@ export default function VendorDashboardScreen() {
       cta: string;
       onPress: () => void;
     }[] = [];
+    if (counts.pending > 0) {
+      list.push({
+        key: 'accept',
+        Icon: Clock,
+        tone: colors.error,
+        soft: colors.errorSoft,
+        title: `${counts.pending} commande${counts.pending > 1 ? 's' : ''} à accepter`,
+        subtitle: "L'horloge tourne — répondez avant l'expiration (5 min).",
+        cta: 'Accepter',
+        onPress: () => router.push(VENDOR_HREF.ordersTab),
+      });
+    }
     if (horaires.loaded && !horaires.hasHours) {
       list.push({
         key: 'horaires',
@@ -330,13 +345,14 @@ export default function VendorDashboardScreen() {
         onPress: openHorairesEditor,
       });
     }
-    if (counts.prep > 0) {
+    const prepToDo = counts.prep - counts.pending;
+    if (prepToDo > 0) {
       list.push({
         key: 'prep',
         Icon: UtensilsCrossed,
         tone: colors.warning,
         soft: colors.warningSoft,
-        title: `${counts.prep} commande${counts.prep > 1 ? 's' : ''} à préparer`,
+        title: `${prepToDo} commande${prepToDo > 1 ? 's' : ''} à préparer`,
         subtitle: 'Vos clients attendent leur commande.',
         cta: 'Préparer',
         onPress: () => router.push(VENDOR_HREF.ordersTab),
@@ -355,7 +371,7 @@ export default function VendorDashboardScreen() {
       });
     }
     return list;
-  }, [horaires.loaded, horaires.hasHours, counts.prep, profileIncomplete, colors, router, openHorairesEditor]);
+  }, [horaires.loaded, horaires.hasHours, counts.pending, counts.prep, profileIncomplete, colors, router, openHorairesEditor]);
 
   return (
     <ThemedView style={styles.screen}>
@@ -365,13 +381,19 @@ export default function VendorDashboardScreen() {
 
         {/* ── En-tête : salutation + statut + date + notifications ── */}
         <View style={styles.topRow}>
-          <LinearGradient
-            colors={isDark ? [palette.primary, '#0A5C3C'] : [palette.primary, palette.primaryDeep]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.avatar, { shadowColor: GOLIVRA_BRAND_SHADOW }]}>
-            <ThemedText style={styles.avatarLetter}>{shopName.charAt(0).toUpperCase()}</ThemedText>
-          </LinearGradient>
+          <View style={[styles.avatar, { shadowColor: GOLIVRA_BRAND_SHADOW }]}>
+            {shop?.avatar ? (
+              <Image source={{ uri: shop.avatar }} style={styles.avatarImg} contentFit="cover" transition={150} />
+            ) : (
+              <LinearGradient
+                colors={isDark ? [palette.primary, '#0A5C3C'] : [palette.primary, palette.primaryDeep]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.avatarFallback}>
+                <ThemedText style={styles.avatarLetter}>{shopName.charAt(0).toUpperCase()}</ThemedText>
+              </LinearGradient>
+            )}
+          </View>
           <View style={styles.identity}>
             <ThemedText style={[styles.greetingSmall, { color: colors.textMuted }]}>{greeting}</ThemedText>
             <ThemedText style={[styles.greeting, { color: colors.text }]} numberOfLines={1}>
@@ -683,12 +705,18 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+    overflow: 'hidden',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.18,
     shadowRadius: 8,
     elevation: 3,
+  },
+  avatarImg: { width: '100%', height: '100%' },
+  avatarFallback: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatarLetter: { color: '#FFFFFF', fontSize: 22, fontWeight: '900' },
   identity: { flex: 1, gap: 1 },

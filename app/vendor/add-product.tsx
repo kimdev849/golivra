@@ -11,7 +11,7 @@ import { VENDOR_HREF } from '@/lib/vendor-nav';
 
 export default function VendorAddProductScreen() {
   const router = useRouter();
-  const { shop, refresh, setProducts, loading } = useVendor();
+  const { shop, refresh, loading } = useVendor();
   const { palette } = useVendorTheme();
   const isRestaurant = shop?.type === 'restaurant';
 

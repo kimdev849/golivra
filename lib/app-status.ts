@@ -84,6 +84,10 @@ export async function fetchAppStatus(options?: { force?: boolean }): Promise<App
       const status = await apiFetch<AppStatus>('/api/settings/status', {
         method: 'GET',
         skipIncidentReport: true,
+        // Timeout court : cet appel bloque l'écran de garde au démarrage. Si
+        // l'API est lente (cold start), on enchaîne sur les valeurs par défaut
+        // au lieu de laisser l'app sur un spinner pendant plus d'une minute.
+        timeoutMs: 4000,
       });
       cached = { ...defaults(), ...status };
       cachedAt = Date.now();

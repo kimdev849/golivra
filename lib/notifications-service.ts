@@ -35,6 +35,15 @@ const LAST_HANDLED_NOTIF_KEY = 'golivra_last_handled_notif_id';
 /** Mémorise que la demande de permission a déjà été affichée (1 fois max). */
 const NOTIF_PERMISSION_ASKED_KEY = 'golivra_notif_permission_asked_v1';
 
+/**
+ * Anti-course : au 1er lancement, initializeNotifications() (boot) et
+ * resyncNotificationsOnForeground() (AppState → 'active' immédiat) peuvent
+ * appeler requestPermissionsAsync en même temps. Android peut afficher deux
+ * dialogues et iOS renvoie 'denied' si un second appel arrive pendant qu'un
+ * premier est en vol. On sérilise : le 2e appelant reçoit la promesse du 1er.
+ */
+let permissionRequestInFlight: Promise<NotificationPermissionStatus> | null = null;
+
 export async function markNotificationHandled(id: string | null | undefined): Promise<void> {
   if (!id) return;
   try {
@@ -76,18 +85,39 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
     const alreadyAsked = (await safeGetItem(NOTIF_PERMISSION_ASKED_KEY)) === '1';
     if (alreadyAsked) return existing as NotificationPermissionStatus;
 
-    const { status } = await Notifications.requestPermissionsAsync({
-      ios: {
-        allowAlert: true,
-        allowBadge: true,
-        allowSound: true,
-        allowDisplayInCarPlay: false,
-        allowCriticalAlerts: false,
-      },
-    });
+    // Anti-course (voir plus haut) : si une demande est déjà en vol, on attend
+    // son résultat au lieu d'en lancer une seconde (double dialogue Android /
+    // échec iOS).
+    if (permissionRequestInFlight) {
+      return permissionRequestInFlight;
+    }
 
-    await safeSetItem(NOTIF_PERMISSION_ASKED_KEY, '1');
-    return status as NotificationPermissionStatus;
+    permissionRequestInFlight = (async () => {
+      const { status } = await Notifications.requestPermissionsAsync({
+        ios: {
+          allowAlert: true,
+          allowBadge: true,
+          allowSound: true,
+          allowDisplayInCarPlay: false,
+          allowCriticalAlerts: false,
+        },
+      });
+
+      // On ne grave le flag « déjà demandé » QUE si l'utilisateur a réellement
+      // répondu (accordé ou refusé). Si le dialogue a été ignoré (statut
+      // `undetermined`), on pourra redemander au prochain lancement — sinon une
+      // seule hésitation condamnait l'app à ne JAMAIS recevoir de push.
+      if (status !== 'undetermined') {
+        await safeSetItem(NOTIF_PERMISSION_ASKED_KEY, '1');
+      }
+      return status as NotificationPermissionStatus;
+    })();
+
+    try {
+      return await permissionRequestInFlight;
+    } finally {
+      permissionRequestInFlight = null;
+    }
   } catch (err) {
     console.warn('[notifications] requestPermission error:', err);
     return 'denied';
@@ -186,6 +216,22 @@ export async function initializeNotifications(): Promise<NotificationPermissionS
   return permission;
 }
 
+/**
+ * Resynchronise les notifications au retour au premier plan : recrée le canal
+ * Android s'il a été purgé par le système (certains fabricants le font en mode
+ * économie) et (ré)enregistre le token si la permission a été accordée
+ * entre-temps. Silencieux et non bloquant.
+ */
+export async function resyncNotificationsOnForeground(): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try {
+    await ensureAndroidChannel();
+    await ensurePushTokenRegistered();
+  } catch (err) {
+    console.warn('[notifications] resyncOnForeground error:', err);
+  }
+}
+
 /** Anti-doublon : évite de relancer une inscription push en rafale. */
 let lastTokenRegistrationAt = 0;
 
@@ -214,7 +260,16 @@ export async function ensurePushTokenRegistered(): Promise<void> {
 
   try {
     const { status } = await Notifications.getPermissionsAsync();
-    if (status !== 'granted') return;
+
+    // Permission jamais tranchée (dialogue ignoré au 1er lancement) : on la
+    // redemande ici. Sans cela, le token n'était jamais enregistré → aucun push
+    // quand l'app est fermée. Si refus définitif, on n'insiste pas.
+    if (status === 'undetermined') {
+      const asked = await requestNotificationPermission();
+      if (asked !== 'granted') return;
+    } else if (status !== 'granted') {
+      return;
+    }
 
     const token = await getExpoPushToken();
     if (!token) return;
@@ -293,10 +348,27 @@ export function setupNotificationListeners(
     });
 
     const subResponse = Notifications.addNotificationResponseReceivedListener((response) => {
-      console.log('[notifications] 👆 Tappée:', response.notification.request.content.title);
-      const data = response.notification.request.content.data;
-      handleNotificationNavigation(data as NotifData);
-      onResponse?.(response);
+      const notifId = response.notification.request.identifier;
+
+      // 🛑 Garde anti-redirection (retour au premier plan) : sur Android, l'OS
+      // peut RE-DÉLIVRER une réponse de notification déjà traitée quand l'app
+      // revient au premier plan — sans AUCUN tap de l'utilisateur. Sans cette
+      // garde, l'app redirigeait vers /notifications quelques instants après le
+      // retour, alors qu'on devait rester sur l'écran en cours (Profil, marché…).
+      // On ne navigue que si cette notification n'a JAMAIS été traitée
+      // (ni au boot, ni par un tap précédent).
+      void (async () => {
+        if (await isNotificationAlreadyHandled(notifId)) {
+          return;
+        }
+        console.log('[notifications] 👆 Tappée:', response.notification.request.content.title);
+        const data = response.notification.request.content.data;
+        handleNotificationNavigation(data as NotifData);
+        // Marquer APRÈS le tap : évite que getLastNotificationResponseAsync()
+        // ne la renvoie au prochain lancement (redirection intempestive).
+        void markNotificationHandled(notifId);
+        onResponse?.(response);
+      })();
     });
 
     cleanup = () => {
@@ -344,11 +416,30 @@ export async function handleInitialNotification(): Promise<void> {
       return;
     }
 
+    const data = response.notification.request.content.data as NotifData;
+    const action = getAction(data);
+
+    // 🛑 Garde 3 : seules les actions de deep-link EXPLICITES déclenchent
+    // une navigation automatique au lancement. Un tap générique sur une
+    // notification (sans action connue) ne renvoie JAMAIS vers /notifications
+    // automatiquement : l'utilisateur y accède via l'icône de notification
+    // dans l'app. Cette garde corrige le bug où l'utilisateur atterrissait
+    // sur /notifications à chaque ouverture de l'app.
+    const isKnownAction =
+      action === 'open_delivery' ||
+      action === 'courier_missions' ||
+      action === 'vendor_orders' ||
+      action === 'open_orders';
+
+    if (!isKnownAction) {
+      await markNotificationHandled(notifId);
+      return;
+    }
+
     await markNotificationHandled(notifId);
     console.log('[notifications] 🚀 App ouverte depuis une notification');
-    const data = response.notification.request.content.data;
     setTimeout(() => {
-      handleNotificationNavigation(data as NotifData);
+      handleNotificationNavigation(data);
     }, 500);
   } catch (err) {
     console.warn('[notifications] handleInitialNotification error:', err);
@@ -379,4 +470,21 @@ export async function sendLocalNotification(
     content: { title, body, data, sound: true },
     trigger: null,
   });
+}
+
+// ─── Web (Notification API navigateur) ──────────────────────────────────────
+// No-ops sur natif : le natif utilise les push Expo (FCM/APNs). Les vraies
+// implémentations web sont dans notifications-service.web.ts (utilisées
+// automatiquement par Metro sur la plateforme web).
+
+export function showWebNotification(
+  _title: string,
+  _body: string,
+  _data?: Record<string, unknown>,
+): void {
+  /* no-op natif */
+}
+
+export function playWebNotificationSound(): void {
+  /* no-op natif */
 }

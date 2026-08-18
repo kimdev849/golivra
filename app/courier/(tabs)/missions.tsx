@@ -54,7 +54,7 @@ export default function CourierMissionsScreen() {
             Mes courses
           </ThemedText>
           <ThemedText style={[styles.sub, { color: palette.muted }]}>
-            Missions attribuées par GoLivra
+            Les courses proposées par GoLivra
           </ThemedText>
         </View>
 

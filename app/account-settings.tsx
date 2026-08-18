@@ -21,6 +21,7 @@ import { FormErrorBanner } from '@/components/form-error-banner';
 import { FormSuccessBanner } from '@/components/form-success-banner';
 import { BiometricLockToggle } from '@/components/biometric-lock-toggle';
 import { DeleteAccountSection } from '@/components/delete-account-section';
+import { ExportDataSection } from '@/components/export-data-section';
 import { InlineFormError } from '@/components/inline-form-error';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { pickVendorImageAsset } from '@/components/vendor-form-shared';
@@ -149,7 +150,7 @@ export default function AccountSettingsScreen() {
       return;
     }
     if (!phoneE164) {
-      next.phone = 'Numéro de téléphone invalide.';
+      next.phone = 'Ce numéro ne semble pas complet. Vérifiez-le, par exemple +242 06 123 45 67.';
       setFieldErrors(next);
       return;
     }
@@ -240,6 +241,7 @@ export default function AccountSettingsScreen() {
         </View>
 
         <ScrollView
+          style={{ flex: 1 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
@@ -410,7 +412,7 @@ export default function AccountSettingsScreen() {
                         style={[styles.cellInput, styles.inputFlex, { color: colors.text }]}
                         value={newPassword}
                         onChangeText={setNewPassword}
-                        placeholder="Au moins 6 caractères"
+                        placeholder="Au moins 8 caractères"
                         placeholderTextColor={colors.placeholder}
                         secureTextEntry={!showNew}
                       />
@@ -464,6 +466,8 @@ export default function AccountSettingsScreen() {
                   <ThemedText style={[styles.secondaryBtnText, { color: isDark ? colors.primaryBright : colors.primaryDeep }]}>Mettre à jour le mot de passe</ThemedText>
                 )}
               </Pressable>
+
+              <ExportDataSection />
 
               <DeleteAccountSection />
             </>

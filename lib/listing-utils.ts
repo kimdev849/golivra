@@ -29,6 +29,38 @@ export function productKind(product: ProductPublic): 'plat' | 'article' {
   return product.kind === 'article' ? 'article' : 'plat';
 }
 
+/**
+ * État du produit (articles boutique) : neuf / occasion / reconditionné.
+ * Renvoie `null` si l'état est absent (ex. plats, ou produit sans état choisi).
+ */
+export function getProductCondition(product: ProductPublic): {
+  key: 'neuf' | 'occasion' | 'reconditionne';
+  label: string;
+} | null {
+  const raw = (product.etat_produit ?? '').trim().toLowerCase();
+  if (raw === 'neuf') return { key: 'neuf', label: 'Neuf' };
+  if (raw === 'occasion' || raw === 'used') return { key: 'occasion', label: 'Occasion' };
+  if (raw === 'reconditionne' || raw === 'reconditionné' || raw === 'reconditioned') {
+    return { key: 'reconditionne', label: 'Reconditionné' };
+  }
+  return null;
+}
+
+export type ProductConditionKey = 'neuf' | 'occasion' | 'reconditionne';
+
+/**
+ * Couleur du badge d'état produit (neuf = vert marque, occasion = bleu,
+ * reconditionné = orange). Source unique partagée entre la liste et la fiche.
+ */
+export function getProductConditionColor(
+  key: ProductConditionKey,
+  colors: ReturnType<typeof import('@/hooks/use-app-colors').useAppColors>,
+): string {
+  if (key === 'neuf') return colors.primary;
+  if (key === 'occasion') return '#2563EB';
+  return '#EA7A1E';
+}
+
 export function productDetailHref(product: ProductPublic): string {
   const kind = productKind(product);
   // Fiche produit dans le Stack racine (plein écran) : le retour revient à

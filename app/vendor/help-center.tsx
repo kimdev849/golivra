@@ -23,8 +23,8 @@ const FAQ = [
     a: 'Les règles de commission et de reversement sont définies dans votre contrat partenaire. Un détail sera disponible ici une fois branché sur la facturation réelle.',
   },
   {
-    q: 'Un livreur n\'est pas encore assigné',
-    a: 'GoLivra assigne un livreur disponible près de votre zone. Si le délai dépasse l\'estimation, contactez le support avec le numéro de commande.',
+    q: 'Je n\'ai pas encore de livreur',
+    a: 'GoLivra cherche un livreur disponible près de chez vous. Si le délai dépasse l\'estimation, contactez le support avec le numéro de commande.',
   },
 ] as const;
 

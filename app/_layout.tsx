@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, View } from 'react-native';
+import { AppState, Platform, View } from 'react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
@@ -19,22 +19,27 @@ import { CustomSplashScreen } from '@/components/splash-screen';
 import { AppThemeProvider, useAppTheme } from '@/contexts/app-theme-context';
 import { TextScaleProvider } from '@/contexts/text-scale-context';
 import { useIsOffline } from '@/hooks/use-network-status';
-import { warmAppCaches } from '@/lib/app-bootstrap';
+import { useWebNotifications } from '@/hooks/use-web-notifications';
 import { prefetchClientCatalog } from '@/lib/client-data';
 import { stackAuthOptions, stackScreenOptions } from '@/lib/app-navigation';
 import { syncSystemBars } from '@/lib/system-ui';
+import { startServerWarmup } from '@/lib/server-warmup';
 import { startUpdateChecker } from '@/lib/update-checker';
 import { installGlobalErrorReporting } from '@/lib/error-reporting';
 import {
   initializeNotifications,
   setupNotificationListeners,
   handleInitialNotification,
+  resyncNotificationsOnForeground,
 } from '@/lib/notifications-service';
 
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+// PAS d'anchor : la route initiale du stack racine doit être `index` (le
+// landing / bootstrap). Un `anchor: '(tabs)'` faisait démarrer l'app
+// directement sur les onglets (redirigés vers /auth sans session), si bien
+// que l'écran d'introduction (image + slogan + Se connecter) n'apparaissait
+// JAMAIS au premier lancement. `index` décide ensuite lui-même de la route
+// (intro → /auth → accueil) via resolveBootstrapTarget().
 
 function RootNavigation() {
   const { colors, isDark } = useAppTheme();
@@ -49,17 +54,39 @@ function RootNavigation() {
     startUpdateChecker();
   }, []);
 
+  // Warm-up du serveur API : ping /health au lancement puis toutes les 4 min
+  // pour éviter le cold start Render (le panier/les commandes restent rapides).
+  useEffect(() => {
+    startServerWarmup();
+  }, []);
+
   // Barre de navigation système transparente + boutons adaptés au thème
   // (edge-to-edge propre : plus de bande blanche ni d'écran coupé en bas).
   useEffect(() => {
     void syncSystemBars(isDark);
   }, [isDark]);
 
+  // ── Notifications web (Navigation API navigateur + son, polling léger) ──
+  useWebNotifications();
+
   // ── Initialisation des notifications push au démarrage (natif uniquement) ──
   useEffect(() => {
     if (Platform.OS === 'web') return;
 
-    void initializeNotifications();
+    // Premier lancement (jamais connecté) : on DIFFÈRE la demande de permission
+    // push — le dialogue système ne doit pas apparaître sur le landing / la
+    // connexion avant que l'utilisateur n'ait vu l'app. initializeNotifications()
+    // (canal Android + permission + token) n'est lancé qu'avec une session
+    // active ; après connexion, persistAuthSession() le fait déjà via
+    // ensurePushTokenRegistered().
+    let alive = true;
+    void (async () => {
+      const { getSessionToken } = await import('@/lib/auth');
+      const token = await getSessionToken();
+      if (!alive || !token) return;
+      void initializeNotifications();
+    })();
+
     void handleInitialNotification();
 
     const cleanup = setupNotificationListeners(
@@ -67,7 +94,21 @@ function RootNavigation() {
       (_response) => {},
     );
 
-    return cleanup;
+    // Au retour au premier plan : recrée le canal Android (certains fabricants
+    // le purgent en économie d'énergie) et ré-enregistre le token si la
+    // permission a été accordée entre-temps → les push « app fermée » arrivent
+    // enfin, avec son et vibration.
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void resyncNotificationsOnForeground();
+      }
+    });
+
+    return () => {
+      alive = false;
+      cleanup();
+      appStateSub.remove();
+    };
   }, []);
 
   const navTheme = useMemo(
@@ -147,7 +188,6 @@ function useSilentReconnectRefresh() {
 }
 
 function RootLayout() {
-  const [appReady, setAppReady] = useState(false);
   const [splashVisible, setSplashVisible] = useState(true);
 
   useEffect(() => {
@@ -158,25 +198,16 @@ function RootLayout() {
     SplashScreen.preventAutoHideAsync().catch(() => {});
   }, []);
 
-  useEffect(() => {
-    const init = async () => {
-      try {
-        await warmAppCaches();
-      } finally {
-        setAppReady(true);
-      }
-    };
-    void init();
-  }, []);
+  // warmAppCaches est géré par resolveBootstrapTarget() dans app/index.tsx
 
   useSilentReconnectRefresh();
 
+  // Le splash JS gère lui-même l'attente du bootstrap (le fade-out final est
+  // retardé jusqu'à `bootstrapSettled`, max 2 s) : à ce stade onAnimationComplete
+  // n'est appelé qu'une fois l'app prête. Ici on démonte juste le composant.
   const handleSplashDone = useCallback(() => {
     setSplashVisible(false);
-    SplashScreen.hideAsync().catch(() => {});
   }, []);
-
-  if (!appReady) return null;
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -192,6 +223,7 @@ function RootLayout() {
                 <OfflineBanner />
                 <AnnouncementBanner />
                 <RootNavigation />
+                {splashVisible && <StatusBar style="light" />}
                 <AppToastHost />
               </View>
             </AppStatusGate>

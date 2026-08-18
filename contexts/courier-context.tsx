@@ -5,10 +5,35 @@ import { apiFetch } from '@/lib/api';
 import {
   fetchCourierMissions,
   fetchCourierProfile,
+  sendCourierPosition,
   setCourierAvailability,
   type CourierMission,
   type CourierProfile,
 } from '@/lib/courier-api';
+
+/** Statuts pendant lesquels le livreur partage sa position au client. */
+const ACTIVE_MISSION_STATUTS = new Set(['attribuee', 'en_collecte', 'collectee', 'en_route']);
+
+/** Fréquence de partage normale : un point toutes les 30 s pendant la course. */
+const POSITION_SHARE_MS = 30_000;
+
+/** Fréquence accélérée quand le livreur approche de l'adresse de livraison. */
+const POSITION_SHARE_FAST_MS = 15_000;
+
+/** En dessous de cette distance (km), on accélère le partage. */
+const PROCHAIN_THRESHOLD_KM = 1;
+
+/** Distance Haversine (km) entre deux points GPS. */
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 type AuthMeLivreur = {
   id: string;
@@ -173,9 +198,69 @@ export const useCourier = create<CourierStore>((set, get) => ({
 }));
 
 export function CourierProvider({ children }: { children: ReactNode }) {
+  const missions = useCourier((s) => s.missions);
+
   useEffect(() => {
     void useCourier.getState().refresh();
   }, []);
+
+  // Partage de position pendant une course active (best-effort, jamais bloquant) :
+  // - ne tourne QUE s'il y a une course en cours (attribuée → en route) ;
+  // - s'arrête automatiquement dès que la course est livrée / annulée ;
+  // - fréquence adaptative : 30 s normalement, 15 s quand le livreur approche
+  //   de l'adresse de livraison (< 1 km) — batterie et data préservées ;
+  // - échec réseau silencieux, le tick suivant réessaie.
+  useEffect(() => {
+    const activeMission = missions.find((m) => ACTIVE_MISSION_STATUTS.has(m.statut));
+    if (!activeMission) return;
+
+    let stopped = false;
+    let sending = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const schedule = (delay: number) => {
+      if (stopped) return;
+      timer = setTimeout(() => void tick(), delay);
+    };
+
+    const tick = async () => {
+      if (stopped || sending) return;
+      sending = true;
+      try {
+        const { getSessionToken } = await import('@/lib/auth');
+        const token = await getSessionToken();
+        if (!token) return;
+        const { captureCurrentPosition } = await import('@/lib/location');
+        const pos = await captureCurrentPosition();
+        if (pos) {
+          await sendCourierPosition(token, pos.latitude, pos.longitude);
+          // Proche de l'adresse de livraison → partage plus fréquent.
+          let next = POSITION_SHARE_MS;
+          const destLat = Number(activeMission.latitude_livraison);
+          const destLng = Number(activeMission.longitude_livraison);
+          if (Number.isFinite(destLat) && Number.isFinite(destLng)) {
+            const dist = haversineKm(pos.latitude, pos.longitude, destLat, destLng);
+            if (dist < PROCHAIN_THRESHOLD_KM) next = POSITION_SHARE_FAST_MS;
+          }
+          schedule(next);
+          return;
+        }
+      } catch {
+        // Silencieux : le client garde la dernière position connue.
+      } finally {
+        sending = false;
+      }
+      // Pas de position (permission refusée / GPS indisponible) : on réessaie
+      // à la fréquence normale, sans spammer.
+      schedule(POSITION_SHARE_MS);
+    };
+
+    void tick();
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [missions]);
 
   return <>{children}</>;
 }

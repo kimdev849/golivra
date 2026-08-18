@@ -56,6 +56,7 @@ import {
   type ListingFieldErrors,
 } from '@/lib/vendor-listing-validation';
 import { showToast } from '@/lib/app-toast';
+import { MIN_PRICE } from '@/lib/form-validation';
 
 const DESC_MAX = 500;
 
@@ -158,7 +159,7 @@ export function VendorMenuItemFormWizard({
       }
     } catch (e) {
       setCategories([]);
-      setCatError(e instanceof Error ? e.message : 'Erreur réseau.');
+      setCatError(e instanceof Error ? e.message : 'Problème de connexion.');
     } finally {
       setCatLoading(false);
     }
@@ -347,6 +348,9 @@ export function VendorMenuItemFormWizard({
             placeholderTextColor={colors.placeholder}
           />
           <InlineFormError message={errors.prix} colors={colors} />
+          <ThemedText style={[styles.hintTxt, { color: colors.textMuted }]}>
+            Prix minimum : {MIN_PRICE} FCFA.
+          </ThemedText>
           <ThemedText style={[styles.label, { color: colors.text }]}>Catégorie du plat</ThemedText>
           <Pressable
             style={[styles.selectCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}

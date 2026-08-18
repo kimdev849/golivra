@@ -1,4 +1,4 @@
-import { safeGetItem, safeSetItem, safeDeleteItem } from '@/lib/safe-store';
+import { secureGetItem, secureSetItem, secureDeleteItem } from '@/lib/safe-store';
 
 import { apiFetch } from '@/lib/api';
 import { clearSessionSnapshot, saveSessionSnapshot } from '@/lib/session-store';
@@ -32,7 +32,10 @@ export function getSessionTokenSync(): string | null {
 export async function hydrateSessionToken(): Promise<string | null> {
   if (tokenHydrated) return memoryToken;
   try {
-    memoryToken = await safeGetItem(TOKEN_KEY);
+    // SecureStore UNIQUEMENT : jamais de repli AsyncStorage pour le token
+    // (secret). Si SecureStore est indisponible (ex. web), pas de token
+    // persisté → reconnexion nécessaire. Voir lib/safe-store.ts.
+    memoryToken = await secureGetItem(TOKEN_KEY);
   } catch {
     memoryToken = null;
   }
@@ -48,14 +51,14 @@ export async function getSessionToken(): Promise<string | null> {
 export async function setSessionToken(token: string): Promise<void> {
   memoryToken = token;
   tokenHydrated = true;
-  await safeSetItem(TOKEN_KEY, token);
+  await secureSetItem(TOKEN_KEY, token);
 }
 
 export async function clearSessionToken(): Promise<void> {
   memoryToken = null;
   tokenHydrated = true;
   try {
-    await safeDeleteItem(TOKEN_KEY);
+    await secureDeleteItem(TOKEN_KEY);
   } catch {
     /* ignore */
   }
@@ -160,6 +163,17 @@ export async function logoutRemote(token: string): Promise<void> {
     method: 'POST',
     token,
     jsonBody: {},
+  });
+}
+
+/**
+ * Export RGPD — portabilité des données personnelles (art. 20 RGPD).
+ * Renvoie le JSON complet des données de l'utilisateur (sans aucun secret).
+ */
+export async function exportMyDataRemote(payload: { token: string }): Promise<unknown> {
+  return apiFetch<unknown>('/api/auth/data-export', {
+    method: 'GET',
+    token: payload.token,
   });
 }
 

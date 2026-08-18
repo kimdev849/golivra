@@ -12,12 +12,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Check, ChevronRight, Home, Info, Minus, PackageOpen, Plus, Sparkles, Trash2, Truck } from 'lucide-react-native';
+import { Check, ChevronRight, Clock, Home, Info, Minus, PackageOpen, Plus, Sparkles, Trash2, Truck } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 
 
 import { DeliveryAddressForm } from '@/components/delivery-address-form';
 import { ProductPrice } from '@/components/product-price';
+import { PressableScale } from '@/components/ui/pressable-scale';
 import { ZoomableImage } from '@/components/zoomable-image';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -47,16 +48,20 @@ import {
   deliveryFeeForQuartier,
   deliveryMinutesForQuartier,
   displayDeliveryFeeFcfa,
+  enterprisePrepMinutes,
   etaEstimateForEnterprise,
   fetchPublicPricing,
   type PublicPricing,
 } from '@/lib/pricing';
 import { validatePromoCode, type PromoValidation } from '@/lib/promo-api';
+import { captureCurrentPosition } from '@/lib/location';
 import { effectiveStockCap, UNLIMITED_STOCK_CAP } from '@/lib/product-stock';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
+import { useCurrentTime } from '@/hooks/use-current-time';
 import { useFeatureEnabled } from '@/hooks/use-feature-enabled';
+import { computeLiveStatus } from '@/lib/horaires-status';
 
 /** Valeur d'adresse vierge (aucune adresse sélectionnée). */
 const emptyAddressForm = (): DeliveryAddressFields => ({
@@ -109,6 +114,9 @@ export default function CartScreen() {
   const [promoError, setPromoError] = useState<string | null>(null);
   const [pricing, setPricing] = useState<PublicPricing | null>(null);
   const orderInFlight = useRef(false);
+  // ⚡ Horloge locale rafraîchie toutes les 30 s : recalcul du statut
+  // ouvert/fermé de chaque commerce du panier (mêmes règles que le serveur).
+  const now = useCurrentTime(30_000);
   // ── Contrôle à distance : si l'admin coupe les commandes, on bloque ici aussi
   const ordersEnabled = useFeatureEnabled('orders');
 
@@ -158,16 +166,46 @@ export default function CartScreen() {
       setSavedAddresses(rows);
       const principal = rows.find((a) => a.est_principale) ?? rows[0];
       if (!principal) return;
-      // Pré-remplit avec l'adresse principale uniquement si l'utilisateur
-      // n'a encore rien saisi ; une adresse manuelle reste intacte et
-      // aucune carte n'est surlignée à sa place (jamais imposé).
+      // Une adresse enregistrée déjà sélectionnée reste sélectionnée.
       const current = addressRef.current;
-      const prefilled = !current.quartier.trim() && !current.ligne1.trim();
+      const isEmpty = !current.quartier.trim() && !current.ligne1.trim();
+      // Si l'utilisateur vient d'enregistrer son adresse dans « Mes adresses »,
+      // la saisie courante correspond à une adresse enregistrée : on la
+      // sélectionne automatiquement (l'adresse de livraison s'affiche).
+      // Sinon (panier vierge), on pré-remplit avec l'adresse principale.
+      const match = !isEmpty
+        ? (rows.find(
+            (r) =>
+              String(r.quartier || '').trim() === current.quartier.trim() &&
+              String(r.ligne1 || '').trim() === current.ligne1.trim(),
+          ) ?? null)
+        : null;
+      const target = match ?? (isEmpty ? principal : null);
       setSavedAddressId((prev) => {
         if (prev && rows.some((r) => r.id === prev)) return prev;
-        return prefilled ? principal.id : null;
+        return target?.id ?? null;
       });
-      if (prefilled) setAddress(addressFromSaved(principal));
+      if (target) {
+        if (match) {
+          // La saisie correspond déjà (quartier + adresse) : on récupère les
+          // champs optionnels de l'adresse enregistrée SANS écraser ce que
+          // l'utilisateur a déjà tapé (repère / instructions…).
+          const saved = addressFromSaved(target);
+          setAddress((prev) => ({
+            ...prev,
+            point_reperes: prev.point_reperes?.trim()
+              ? prev.point_reperes
+              : (saved.point_reperes ?? ''),
+            instructions: prev.instructions?.trim()
+              ? prev.instructions
+              : (saved.instructions ?? ''),
+            ville: prev.ville || saved.ville,
+            pays: prev.pays || saved.pays,
+          }));
+        } else {
+          setAddress(addressFromSaved(target));
+        }
+      }
     } catch {
       /* pas d'adresse enregistrée */
     }
@@ -344,6 +382,9 @@ export default function CartScreen() {
       showError('Adresse invalide', addrErr);
       return;
     }
+    // Capture GPS en arrière-plan en même temps que la validation
+    // (jamais bloquante — 5 s max, si échoue on passe sans).
+    const gpsPromise = savedAddressId ? Promise.resolve(null) : captureCurrentPosition();
     const adressePayload = snapshotFromFields(address);
     const adresseText = formatDeliveryAddressText(address);
     const token = await getSessionToken();
@@ -357,9 +398,20 @@ export default function CartScreen() {
       const created = await apiFetch<{ id: string }>('/api/orders', {
         method: 'POST',
         token,
+        // Timeout long : une commande peut légitimement prendre 45 s quand le
+        // serveur se réveille (cold start Render) — on ne veut pas la couper.
+        timeoutMs: 45_000,
         jsonBody: {
           adresseLivraison: adresseText,
-          adresse: adressePayload,
+          adresse: {
+            ...adressePayload,
+            // On attend le GPS (5 s max) puis on l'ajoute au payload.
+            // Le backend le stocke dans le snapshot pour calculer la distance livreur→client.
+            ...(await Promise.race([
+              gpsPromise,
+              new Promise<null>((r) => setTimeout(() => r(null), 5_000)),
+            ])) || {},
+          },
           ...(savedAddressId ? { adresseLivraisonId: savedAddressId } : {}),
           methodePaiement,
           ...(appliedPromo?.code ? { codePromo: appliedPromo.code } : {}),
@@ -405,6 +457,26 @@ export default function CartScreen() {
   const hasItems = cart && cart.segments.some((s) => s.lines.length > 0);
   const addressOk = !deliveryAddressError(address);
 
+  // ⚡ Un commerce fermé (ou « trop tard pour commander ») dans le panier →
+  // le bouton « Passer la commande » est désactivé et le segment concerné
+  // affiche la raison (bannière à la place de l'estimation de livraison).
+  const anySegmentBlocked = useMemo(() => {
+    if (!cart) return false;
+    return cart.segments.some((seg) => {
+      const ent = enterpriseById[seg.enterpriseId];
+      const status = computeLiveStatus(ent?.horaires ?? [], {
+        prepMinutes: enterprisePrepMinutes(ent),
+        kind:
+          (ent?.type ?? seg.enterpriseType ?? 'restaurant') === 'boutique'
+            ? 'boutique'
+            : 'restaurant',
+        fermeManuellement: ent?.ouvert === false,
+        sansHoraires: ent?.accepte_commandes === false,
+      }, now);
+      return status.commandesBloquees;
+    });
+  }, [cart, enterpriseById, now]);
+
   return (
     <ThemedView style={styles.screen}>
       <FeedbackOverlay />
@@ -413,6 +485,7 @@ export default function CartScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}>
         <ScrollView
+          style={{ flex: 1 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.scroll, { paddingTop: Math.max(insets.top, 14), paddingBottom: bottomPad }]}>
@@ -458,12 +531,12 @@ export default function CartScreen() {
               <ThemedText style={[styles.emptyBody, { color: colors.textMuted }]}>
                 Découvrez les restaurants et boutiques pour commencer vos achats.
               </ThemedText>
-              <Pressable
+              <PressableScale
                 style={[styles.cta, { backgroundColor: colors.primary }]}
-                onPress={() => router.navigate('/(tabs)')}
-                android_ripple={{ color: 'rgba(255,255,255,0.2)' }}>
+                scaleTo={0.97}
+                onPress={() => router.navigate('/(tabs)')}>
                 <ThemedText style={[styles.ctaText, { color: colors.onPrimary }]}>Voir les commerces</ThemedText>
-              </Pressable>
+              </PressableScale>
             </View>
           ) : (
             <>
@@ -495,18 +568,58 @@ export default function CartScreen() {
                   address.quartier,
                   pricing ?? DEFAULT_PUBLIC_PRICING,
                 );
+                // ⚡ Statut ouvert/fermé recalculé EN DIRECT à l'heure locale :
+                // si le commerce est fermé (ou qu'il est trop tard), on affiche
+                // clairement l'avertissement au lieu d'une estimation de
+                // livraison contradictoire (« prévue dans 1h15 » alors que la
+                // commande ne peut pas être passée).
+                const liveStatus = computeLiveStatus(ent?.horaires ?? [], {
+                  prepMinutes: eta.prepMinutes,
+                  kind: (ent?.type ?? seg.enterpriseType ?? 'restaurant') === 'boutique'
+                    ? 'boutique'
+                    : 'restaurant',
+                  fermeManuellement: ent?.ouvert === false,
+                  sansHoraires: ent?.accepte_commandes === false,
+                }, now);
 
                 return (
                   <View key={seg.enterpriseId} style={styles.segmentBlock}>
                     <ThemedText type="defaultSemiBold" style={[styles.sectionTitle, { color: colors.text }]}>
                       {label} · {merchantName}
                     </ThemedText>
-                    <ThemedText style={[styles.segEta, { color: colors.textSecondary }]}>
-                      🛵{' '}
-                      {eta.deliveryMinutes != null
-                        ? `Livraison prévue dans environ ${formatHumanMinutes(eta.totalMinutes)}`
-                        : `Votre commande sera prête dans environ ${eta.prepMinutes} min`}
-                    </ThemedText>
+                    {liveStatus.commandesBloquees ? (
+                      <View
+                        style={[
+                          styles.segClosedBanner,
+                          {
+                            backgroundColor:
+                              liveStatus.tone === 'warning' ? colors.warningSoft : colors.errorSoft,
+                            borderColor: liveStatus.tone === 'warning' ? colors.warning : colors.error,
+                          },
+                        ]}>
+                        <Clock
+                          size={15}
+                          color={liveStatus.tone === 'warning' ? colors.warning : colors.error}
+                          strokeWidth={LUCIDE_STROKE}
+                        />
+                        <ThemedText
+                          style={[
+                            styles.segClosedTxt,
+                            {
+                              color: liveStatus.tone === 'warning' ? colors.warning : colors.error,
+                            },
+                          ]}>
+                          {liveStatus.messageCommande ?? liveStatus.messageFermeture}
+                        </ThemedText>
+                      </View>
+                    ) : (
+                      <ThemedText style={[styles.segEta, { color: colors.textSecondary }]}>
+                        🛵{' '}
+                        {eta.deliveryMinutes != null
+                          ? `Estimation livraison : environ ${formatHumanMinutes(eta.totalMinutes)}`
+                          : `Estimation : préparation en environ ${eta.prepMinutes} min`}
+                      </ThemedText>
+                    )}
 
                     {seg.lines.map((line) => {
                       const cap = stockCap(line.productId, line.stockSnapshot);
@@ -676,7 +789,7 @@ export default function CartScreen() {
                 {cart?.segments.map((seg) => (
                   <View key={`sum-${seg.enterpriseId}`} style={styles.summaryRow}>
                     <ThemedText style={[styles.summaryLabel, { color: colors.textSecondary }]} numberOfLines={1}>
-                      Sous-total · {seg.enterpriseNom}
+                      Total articles · {seg.enterpriseNom}
                     </ThemedText>
                     <ThemedText type="defaultSemiBold" style={[styles.summaryValue, { color: colors.text }]}>
                       {formatFcfa(segmentSubtotal(seg))}
@@ -763,11 +876,11 @@ export default function CartScreen() {
                   </ThemedText>
                 </View>
               ) : (
-                <Pressable
-                  style={[styles.submitBtn, { backgroundColor: colors.primaryDeep }, (submitting || !addressOk) && styles.submitBtnDisabled]}
-                  disabled={submitting || !addressOk}
-                  onPress={() => void submitOrder()}
-                  android_ripple={{ color: 'rgba(255,255,255,0.2)' }}>
+                <PressableScale
+                  style={[styles.submitBtn, { backgroundColor: colors.primaryDeep }, (submitting || !addressOk || anySegmentBlocked) && styles.submitBtnDisabled]}
+                  scaleTo={0.98}
+                  disabled={submitting || !addressOk || anySegmentBlocked}
+                  onPress={() => void submitOrder()}>
                   {submitting ? (
                     <ActivityIndicator color={colors.onPrimary} />
                   ) : (
@@ -775,7 +888,7 @@ export default function CartScreen() {
                       {segmentCount > 1 ? `Commander (${segmentCount} commerces)` : 'Passer la commande'}
                     </ThemedText>
                   )}
-                </Pressable>
+                </PressableScale>
               )}
 
               <Pressable onPress={() => router.push('/how-multi-delivery' as Href)} style={styles.footerLink}>
@@ -789,7 +902,6 @@ export default function CartScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
-      {FeedbackOverlay()}
     </ThemedView>
   );
 }
@@ -830,6 +942,18 @@ const styles = StyleSheet.create({
   multiBannerBody: { fontSize: 13, lineHeight: 18, marginTop: 4 },
   segmentBlock: { marginBottom: 4 },
   segEta: { fontSize: 12, fontWeight: '600', marginTop: -8, marginBottom: 10, lineHeight: 16 },
+  segClosedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    marginTop: -8,
+    marginBottom: 10,
+  },
+  segClosedTxt: { flex: 1, fontSize: 12, fontWeight: '700', lineHeight: 17 },
   emptyCard: {
     marginTop: 12,
     borderRadius: 16,

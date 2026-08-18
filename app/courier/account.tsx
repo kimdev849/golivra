@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { FormErrorBanner } from '@/components/form-error-banner';
+import { InlineFormError } from '@/components/inline-form-error';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useCourier } from '@/contexts/courier-context';
 import { apiFetch } from '@/lib/api';
@@ -51,25 +52,34 @@ export default function CourierAccountScreen() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    nom?: string | null;
+    phone?: string | null;
+    currentPassword?: string | null;
+    newPassword?: string | null;
+    confirmPassword?: string | null;
+  }>({});
 
   const phoneE164 = toE164(phoneDisplay);
 
   const saveProfile = async () => {
     setError(null);
+    const next: Record<string, string | null> = {};
     const e1 = validatePersonName(nom);
     if (!e1.ok) {
-      setError(e1.message);
-      return;
+      next.nom = e1.message;
     }
     const e2 = validatePhone(phoneDisplay);
     if (!e2.ok) {
-      setError(e2.message);
+      next.phone = e2.message;
+    } else if (!phoneE164) {
+      next.phone = 'Ce numéro ne semble pas complet. Vérifiez-le, par exemple +242 06 123 45 67.';
+    }
+    if (Object.values(next).some(Boolean)) {
+      setFieldErrors(next);
       return;
     }
-    if (!phoneE164) {
-      setError('Numéro invalide.');
-      return;
-    }
+    setFieldErrors({});
     setSavingProfile(true);
     try {
       const token = await getSessionToken();
@@ -92,20 +102,23 @@ export default function CourierAccountScreen() {
 
   const savePassword = async () => {
     setError(null);
+    const next: Record<string, string | null> = {};
     if (!currentPassword) {
-      setError('Mot de passe actuel requis.');
-      return;
+      next.currentPassword = 'Saisissez votre mot de passe actuel pour continuer.';
     }
     const e1 = validatePassword(newPassword);
     if (!e1.ok) {
-      setError(e1.message);
-      return;
+      next.newPassword = e1.message;
     }
     const e2 = validatePasswordConfirmation(confirmPassword, newPassword);
     if (!e2.ok) {
-      setError(e2.message);
+      next.confirmPassword = e2.message;
+    }
+    if (Object.values(next).some(Boolean)) {
+      setFieldErrors(next);
       return;
     }
+    setFieldErrors({});
     setSavingPassword(true);
     try {
       const token = await getSessionToken();
@@ -141,6 +154,7 @@ export default function CourierAccountScreen() {
         </View>
 
         <ScrollView
+          style={{ flex: 1 }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 24 }]}>
@@ -153,16 +167,30 @@ export default function CourierAccountScreen() {
           />
           <ThemedText style={[styles.section, { color: palette.primaryDeep }]}>Informations</ThemedText>
           <View style={[styles.group, { backgroundColor: palette.card, borderColor: palette.border }]}>
-            <Field icon={<User size={18} color={palette.primary} />} label="Nom" value={nom} onChangeText={setNom} palette={palette} />
+            <Field
+              icon={<User size={18} color={palette.primary} />}
+              label="Nom"
+              value={nom}
+              onChangeText={(t) => {
+                setNom(t);
+                if (fieldErrors.nom) setFieldErrors((prev) => ({ ...prev, nom: null }));
+              }}
+              palette={palette}
+            />
             <Field
               icon={<Smartphone size={18} color={palette.primary} />}
               label="Téléphone"
               value={phoneDisplay}
-              onChangeText={(t) => setPhoneDisplay(formatPhone(t))}
+              onChangeText={(t) => {
+                setPhoneDisplay(formatPhone(t));
+                if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: null }));
+              }}
               keyboardType="phone-pad"
               palette={palette}
             />
           </View>
+          <InlineFormError message={fieldErrors.nom} colors={{ error: palette.danger, errorSoft: palette.dangerBg }} />
+          <InlineFormError message={fieldErrors.phone} colors={{ error: palette.danger, errorSoft: palette.dangerBg }} />
           <Pressable style={[styles.primaryBtn, { backgroundColor: palette.primary }]} onPress={() => void saveProfile()} disabled={savingProfile}>
             {savingProfile ? (
               <ActivityIndicator color="#FFF" />
@@ -173,10 +201,43 @@ export default function CourierAccountScreen() {
 
           <ThemedText style={[styles.section, { marginTop: 16, color: palette.primaryDeep }]}>Mot de passe</ThemedText>
           <View style={[styles.group, { backgroundColor: palette.card, borderColor: palette.border }]}>
-            <PwdField label="Actuel" value={currentPassword} onChange={setCurrentPassword} show={showCurrent} toggle={() => setShowCurrent((v) => !v)} palette={palette} />
-            <PwdField label="Nouveau" value={newPassword} onChange={setNewPassword} show={showNew} toggle={() => setShowNew((v) => !v)} palette={palette} />
-            <PwdField label="Confirmer" value={confirmPassword} onChange={setConfirmPassword} show={showConfirm} toggle={() => setShowConfirm((v) => !v)} palette={palette} />
+            <PwdField
+              label="Actuel"
+              value={currentPassword}
+              onChange={(t) => {
+                setCurrentPassword(t);
+                if (fieldErrors.currentPassword) setFieldErrors((prev) => ({ ...prev, currentPassword: null }));
+              }}
+              show={showCurrent}
+              toggle={() => setShowCurrent((v) => !v)}
+              palette={palette}
+            />
+            <PwdField
+              label="Nouveau"
+              value={newPassword}
+              onChange={(t) => {
+                setNewPassword(t);
+                if (fieldErrors.newPassword) setFieldErrors((prev) => ({ ...prev, newPassword: null }));
+              }}
+              show={showNew}
+              toggle={() => setShowNew((v) => !v)}
+              palette={palette}
+            />
+            <PwdField
+              label="Confirmer"
+              value={confirmPassword}
+              onChange={(t) => {
+                setConfirmPassword(t);
+                if (fieldErrors.confirmPassword) setFieldErrors((prev) => ({ ...prev, confirmPassword: null }));
+              }}
+              show={showConfirm}
+              toggle={() => setShowConfirm((v) => !v)}
+              palette={palette}
+            />
           </View>
+          <InlineFormError message={fieldErrors.currentPassword} colors={{ error: palette.danger, errorSoft: palette.dangerBg }} />
+          <InlineFormError message={fieldErrors.newPassword} colors={{ error: palette.danger, errorSoft: palette.dangerBg }} />
+          <InlineFormError message={fieldErrors.confirmPassword} colors={{ error: palette.danger, errorSoft: palette.dangerBg }} />
           <Pressable style={[styles.secondaryBtn, { borderColor: palette.primary }]} onPress={() => void savePassword()} disabled={savingPassword}>
             {savingPassword ? (
               <ActivityIndicator color={palette.primary} />

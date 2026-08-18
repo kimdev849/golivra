@@ -44,7 +44,7 @@ import { fetchUserAddresses } from '@/lib/addresses';
 import { apiFetch } from '@/lib/api';
 import { getSessionToken } from '@/lib/auth';
 import { fetchAuthMe, peekAuthMe, type AuthMe } from '@/lib/client-data';
-import { fetchFavorites, type FavoriteEnterprise } from '@/lib/favorites-api';
+import { fetchFavoriteProducts, fetchFavorites, type FavoriteEnterprise } from '@/lib/favorites-api';
 import { resolveRemoteImageUrl } from '@/lib/images';
 import { isActiveOrderStatus } from '@/lib/order-status';
 
@@ -195,12 +195,13 @@ export default function ProfileScreen() {
         setIsLoading(true);
       }
 
-      // Fetch profile + orders + favorites + addresses in parallel
-      const [profileData, ordersData, favData, addressesData] =
+      // Fetch profile + orders + favorites (commerces ET produits) + addresses in parallel
+      const [profileData, ordersData, favData, favProductsData, addressesData] =
         await Promise.allSettled([
           fetchAuthMe(token, force),
           apiFetch<OrderSummary[]>('/api/orders', { method: 'GET', token }),
           fetchFavorites(token),
+          fetchFavoriteProducts(token),
           fetchUserAddresses(token),
         ]);
 
@@ -218,11 +219,18 @@ export default function ProfileScreen() {
         activeOrders = orders.filter((o) => isActiveOrderStatus(o.statut)).length;
       }
 
-      // Favorites stats
+      // Favorites stats : commerces + produits (un favori produit doit
+      // compter dans le total affiché sur le profil).
       let totalFavorites = 0;
       if (favData.status === 'fulfilled') {
         const items: FavoriteEnterprise[] = favData.value.items ?? [];
-        totalFavorites = items.length;
+        totalFavorites += items.length;
+      }
+      if (favProductsData.status === 'fulfilled') {
+        const items = Array.isArray(favProductsData.value.items)
+          ? favProductsData.value.items
+          : [];
+        totalFavorites += items.length;
       }
 
       // Addresses stats

@@ -132,7 +132,7 @@ export default function ProfileEditScreen() {
       return;
     }
     if (!phoneE164) {
-      next.phone = 'Numéro de téléphone invalide.';
+      next.phone = 'Ce numéro ne semble pas complet. Vérifiez-le, par exemple +242 06 123 45 67.';
       setFieldErrors(next);
       return;
     }
@@ -180,6 +180,7 @@ export default function ProfileEditScreen() {
         </View>
 
         <ScrollView
+          style={{ flex: 1 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
