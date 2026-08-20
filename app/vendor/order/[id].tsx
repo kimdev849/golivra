@@ -26,7 +26,7 @@ import {
   updateVendorOrderStatus,
 } from '@/lib/vendor-api';
 import type { VendorOrder } from '@/lib/vendor-types';
-import { hrefVendorPreparation } from '@/lib/vendor-nav';
+
 import { vendorOrderStatusLabel as statusLabel } from '@/lib/ux-copy';
 
 export default function VendorOrderDetailScreen() {
@@ -308,8 +308,13 @@ export default function VendorOrderDetailScreen() {
         {showPrep && paid ? (
           <Pressable
             style={[styles.primaryBtn, { backgroundColor: palette.primaryDeep }]}
-            onPress={() => router.push(hrefVendorPreparation(o.id))}>
-            <ThemedText style={styles.primaryTxt}>{labels.orderPrimaryCta}</ThemedText>
+            disabled={actingAction !== null}
+            onPress={() => runStatus('en_preparation', 'Préparation démarrée.', 'prep')}>
+            {actingAction === 'prep' ? (
+              <ActivityIndicator color={colors.onPrimary} size="small" />
+            ) : (
+              <ThemedText style={styles.primaryTxt}>{labels.orderPrimaryCta}</ThemedText>
+            )}
           </Pressable>
         ) : null}
         {showDelivery ? (

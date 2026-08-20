@@ -1,5 +1,6 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams } from 'expo-router';
+import { Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -473,7 +474,7 @@ export default function VendorHorairesScreen() {
               value={pendingTime ?? picker.value}
               mode="time"
               is24Hour
-              display="spinner"
+              display={Platform.OS === 'android' ? 'default' : 'spinner'}
               accentColor={colors.primary}
               onChange={(event, date) => {
                 if (event.type === 'set' && date) setPendingTime(date);
