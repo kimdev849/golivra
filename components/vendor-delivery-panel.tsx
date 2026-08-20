@@ -31,6 +31,8 @@ import {
 
 } from '@/lib/vendor-api';
 
+import { History } from 'lucide-react-native';
+
 import type { VendorPalette } from '@/lib/vendor-theme';
 
 import type { VendorOrder } from '@/lib/vendor-types';
@@ -55,6 +57,8 @@ export function VendorDeliveryPanel({ embedded }: { embedded?: boolean }) {
   const { palette, labels } = useVendorTheme();
   const colors = useAppColors();
   const [externalDeliveries, setExternalDeliveries] = useState<VendorExternalDelivery[]>([]);
+  const [externalHistory, setExternalHistory] = useState<VendorExternalDelivery[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
 
 
 
@@ -88,21 +92,27 @@ export function VendorDeliveryPanel({ embedded }: { embedded?: boolean }) {
 
       if (token) {
 
-        const [freshOrders, freshExternal] = await Promise.all([
+        const [freshOrders, freshExternal, freshHistory] = await Promise.all([
 
           fetchVendorOrders(token),
 
           fetchVendorExternalDeliveries(token),
+
+          fetchVendorExternalDeliveries(token, { active: false }),
 
         ]);
 
         setOrders(freshOrders);
 
         setExternalDeliveries(freshExternal);
+        // Historique = toutes les livraisons, minus les actives
+        const activeIds = new Set(freshExternal.map((d) => d.id));
+        setExternalHistory(freshHistory.filter((d) => !activeIds.has(d.id)));
 
       } else {
 
         setExternalDeliveries([]);
+        setExternalHistory([]);
 
       }
 
@@ -187,6 +197,29 @@ export function VendorDeliveryPanel({ embedded }: { embedded?: boolean }) {
 
         </>
 
+      ) : null}
+
+      {/* ── Historique livraisons externes terminées ── */}
+      {externalHistory.length > 0 ? (
+        <>
+          <Pressable
+            onPress={() => setShowHistory((v) => !v)}
+            style={[styles.historyToggle, { borderColor: colors.border }]}
+          >
+            <History size={16} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+            <ThemedText style={[styles.sectionTitle, { color: colors.textSecondary, marginBottom: 0 }]}>
+              Historique ({externalHistory.length})
+            </ThemedText>
+            <ThemedText style={[styles.historyArrow, { color: colors.textMuted }]}>
+              {showHistory ? '▲' : '▼'}
+            </ThemedText>
+          </Pressable>
+          {showHistory ? (
+            externalHistory.slice(0, 20).map((d) => (
+              <ExternalDeliveryCard key={d.id} d={d} palette={palette} colors={colors} router={router} />
+            ))
+          ) : null}
+        </>
       ) : null}
 
 
@@ -569,6 +602,16 @@ const styles = StyleSheet.create({
   linkBtn: { marginTop: 12, alignItems: 'center', paddingVertical: 8 },
 
   linkTxt: { fontWeight: '800', fontSize: 14 },
+
+  historyToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  historyArrow: { fontSize: 11, marginLeft: 'auto' },
 
 });
 

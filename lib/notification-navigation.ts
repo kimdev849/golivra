@@ -41,6 +41,17 @@ export function navigateFromNotification(router: Router, n: AppNotification): vo
     return;
   }
 
+  // Livraison externe (commerce) : ouvrir le suivi de la livraison externe.
+  if (action === 'vendor_delivery') {
+    const livId = livraisonIdFromData(n.data);
+    if (livId) {
+      router.push(`/vendor/delivery/${livId}`);
+      return;
+    }
+    router.push(VENDOR_HREF.ordersTab);
+    return;
+  }
+
   if (action === 'vendor_orders') {
     router.push(VENDOR_HREF.ordersTab);
     return;

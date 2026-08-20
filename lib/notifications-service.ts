@@ -315,6 +315,17 @@ export function handleNotificationNavigation(data: NotifData): void {
     return;
   }
 
+  // Livraison externe (commerce) : ouvrir le suivi de la livraison externe.
+  if (action === 'vendor_delivery') {
+    const livId = getLivraisonId(data);
+    if (livId) {
+      router.push(`/vendor/delivery/${livId}`);
+      return;
+    }
+    router.push(VENDOR_HREF.ordersTab);
+    return;
+  }
+
   if (action === 'vendor_orders') {
     router.push(VENDOR_HREF.ordersTab);
     return;
@@ -428,6 +439,7 @@ export async function handleInitialNotification(): Promise<void> {
     const isKnownAction =
       action === 'open_delivery' ||
       action === 'courier_missions' ||
+      action === 'vendor_delivery' ||
       action === 'vendor_orders' ||
       action === 'open_orders';
 

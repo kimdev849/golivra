@@ -288,8 +288,10 @@ export type VendorDeliveryPaymentStatus = {
   paye_at?: string | null;
 };
 
-export async function fetchVendorExternalDeliveries(token: string): Promise<VendorExternalDelivery[]> {
-  const data = await apiFetch<VendorExternalDelivery[]>('/api/delivery/vendor/externe', {
+export async function fetchVendorExternalDeliveries(token: string, opts?: { active?: boolean }): Promise<VendorExternalDelivery[]> {
+  const active = opts?.active !== false;
+  const qs = active ? '' : '?active=false';
+  const data = await apiFetch<VendorExternalDelivery[]>(`/api/delivery/vendor/externe${qs}`, {
     method: 'GET',
     token,
   });
