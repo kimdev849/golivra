@@ -96,14 +96,14 @@ export function createEnterpriseDetailStyles(c: AppPalette) {
     ratingBadgeValue: { color: '#FFFFFF', fontWeight: '900', fontSize: 13 },
     ratingBadgeCount: { color: 'rgba(255,255,255,0.85)', fontWeight: '700', fontSize: 11 },
     block: { paddingHorizontal: 0, paddingTop: 18, gap: 10 },
-    name: { fontSize: 26, fontWeight: '800', color: c.text },
+    name: { fontSize: 22, fontWeight: '800', color: c.text },
     // Pastille de statut compacte (Ouvert / Fermé / Plus de commandes).
     statusRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: -4 },
     statusDot: { width: 9, height: 9, borderRadius: 5 },
     statusText: { fontSize: 13, fontWeight: '800', letterSpacing: 0.1 },
-    desc: { fontSize: 15, lineHeight: 22, color: c.textSecondary },
+    desc: { fontSize: 13, lineHeight: 20, color: c.textSecondary },
     infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-    infoText: { flex: 1, fontSize: 14, color: c.textMuted, lineHeight: 20 },
+    infoText: { flex: 1, fontSize: 13, color: c.textMuted, lineHeight: 19 },
     // Carte « Livraison prévue » : l'essentiel d'abord, le détail se plie.
     etaCard: {
       padding: 14,
@@ -112,7 +112,7 @@ export function createEnterpriseDetailStyles(c: AppPalette) {
       gap: 8,
     },
     etaHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    etaHeadline: { flex: 1, fontSize: 16, color: c.text, lineHeight: 22 },
+    etaHeadline: { flex: 1, fontSize: 14, color: c.text, lineHeight: 20 },
     etaBody: { fontSize: 13, color: c.textSecondary, lineHeight: 19 },
     etaToggle: {
       flexDirection: 'row',
@@ -147,7 +147,7 @@ export function createEnterpriseDetailStyles(c: AppPalette) {
       marginTop: 24,
       marginBottom: 12,
     },
-    sectionTitle: { fontSize: 18, fontWeight: '800', color: c.text },
+    sectionTitle: { fontSize: 16, fontWeight: '800', color: c.text },
     emptyProducts: {
       marginHorizontal: 0,
       padding: 24,
@@ -193,9 +193,9 @@ export function createEnterpriseDetailStyles(c: AppPalette) {
       backgroundColor: 'rgba(0,0,0,0.55)',
     },
     galleryBadgeTxt: { color: '#FFF', fontSize: 11, fontWeight: '800' },
-    productName: { fontSize: 16, color: c.text },
+    productName: { fontSize: 14, color: c.text },
     productDesc: { fontSize: 13, color: c.textMuted, marginTop: 4 },
-    productPrice: { fontSize: 15, fontWeight: '800', color: c.primary, marginTop: 6 },
+    productPrice: { fontSize: 14, fontWeight: '800', color: c.primary, marginTop: 6 },
     stock: { fontSize: 12, color: c.textMuted, marginTop: 4 },
     // Raison d'indisponibilité (produit indisponible, commerce fermé…) :
     // gris discret + bouton désactivé, pour éviter l'ambiguïté du rouge.

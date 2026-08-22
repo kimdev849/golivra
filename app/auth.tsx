@@ -457,13 +457,13 @@ function makeAuthStyles(c: AppPalette) {
     },
     logo: { width: 118, height: 68 },
     title: {
-      fontSize: 26,
-      lineHeight: 32,
+      fontSize: 22,
+      lineHeight: 28,
       textAlign: 'center',
     },
     subtitle: {
-      fontSize: 14.5,
-      lineHeight: 21,
+      fontSize: 13,
+      lineHeight: 19,
       textAlign: 'center',
       maxWidth: 340,
     },

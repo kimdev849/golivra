@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   scroll: { paddingHorizontal: 16, gap: 12 },
   header: { marginBottom: 4 },
-  title: { fontSize: 26, fontWeight: '800', letterSpacing: -0.4 },
+  title: { fontSize: 22, fontWeight: '800', letterSpacing: -0.4 },
   sub: { marginTop: 2, fontSize: 13, fontWeight: '500' },
 
   bannerErr: {

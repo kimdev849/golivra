@@ -220,12 +220,12 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   title: {
-    fontSize: 26,
-    lineHeight: 32,
+    fontSize: 22,
+    lineHeight: 28,
     textAlign: 'center',
   },
   description: {
-    fontSize: 14.5,
+    fontSize: 13,
     textAlign: 'center',
     maxWidth: 340,
   },

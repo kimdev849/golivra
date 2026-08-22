@@ -150,8 +150,8 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 16,
   },
-  title: { fontSize: 26, fontWeight: '800', marginBottom: 10, textAlign: 'center' },
-  sub: { fontSize: 15, lineHeight: 22, marginBottom: 22 },
+  title: { fontSize: 22, fontWeight: '800', marginBottom: 10, textAlign: 'center' },
+  sub: { fontSize: 13, lineHeight: 20, marginBottom: 22 },
   list: { gap: 12, marginBottom: 20 },
   rowCard: {
     flexDirection: 'row',

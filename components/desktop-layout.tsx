@@ -4,8 +4,8 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useIsWebDesktop } from '@/hooks/use-is-web-desktop';
 
 export const DESKTOP_MAX_WIDTH = 1200;
-export const DESKTOP_PADDING = 32;
-export const MOBILE_PADDING = 16;
+export const DESKTOP_PADDING = 48;
+export const MOBILE_PADDING = 20;
 
 type Props = {
   children: ReactNode;

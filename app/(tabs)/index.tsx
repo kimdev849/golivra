@@ -71,8 +71,8 @@ import { trackInteraction } from '@/lib/tracking';
 
 // ─── Constants ────────────────────────────────────────────────────
 
-const H_PAD = 16;
-import { DESKTOP_MAX_WIDTH as DESKTOP_MAX, DESKTOP_PADDING as DESKTOP_H_PAD } from '@/components/desktop-layout';
+const H_PAD = 20;
+import { DESKTOP_MAX_WIDTH as DESKTOP_MAX, DESKTOP_PADDING as DESKTOP_H_PAD, MOBILE_PADDING } from '@/components/desktop-layout';
 const DESKTOP_MAX_WIDTH = DESKTOP_MAX;
 const DESKTOP_GRID_COLUMNS = 4;
 const FEED_PAGE_SIZE = 24;
@@ -1162,7 +1162,7 @@ const styles = StyleSheet.create({
     maxWidth: DESKTOP_MAX_WIDTH,
     alignSelf: 'center',
     width: '100%',
-    paddingHorizontal: 16,
+    paddingHorizontal: MOBILE_PADDING,
   },
   fixedHeaderInner: { gap: 12 },
 
@@ -1178,7 +1178,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   locationText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     letterSpacing: -0.3,
   },
@@ -1218,7 +1218,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
   },
-  searchInput: { flex: 1, fontSize: 14, paddingVertical: 0 },
+  searchInput: { flex: 1, fontSize: 13, paddingVertical: 0 },
 
   // Filter chips
   filterRow: { gap: 8, paddingVertical: 2 },
@@ -1231,7 +1231,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
   },
-  filterChipTxt: { fontSize: 13, fontWeight: '500', textTransform: 'lowercase' },
+  filterChipTxt: { fontSize: 12, fontWeight: '500', textTransform: 'lowercase' },
 
   // Sort
   sortRowWrap: {
@@ -1269,7 +1269,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   sectionTitleDesktop: {
-    fontSize: 20,
+    fontSize: 17,
   },
   sectionSeeAll: {
     flexDirection: 'row',
@@ -1291,12 +1291,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   desktopWelcomeTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
   desktopWelcomeSub: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '400',
     marginBottom: 4,
   },
@@ -1341,13 +1341,13 @@ const styles = StyleSheet.create({
   },
   closedTxt: { color: '#FFF', fontSize: 11, fontWeight: '700' },
   enterpriseCardName: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     marginTop: 7,
     paddingHorizontal: 8,
   },
   enterpriseCardMeta: {
-    fontSize: 11,
+    fontSize: 10,
     marginTop: 2,
     paddingHorizontal: 8,
   },
@@ -1384,8 +1384,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  entRowName: { fontSize: 15, fontWeight: '700' },
-  entRowMeta: { fontSize: 12, marginTop: 2 },
+  entRowName: { fontSize: 13, fontWeight: '700' },
+  entRowMeta: { fontSize: 11, marginTop: 2 },
   entRowRating: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   entRowRatingTxt: { fontSize: 13, fontWeight: '700' },
 
@@ -1419,8 +1419,8 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 4,
   },
-  entGridCardName: { fontSize: 14, fontWeight: '700' },
-  entGridCardMeta: { fontSize: 12 },
+  entGridCardName: { fontSize: 13, fontWeight: '700' },
+  entGridCardMeta: { fontSize: 11 },
 
   // Premium product card (2-col grid → 4-col on desktop)
   premiumCard: {
@@ -1481,7 +1481,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   premiumCardName: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: -0.1,
   },
@@ -1505,12 +1505,12 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   premiumCardPrice: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
     letterSpacing: -0.2,
   },
   premiumCardPriceDesktop: {
-    fontSize: 15,
+    fontSize: 14,
   },
   premiumCardOldPrice: {
     fontSize: 11,

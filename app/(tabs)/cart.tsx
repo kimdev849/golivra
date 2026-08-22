@@ -918,7 +918,7 @@ export default function CartScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   scroll: { paddingHorizontal: 16 },
-  title: { fontSize: 26, fontWeight: '800', marginBottom: 20 },
+  title: { fontSize: 22, fontWeight: '800', marginBottom: 20 },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -947,7 +947,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 16,
   },
-  multiBannerTitle: { fontSize: 15 },
+  multiBannerTitle: { fontSize: 13 },
   multiBannerBody: { fontSize: 13, lineHeight: 18, marginTop: 4 },
   segmentBlock: { marginBottom: 4 },
   segEta: { fontSize: 12, fontWeight: '600', marginTop: -8, marginBottom: 10, lineHeight: 16 },
@@ -1010,8 +1010,8 @@ const styles = StyleSheet.create({
   emptyDot: { position: 'absolute', width: 8, height: 8, borderRadius: 4 },
   emptyDotB: { bottom: 12, left: 18 },
   emptyDotC: { bottom: 2, right: 26 },
-  emptyTitle: { fontSize: 18, fontWeight: '800' },
-  emptyBody: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
+  emptyTitle: { fontSize: 16, fontWeight: '800' },
+  emptyBody: { fontSize: 13, lineHeight: 19, textAlign: 'center' },
   cta: {
     marginTop: 8,
     borderRadius: 14,
@@ -1020,7 +1020,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'stretch',
   },
-  ctaText: { fontWeight: '800', fontSize: 15 },
+  ctaText: { fontWeight: '800', fontSize: 14 },
   checkoutSection: {
     marginTop: 20,
     marginBottom: 8,
@@ -1028,7 +1028,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
   },
-  checkoutSectionTitle: { fontSize: 16 },
+  checkoutSectionTitle: { fontSize: 14 },
   checkoutSectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1048,7 +1048,7 @@ const styles = StyleSheet.create({
   },
   addrCardBody: { flex: 1, gap: 3 },
   addrCardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  addrCardTitle: { fontSize: 15, flexShrink: 1 },
+  addrCardTitle: { fontSize: 13, flexShrink: 1 },
   addrPrincipal: { fontSize: 11, fontWeight: '800' },
   addrCardText: { fontSize: 13, lineHeight: 18 },
   addrCheck: {
@@ -1086,7 +1086,7 @@ const styles = StyleSheet.create({
   },
   payChoiceLabel: { fontSize: 13, fontWeight: '800', textAlign: 'center' },
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 15,
     marginBottom: 12,
     marginTop: 8,
   },
@@ -1109,8 +1109,8 @@ const styles = StyleSheet.create({
   },
   thumbPh: { borderWidth: 1 },
   itemTextCol: { flex: 1, gap: 6 },
-  itemMerchant: { fontSize: 16 },
-  itemDesc: { fontSize: 13, lineHeight: 18 },
+  itemMerchant: { fontSize: 14 },
+  itemDesc: { fontSize: 12, lineHeight: 16 },
   itemBottom: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1126,9 +1126,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  qtyVal: { fontSize: 16, fontWeight: '800', minWidth: 24, textAlign: 'center' },
+  qtyVal: { fontSize: 14, fontWeight: '800', minWidth: 24, textAlign: 'center' },
   linePriceCol: { alignItems: 'flex-end', gap: 2 },
-  linePriceRight: { fontSize: 16 },
+  linePriceRight: { fontSize: 14 },
   summary: {
     marginTop: 8,
     marginBottom: 16,
@@ -1141,8 +1141,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  summaryLabel: { fontSize: 15, flex: 1 },
-  summaryValue: { fontSize: 15 },
+  summaryLabel: { fontSize: 13, flex: 1 },
+  summaryValue: { fontSize: 13 },
   promoBox: {
     borderWidth: 1,
     borderRadius: 14,
@@ -1157,7 +1157,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: Platform.OS === 'ios' ? 10 : 8,
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
   },
   promoBtn: {
@@ -1177,8 +1177,8 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  totalLabel: { fontSize: 17 },
-  totalAmount: { fontSize: 20 },
+  totalLabel: { fontSize: 15 },
+  totalAmount: { fontSize: 17 },
   submitBtn: {
     borderRadius: 12,
     paddingVertical: 16,
@@ -1194,7 +1194,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ordersOffText: { fontSize: 13, fontWeight: '700', lineHeight: 19, textAlign: 'center' },
-  submitText: { fontWeight: '800', fontSize: 16 },
+  submitText: { fontWeight: '800', fontSize: 14 },
   footerLink: { marginBottom: 10, alignSelf: 'center', paddingVertical: 4 },
   footerLinkText: { fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' },
   legalHint: { fontSize: 12, lineHeight: 17, textAlign: 'center', marginBottom: 8 },

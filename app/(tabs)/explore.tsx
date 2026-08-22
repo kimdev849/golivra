@@ -594,7 +594,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 14,
   },
-  pendingReviewsTitle: { fontSize: 15 },
+  pendingReviewsTitle: { fontSize: 13 },
   pendingReviewsBody: { fontSize: 13, lineHeight: 19 },
   pendingReviewsBtn: {
     alignSelf: 'flex-start',
@@ -605,7 +605,7 @@ const styles = StyleSheet.create({
   },
   pendingReviewsBtnText: { fontWeight: '800', fontSize: 14 },
   pageTitle: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '800',
     marginBottom: 18,
   },
@@ -648,14 +648,14 @@ const styles = StyleSheet.create({
   },
   orderId: { fontSize: 13, letterSpacing: -0.2 },
   eta: { fontSize: 13, fontWeight: '600' },
-  merchantTitle: { fontSize: 17, marginBottom: 6 },
+  merchantTitle: { fontSize: 15, marginBottom: 6 },
   statusOrange: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     marginBottom: 4,
   },
   statusDark: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     marginBottom: 4,
   },
@@ -681,7 +681,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deliveryText: { fontSize: 14, fontWeight: '700' },
+  deliveryText: { fontSize: 13, fontWeight: '700' },
   dottedLine: {
     flex: 1,
     height: 1,
@@ -696,7 +696,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   dateMuted: { fontSize: 12 },
-  priceStrong: { fontSize: 16 },
+  priceStrong: { fontSize: 14 },
   seeAllBtn: {
     marginTop: 18,
     paddingVertical: 14,
@@ -705,7 +705,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   seeAllBtnPressed: { opacity: 0.92 },
-  seeAllText: { fontSize: 15, fontWeight: '800' },
+  seeAllText: { fontSize: 13, fontWeight: '800' },
   emptyCard: {
     marginTop: 24,
     borderRadius: 18,
@@ -722,7 +722,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
   },
-  emptyTitle: { fontSize: 17, fontWeight: '800' },
+  emptyTitle: { fontSize: 15, fontWeight: '800' },
   emptyBody: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
   cardError: { alignItems: 'center', gap: 12 },
   errText: { fontWeight: '700', textAlign: 'center' },

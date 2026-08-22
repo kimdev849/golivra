@@ -447,8 +447,8 @@ function StateCard({ title, body, ctaLabel, onCta, icon, colors }: StateCardProp
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   head: { paddingHorizontal: 16, marginBottom: 14, gap: 8 },
-  title: { fontSize: 26, fontWeight: '800' },
-  subtitle: { fontSize: 15, lineHeight: 22, opacity: 0.92 },
+  title: { fontSize: 22, fontWeight: '800' },
+  subtitle: { fontSize: 13, lineHeight: 20, opacity: 0.92 },
   tabsWrap: {
     flexDirection: 'row',
     marginTop: 14,
@@ -466,7 +466,7 @@ const styles = StyleSheet.create({
   tabTxt: { fontSize: 14, fontWeight: '700' },
   list: { flexGrow: 1, gap: 14 },
   center: { paddingVertical: 48, alignItems: 'center', gap: 12 },
-  muted: { fontSize: 15 },
+  muted: { fontSize: 13 },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
   },
   thumb: { width: '100%', height: '100%' },
   thumbPh: { alignItems: 'center', justifyContent: 'center' },
-  rowTitle: { fontSize: 17 },
+  rowTitle: { fontSize: 15 },
   badge: {
     alignSelf: 'flex-start',
     marginTop: 6,
@@ -514,8 +514,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
   },
-  stateTitle: { fontSize: 17, fontWeight: '800', textAlign: 'center' },
-  stateBody: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
+  stateTitle: { fontSize: 15, fontWeight: '800', textAlign: 'center' },
+  stateBody: { fontSize: 13, lineHeight: 19, textAlign: 'center' },
   retry: {
     marginTop: 4,
     paddingHorizontal: 20,

@@ -1021,7 +1021,7 @@ const styles = StyleSheet.create({
   },
   liveBadgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800', letterSpacing: 0.3 },
   heroEtaBlock: { alignItems: 'flex-end' },
-  heroEta: { color: '#FFFFFF', fontSize: 26, fontWeight: '900', lineHeight: 28 },
+  heroEta: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', lineHeight: 24 },
   heroEtaUnit: { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '800', marginTop: -2 },
   heroEtaLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600', marginTop: 2 },
   heroDistancePill: {
@@ -1033,7 +1033,7 @@ const styles = StyleSheet.create({
   },
   heroDistancePillText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
   heroBody: { gap: 4 },
-  heroTitle: { color: '#FFFFFF', fontSize: 24, fontWeight: '900', letterSpacing: -0.3 },
+  heroTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '900', letterSpacing: -0.3 },
   heroSub: { color: 'rgba(255,255,255,0.88)', fontSize: 14, fontWeight: '600', lineHeight: 20 },
 
   // ── Compte à rebours (hero) ──

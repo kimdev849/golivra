@@ -101,7 +101,7 @@ export function createMarketplaceStyles(c: AppPalette) {
       marginTop: 4,
     },
     sectionTitle: {
-      fontSize: 17,
+      fontSize: 15,
       fontWeight: '800',
       color: c.text,
     },

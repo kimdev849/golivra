@@ -177,8 +177,8 @@ const styles = StyleSheet.create({
   },
   slogan: {
     color: '#FFFFFF',
-    fontSize: 22,
-    lineHeight: 30,
+    fontSize: 18,
+    lineHeight: 26,
     fontWeight: '600',
     textAlign: 'center',
     textShadowColor: 'rgba(0,0,0,0.55)',
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
   },
   ctaText: {
     color: '#FFFFFF',
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: '700',
     letterSpacing: 0.3,
   },

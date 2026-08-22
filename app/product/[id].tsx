@@ -749,9 +749,9 @@ const styles = StyleSheet.create({
   thumbImg: { width: '100%', height: '100%' },
   body: { padding: 16, gap: 16 },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  title: { fontSize: 20, fontWeight: '800', letterSpacing: -0.2, lineHeight: 26 },
+  title: { fontSize: 18, fontWeight: '800', letterSpacing: -0.2, lineHeight: 24 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-  price: { fontSize: 22, fontWeight: '800' },
+  price: { fontSize: 19, fontWeight: '800' },
   oldPrice: { fontSize: 14, textDecorationLine: 'line-through' },
   promoChip: {
     paddingHorizontal: 6,

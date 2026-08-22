@@ -212,12 +212,12 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   logoGo: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
   logoLivra: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '400',
     letterSpacing: -0.5,
   },
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 12,
     paddingVertical: 0,
   },
   navLinks: {
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   navLinkText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '500',
   },
   badge: {

@@ -410,7 +410,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: { fontSize: 26, lineHeight: 32, fontWeight: '800', textAlign: 'center' },
+  title: { fontSize: 22, lineHeight: 28, fontWeight: '800', textAlign: 'center' },
   sub: { textAlign: 'center', marginTop: 8, marginBottom: 20, maxWidth: 340, lineHeight: 21 },
   stepperWrap: { marginBottom: 20 },
   formCard: {
@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
   },
   field: { gap: 8, marginBottom: 14 },
-  fieldLabel: { fontSize: 13.5, fontWeight: '700' },
+  fieldLabel: { fontSize: 12, fontWeight: '700' },
   inputCard: {
     flexDirection: 'row',
     alignItems: 'center',

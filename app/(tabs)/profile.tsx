@@ -666,7 +666,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   displayName: {
-    fontSize: 22,
+    fontSize: 19,
     fontWeight: '700',
     letterSpacing: -0.3,
     flexShrink: 1,
@@ -747,12 +747,12 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   infoPhone: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     flexShrink: 1,
   },
   infoMember: {
-    fontSize: 13,
+    fontSize: 12,
     flexShrink: 1,
   },
   editBtn: {
@@ -794,7 +794,7 @@ const styles = StyleSheet.create({
     height: 34,
   },
   statValue: {
-    fontSize: 19,
+    fontSize: 17,
     fontWeight: '700',
     marginTop: 2,
     letterSpacing: -0.2,
@@ -834,7 +834,7 @@ const styles = StyleSheet.create({
 
   // ── Mon activité ─────────────────────────────────────────────
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     letterSpacing: -0.2,
     marginBottom: 12,
@@ -860,7 +860,7 @@ const styles = StyleSheet.create({
   },
   menuTitle: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
   },
   menuCount: {
