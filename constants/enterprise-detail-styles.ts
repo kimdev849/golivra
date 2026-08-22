@@ -1,16 +1,17 @@
 import { StyleSheet } from 'react-native';
 
 import type { AppPalette } from '@/constants/app-palette';
+import { DESKTOP_MAX_WIDTH, DESKTOP_PADDING } from '@/components/desktop-layout';
 
 export function createEnterpriseDetailStyles(c: AppPalette) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.background },
     scroll: { paddingBottom: 48, flexGrow: 1 },
     scrollDesktop: {
-      maxWidth: 1200,
+      maxWidth: DESKTOP_MAX_WIDTH,
       alignSelf: 'center',
       width: '100%',
-      paddingHorizontal: 32,
+      paddingHorizontal: DESKTOP_PADDING,
     },
     center: {
       flex: 1,

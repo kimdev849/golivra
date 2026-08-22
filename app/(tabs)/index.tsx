@@ -72,8 +72,8 @@ import { trackInteraction } from '@/lib/tracking';
 // ─── Constants ────────────────────────────────────────────────────
 
 const H_PAD = 16;
-const DESKTOP_H_PAD = 32;
-const DESKTOP_MAX_WIDTH = 1200;
+import { DESKTOP_MAX_WIDTH as DESKTOP_MAX, DESKTOP_PADDING as DESKTOP_H_PAD } from '@/components/desktop-layout';
+const DESKTOP_MAX_WIDTH = DESKTOP_MAX;
 const DESKTOP_GRID_COLUMNS = 4;
 const FEED_PAGE_SIZE = 24;
 // Vignettes commerces (rangée / liste) : version webp redimensionnée pour

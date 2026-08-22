@@ -26,6 +26,7 @@ import { useCart } from '@/contexts/cart-context';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { TAB_BAR_CONTENT_PADDING_BOTTOM } from '@/constants/layout';
 import { useIsWebDesktop } from '@/hooks/use-is-web-desktop';
+import { DESKTOP_MAX_WIDTH, DESKTOP_PADDING } from '@/components/desktop-layout';
 import type { EnterprisePublic, ProductPublic } from '@/lib/catalog';
 import { fetchEnterpriseById, fetchProductsForEnterprise } from '@/lib/catalog';
 import { apiFetch } from '@/lib/api';
@@ -493,8 +494,8 @@ export default function CartScreen() {
           contentContainerStyle={[styles.scroll, {
             paddingTop: Math.max(insets.top, 14),
             paddingBottom: bottomPad,
-            paddingHorizontal: isDesktop ? 32 : 16,
-            maxWidth: isDesktop ? 1200 : undefined,
+            paddingHorizontal: isDesktop ? DESKTOP_PADDING : 16,
+            maxWidth: isDesktop ? DESKTOP_MAX_WIDTH : undefined,
             alignSelf: isDesktop ? 'center' : undefined,
             width: isDesktop ? '100%' : undefined,
           }]}>

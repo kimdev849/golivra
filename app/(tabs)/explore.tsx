@@ -16,6 +16,7 @@ import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { TAB_BAR_CONTENT_PADDING_BOTTOM } from '@/constants/layout';
 import { useIsWebDesktop } from '@/hooks/use-is-web-desktop';
+import { DESKTOP_MAX_WIDTH, DESKTOP_PADDING } from '@/components/desktop-layout';
 import { apiFetch } from '@/lib/api';
 import { getSessionToken } from '@/lib/auth';
 import { fetchAllEnterprises, peekAllEnterprises } from '@/lib/client-data';
@@ -460,9 +461,9 @@ export default function OrdersScreen() {
           {
             paddingTop: Math.max(insets.top, 14),
             paddingBottom: bottomPad + 8,
-            maxWidth: isDesktop ? 1200 : undefined,
+            maxWidth: isDesktop ? DESKTOP_MAX_WIDTH : undefined,
             alignSelf: isDesktop ? 'center' : undefined,
-            paddingHorizontal: isDesktop ? 32 : 16,
+            paddingHorizontal: isDesktop ? DESKTOP_PADDING : 16,
             width: isDesktop ? '100%' : undefined,
           },
         ]}>

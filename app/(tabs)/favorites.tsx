@@ -24,6 +24,7 @@ import { ListingCard } from '@/components/listing-card';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { TAB_BAR_CONTENT_PADDING_BOTTOM } from '@/constants/layout';
 import { useIsWebDesktop } from '@/hooks/use-is-web-desktop';
+import { DESKTOP_MAX_WIDTH, DESKTOP_PADDING } from '@/components/desktop-layout';
 import type { EnterprisePublic, ProductPublic } from '@/lib/catalog';
 import { fetchAllEnterprises, peekAllEnterprises } from '@/lib/client-data';
 import { fetchProductFeed } from '@/lib/catalog';
@@ -185,8 +186,8 @@ export default function FavoritesScreen() {
     <ThemedView style={styles.screen}>
       <View style={[styles.head, {
         paddingTop: Math.max(insets.top, 14),
-        paddingHorizontal: isDesktop ? 32 : 16,
-        maxWidth: isDesktop ? 1200 : undefined,
+        paddingHorizontal: isDesktop ? DESKTOP_PADDING : 16,
+        maxWidth: isDesktop ? DESKTOP_MAX_WIDTH : undefined,
         alignSelf: isDesktop ? 'center' : undefined,
         width: isDesktop ? '100%' : undefined,
       }]}>
@@ -233,9 +234,9 @@ export default function FavoritesScreen() {
           columnWrapperStyle={isDesktop ? { gap: 12, marginBottom: 12 } : undefined}
           contentContainerStyle={[styles.list, {
             paddingBottom: bottomPad,
-            maxWidth: isDesktop ? 1200 : undefined,
+            maxWidth: isDesktop ? DESKTOP_MAX_WIDTH : undefined,
             alignSelf: isDesktop ? 'center' : undefined,
-            paddingHorizontal: isDesktop ? 32 : 16,
+            paddingHorizontal: isDesktop ? DESKTOP_PADDING : 16,
           }]} 
           ListEmptyComponent={
             loadingEnt ? (
@@ -358,9 +359,9 @@ export default function FavoritesScreen() {
           keyExtractor={(item) => `p-${item.kind}-${item.id}`}
           contentContainerStyle={[styles.list, {
             paddingBottom: bottomPad,
-            maxWidth: isDesktop ? 1200 : undefined,
+            maxWidth: isDesktop ? DESKTOP_MAX_WIDTH : undefined,
             alignSelf: isDesktop ? 'center' : undefined,
-            paddingHorizontal: isDesktop ? 32 : 16,
+            paddingHorizontal: isDesktop ? DESKTOP_PADDING : 16,
           }]}
           ListEmptyComponent={
             loadingProd ? (

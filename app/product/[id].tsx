@@ -36,7 +36,9 @@ import { LUCIDE_STROKE } from '@/constants/icons';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useCurrentTime } from '@/hooks/use-current-time';
-import { MAX_CONTENT_WIDTH, useResponsiveLayout } from '@/hooks/use-responsive-layout';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
+import { useIsWebDesktop } from '@/hooks/use-is-web-desktop';
+import { DESKTOP_MAX_WIDTH, DESKTOP_PADDING } from '@/components/desktop-layout';
 import { computeLiveStatus } from '@/lib/horaires-status';
 import {
   fetchEnterpriseById,
@@ -94,7 +96,9 @@ export default function ProductDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
-  const { contentWidth } = useResponsiveLayout();
+  const { contentWidth: mobileContentWidth } = useResponsiveLayout();
+  const isDesktop = useIsWebDesktop();
+  const contentWidth = isDesktop ? DESKTOP_MAX_WIDTH : mobileContentWidth;
   const { showError, FeedbackOverlay } = useActionFeedback();
   const params = useLocalSearchParams<{ id: string; kind?: string }>();
   const cart = useCart((s) => s.cart);
@@ -886,7 +890,7 @@ const styles = StyleSheet.create({
 function ProductDetailSkeleton({ colors }: { colors: ReturnType<typeof useAppColors> }) {
   return (
     <ScrollView
-      style={{ maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center', width: '100%' }}
+      style={{ maxWidth: 720, alignSelf: 'center', width: '100%' }}
       showsVerticalScrollIndicator={false}>
       {/* Hero image skeleton */}
       <Skeleton width="100%" height={340} borderRadius={0} />

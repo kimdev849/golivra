@@ -2,7 +2,6 @@ import { useRouter, usePathname } from 'expo-router';
 import { memo, useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
-  Bell,
   ClipboardList,
   Heart,
   Home,
@@ -15,8 +14,9 @@ import {
 import { useCart } from '@/contexts/cart-context';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { LUCIDE_STROKE } from '@/constants/icons';
+import { DESKTOP_MAX_WIDTH, DESKTOP_PADDING } from '@/components/desktop-layout';
 
-const NAVBAR_HEIGHT = 64;
+const NAVBAR_HEIGHT = 60;
 
 export { NAVBAR_HEIGHT };
 
@@ -42,6 +42,7 @@ export const WebNavbar = memo(function WebNavbar({
   const colors = useAppColors();
   const { itemCount } = useCart();
   const [search, setSearch] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
 
   const currentSearch = searchValue ?? search;
   const handleSearchChange = onSearchChange ?? setSearch;
@@ -69,106 +70,122 @@ export const WebNavbar = memo(function WebNavbar({
 
   return (
     <View style={[styles.navbar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-      {/* Logo */}
-      <Pressable
-        style={styles.logoWrap}
-        onPress={() => router.push('/(tabs)')}
-        hitSlop={8}>
-        <Text style={[styles.logoText, { color: colors.primary }]}>Go</Text>
-        <Text style={[styles.logoLivra, { color: colors.text }]}>Livra</Text>
-      </Pressable>
+      <View style={styles.navbarInner}>
+        {/* Logo */}
+        <Pressable
+          style={styles.logoWrap}
+          onPress={() => router.navigate('/(tabs)')}
+          hitSlop={8}>
+          <Text style={[styles.logoGo, { color: colors.primary }]}>Go</Text>
+          <Text style={[styles.logoLivra, { color: colors.text }]}>Livra</Text>
+        </Pressable>
 
-      {/* Search bar */}
-      <View style={[styles.searchBar, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
-        <Search size={16} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-        <TextInput
-          style={[styles.searchInput, { color: colors.text }]}
-          placeholder="Rechercher un plat, un produit, un restaurant…"
-          placeholderTextColor={colors.placeholder}
-          value={currentSearch}
-          onChangeText={handleSearchChange}
-          onSubmitEditing={handleSearchSubmit}
-          returnKeyType="search"
-        />
-        {currentSearch.length > 0 ? (
-          <Pressable onPress={handleClearSearch} hitSlop={8}>
-            <X size={14} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-          </Pressable>
-        ) : null}
-      </View>
-
-      {/* Nav links */}
-      <View style={styles.navLinks}>
-        {NAV_LINKS.map(({ key, label, Icon, href }) => {
-          const active = isActive(key);
-          return (
-            <Pressable
-              key={key}
-              style={({ pressed }) => [
-                styles.navLink,
-                active && { backgroundColor: colors.primarySoft },
-                pressed && { opacity: 0.7 },
-              ]}
-              onPress={() => router.navigate(href)}>
-              <Icon
-                size={16}
-                color={active ? colors.primary : colors.textMuted}
-                strokeWidth={active ? 2.4 : LUCIDE_STROKE}
-              />
-              <Text
-                style={[
-                  styles.navLinkText,
-                  { color: active ? colors.primary : colors.textMuted },
-                ]}>
-                {label}
-              </Text>
+        {/* Search bar */}
+        <View
+          style={[
+            styles.searchBar,
+            {
+              backgroundColor: searchFocused ? colors.surface : colors.surfaceMuted,
+              borderColor: searchFocused ? colors.primary : colors.border,
+            },
+          ]}>
+          <Search size={15} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Rechercher un plat, un restaurant…"
+            placeholderTextColor={colors.placeholder}
+            value={currentSearch}
+            onChangeText={handleSearchChange}
+            onSubmitEditing={handleSearchSubmit}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
+            returnKeyType="search"
+          />
+          {currentSearch.length > 0 ? (
+            <Pressable onPress={handleClearSearch} hitSlop={8}>
+              <X size={14} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
             </Pressable>
-          );
-        })}
+          ) : null}
+        </View>
 
-        {/* Panier */}
+        {/* Nav links */}
+        <View style={styles.navLinks}>
+          {NAV_LINKS.map(({ key, label, Icon, href }) => {
+            const active = isActive(key);
+            return (
+              <Pressable
+                key={key}
+                style={({ pressed }) => [
+                  styles.navLink,
+                  active && { backgroundColor: colors.primarySoft },
+                  pressed && { opacity: 0.7 },
+                ]}
+                onPress={() => router.navigate(href)}>
+                <Icon
+                  size={15}
+                  color={active ? colors.primary : colors.textMuted}
+                  strokeWidth={active ? 2.4 : LUCIDE_STROKE}
+                />
+                <Text
+                  style={[
+                    styles.navLinkText,
+                    { color: active ? colors.primary : colors.textMuted },
+                    active && { fontWeight: '700' },
+                  ]}>
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+
+          {/* Panier */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.navLink,
+              isActive('cart') && { backgroundColor: colors.primarySoft },
+              pressed && { opacity: 0.7 },
+            ]}
+            onPress={() => router.navigate('/(tabs)/cart')}>
+            <View>
+              <ShoppingBag
+                size={15}
+                color={isActive('cart') ? colors.primary : colors.textMuted}
+                strokeWidth={isActive('cart') ? 2.4 : LUCIDE_STROKE}
+              />
+              {itemCount > 0 ? (
+                <View style={[styles.badge, { backgroundColor: colors.error }]}>
+                  <Text style={styles.badgeText}>
+                    {itemCount > 99 ? '99+' : String(itemCount)}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            <Text
+              style={[
+                styles.navLinkText,
+                { color: isActive('cart') ? colors.primary : colors.textMuted },
+                isActive('cart') && { fontWeight: '700' },
+              ]}>
+              Panier
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Divider */}
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+        {/* Profil */}
         <Pressable
           style={({ pressed }) => [
-            styles.navLink,
-            isActive('cart') && { backgroundColor: colors.primarySoft },
+            styles.profileBtn,
+            { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
             pressed && { opacity: 0.7 },
           ]}
-          onPress={() => router.navigate('/(tabs)/cart')}>
-          <View>
-            <ShoppingBag
-              size={16}
-              color={isActive('cart') ? colors.primary : colors.textMuted}
-              strokeWidth={isActive('cart') ? 2.4 : LUCIDE_STROKE}
-            />
-            {itemCount > 0 ? (
-              <View style={[styles.badge, { backgroundColor: colors.error }]}>
-                <Text style={styles.badgeText}>
-                  {itemCount > 99 ? '99+' : String(itemCount)}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-          <Text
-            style={[
-              styles.navLinkText,
-              { color: isActive('cart') ? colors.primary : colors.textMuted },
-            ]}>
-            Panier
-          </Text>
+          onPress={() => router.navigate('/(tabs)/profile')}
+          hitSlop={8}>
+          <UserRound size={18} color={colors.text} strokeWidth={LUCIDE_STROKE} />
         </Pressable>
       </View>
-
-      {/* Profil */}
-      <Pressable
-        style={({ pressed }) => [
-          styles.profileBtn,
-          { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
-          pressed && { opacity: 0.7 },
-        ]}
-        onPress={() => router.navigate('/(tabs)/profile')}
-        hitSlop={8}>
-        <UserRound size={20} color={colors.text} strokeWidth={LUCIDE_STROKE} />
-      </Pressable>
     </View>
   );
 });
@@ -176,68 +193,71 @@ export const WebNavbar = memo(function WebNavbar({
 const styles = StyleSheet.create({
   navbar: {
     height: NAVBAR_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    gap: 20,
     borderBottomWidth: StyleSheet.hairlineWidth,
     zIndex: 100,
-    maxWidth: 1200,
+  },
+  navbarInner: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    maxWidth: DESKTOP_MAX_WIDTH,
     alignSelf: 'center',
     width: '100%',
+    paddingHorizontal: DESKTOP_PADDING,
+    gap: 16,
   },
   logoWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 8,
+    marginRight: 4,
   },
-  logoText: {
-    fontSize: 22,
+  logoGo: {
+    fontSize: 20,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
   logoLivra: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '400',
     letterSpacing: -0.5,
   },
   searchBar: {
     flex: 1,
-    maxWidth: 480,
+    maxWidth: 400,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
     borderWidth: 1,
   },
   searchInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 13,
     paddingVertical: 0,
   },
   navLinks: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 2,
   },
   navLink: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
   },
   navLinkText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   badge: {
     position: 'absolute',
     top: -5,
-    right: -7,
+    right: -8,
     minWidth: 16,
     height: 16,
     borderRadius: 8,
@@ -250,13 +270,17 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '800',
   },
+  divider: {
+    width: 1,
+    height: 24,
+    opacity: 0.4,
+  },
   profileBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    marginLeft: 4,
   },
 });

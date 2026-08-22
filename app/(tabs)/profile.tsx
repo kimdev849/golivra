@@ -37,6 +37,7 @@ import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { TAB_BAR_CONTENT_PADDING_BOTTOM } from '@/constants/layout';
 import { useIsWebDesktop } from '@/hooks/use-is-web-desktop';
+import { DESKTOP_MAX_WIDTH, DESKTOP_PADDING } from '@/components/desktop-layout';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useLogout } from '@/hooks/use-logout';
@@ -329,9 +330,9 @@ export default function ProfileScreen() {
           {
             paddingTop: Math.max(insets.top, 12),
             paddingBottom: bottomPad,
-            maxWidth: isDesktop ? 1200 : undefined,
+            maxWidth: isDesktop ? DESKTOP_MAX_WIDTH : undefined,
             alignSelf: isDesktop ? 'center' : undefined,
-            paddingHorizontal: isDesktop ? 32 : 16,
+            paddingHorizontal: isDesktop ? DESKTOP_PADDING : 16,
             width: isDesktop ? '100%' : undefined,
           },
         ]}>
