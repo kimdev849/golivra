@@ -36,6 +36,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { TAB_BAR_CONTENT_PADDING_BOTTOM } from '@/constants/layout';
+import { useIsWebDesktop } from '@/hooks/use-is-web-desktop';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useLogout } from '@/hooks/use-logout';
@@ -292,7 +293,8 @@ export default function ProfileScreen() {
         })
       : null;
 
-  const bottomPad = Math.max(insets.bottom, 12) + TAB_BAR_CONTENT_PADDING_BOTTOM;
+  const isDesktop = useIsWebDesktop();
+  const bottomPad = isDesktop ? 24 : Math.max(insets.bottom, 12) + TAB_BAR_CONTENT_PADDING_BOTTOM;
 
   const ordersPill =
     stats.totalOrders > 0
@@ -327,6 +329,10 @@ export default function ProfileScreen() {
           {
             paddingTop: Math.max(insets.top, 12),
             paddingBottom: bottomPad,
+            maxWidth: isDesktop ? 1200 : undefined,
+            alignSelf: isDesktop ? 'center' : undefined,
+            paddingHorizontal: isDesktop ? 32 : 16,
+            width: isDesktop ? '100%' : undefined,
           },
         ]}>
 

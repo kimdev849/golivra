@@ -15,6 +15,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { TAB_BAR_CONTENT_PADDING_BOTTOM } from '@/constants/layout';
+import { useIsWebDesktop } from '@/hooks/use-is-web-desktop';
 import { apiFetch } from '@/lib/api';
 import { getSessionToken } from '@/lib/auth';
 import { fetchAllEnterprises, peekAllEnterprises } from '@/lib/client-data';
@@ -343,8 +344,9 @@ export default function OrdersScreen() {
     annulees: false,
   });
   const [pendingReviews, setPendingReviews] = useState<PendingReview[]>([]);
+  const isDesktop = useIsWebDesktop();
 
-  const bottomPad = Math.max(insets.bottom, 12) + TAB_BAR_CONTENT_PADDING_BOTTOM;
+  const bottomPad = isDesktop ? 24 : Math.max(insets.bottom, 12) + TAB_BAR_CONTENT_PADDING_BOTTOM;
 
   const load = useCallback(async (force = false) => {
     setError(null);
@@ -455,7 +457,14 @@ export default function OrdersScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scroll,
-          { paddingTop: Math.max(insets.top, 14), paddingBottom: bottomPad + 8 },
+          {
+            paddingTop: Math.max(insets.top, 14),
+            paddingBottom: bottomPad + 8,
+            maxWidth: isDesktop ? 1200 : undefined,
+            alignSelf: isDesktop ? 'center' : undefined,
+            paddingHorizontal: isDesktop ? 32 : 16,
+            width: isDesktop ? '100%' : undefined,
+          },
         ]}>
         <ThemedText type="title" style={[styles.pageTitle, { color: colors.primaryDeep }]}>
           Commandes

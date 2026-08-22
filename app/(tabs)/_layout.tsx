@@ -1,13 +1,16 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { Tabs, useRouter } from 'expo-router';
 import { ClipboardList, Heart, Home, ShoppingBag, UserRound } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, createContext, useContext } from 'react';
+import { Platform, StyleSheet, View } from 'react-native';
 
 import { GolivraTabBar } from '@/components/golivra-tab-bar';
+import { WebNavbar, NAVBAR_HEIGHT } from '@/components/web-navbar';
 import { CartProvider } from '@/contexts/cart-context';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useIsWebDesktop } from '@/hooks/use-is-web-desktop';
 import { isAuthErrorMessage } from '@/lib/app-bootstrap';
 import { hydrateSessionToken } from '@/lib/auth';
 import { fetchAuthMe, prefetchClientCatalog } from '@/lib/client-data';
@@ -18,6 +21,10 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
   const [sessionOk, setSessionOk] = useState(true);
+  const isDesktop = useIsWebDesktop();
+  const [desktopSearch, setDesktopSearch] = useState('');
+  const setSearchValue = useCallback((v: string) => setDesktopSearch(v), []);
+  const searchCtx = useMemo(() => ({ searchValue: desktopSearch, setSearchValue }), [desktopSearch, setSearchValue]);
 
   const verifySessionInBackground = useCallback(
     async (token: string) => {
@@ -69,6 +76,80 @@ export default function TabLayout() {
 
   if (!sessionOk) return null;
 
+  // ── Desktop : top navbar + tabs sans bottom bar ──────────────
+  if (isDesktop) {
+    return (
+      <CartProvider>
+        <DesktopSearchContext.Provider value={searchCtx}>
+        <View style={styles.desktopRoot}>
+          <WebNavbar searchValue={searchCtx.searchValue} onSearchChange={searchCtx.setSearchValue} />
+          <View style={styles.desktopContent}>
+            <Tabs
+              tabBar={() => null}
+              screenOptions={{
+                tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+                tabBarInactiveTintColor: Colors[colorScheme ?? 'light'].tabIconDefault,
+                headerShown: false,
+              }}>
+              <Tabs.Screen
+                name="index"
+                options={{
+                  title: 'Accueil',
+                  tabBarIcon: ({ color, focused }) => (
+                    <Home size={21} color={color} strokeWidth={focused ? 2.4 : LUCIDE_STROKE} />
+                  ),
+                }}
+              />
+              <Tabs.Screen
+                name="explore"
+                options={{
+                  title: 'Commandes',
+                  tabBarIcon: ({ color, focused }) => (
+                    <ClipboardList size={21} color={color} strokeWidth={focused ? 2.4 : LUCIDE_STROKE} />
+                  ),
+                }}
+              />
+              <Tabs.Screen
+                name="cart"
+                options={{
+                  title: 'Panier',
+                  tabBarIcon: ({ color, focused }) => (
+                    <ShoppingBag size={21} color={color} strokeWidth={focused ? 2.4 : LUCIDE_STROKE} />
+                  ),
+                }}
+              />
+              <Tabs.Screen
+                name="favorites"
+                options={{
+                  title: 'Favoris',
+                  tabBarIcon: ({ color, focused }) => (
+                    <Heart
+                      size={21}
+                      color={color}
+                      fill={focused ? color : 'transparent'}
+                      strokeWidth={focused ? 2.4 : LUCIDE_STROKE}
+                    />
+                  ),
+                }}
+              />
+              <Tabs.Screen
+                name="profile"
+                options={{
+                  title: 'Compte',
+                  tabBarIcon: ({ color, focused }) => (
+                    <UserRound size={21} color={color} strokeWidth={focused ? 2.4 : LUCIDE_STROKE} />
+                  ),
+                }}
+              />
+            </Tabs>
+          </View>
+        </View>
+        </DesktopSearchContext.Provider>
+      </CartProvider>
+    );
+  }
+
+  // ── Mobile : bottom tab bar classique ────────────────────────
   return (
     <CartProvider>
       <Tabs
@@ -139,3 +220,27 @@ export default function TabLayout() {
     </CartProvider>
   );
 }
+
+// ── Search context (lifted to share between WebNavbar and home screen) ──
+export type DesktopSearchContextType = {
+  searchValue: string;
+  setSearchValue: (v: string) => void;
+};
+
+const DesktopSearchContext = createContext<DesktopSearchContextType>({
+  searchValue: '',
+  setSearchValue: () => {},
+});
+
+export function useDesktopSearch() {
+  return useContext(DesktopSearchContext);
+}
+
+const styles = StyleSheet.create({
+  desktopRoot: {
+    flex: 1,
+  },
+  desktopContent: {
+    flex: 1,
+  },
+});

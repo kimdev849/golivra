@@ -23,6 +23,7 @@ import { ThemedView } from '@/components/themed-view';
 import { ListingCard } from '@/components/listing-card';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { TAB_BAR_CONTENT_PADDING_BOTTOM } from '@/constants/layout';
+import { useIsWebDesktop } from '@/hooks/use-is-web-desktop';
 import type { EnterprisePublic, ProductPublic } from '@/lib/catalog';
 import { fetchAllEnterprises, peekAllEnterprises } from '@/lib/client-data';
 import { fetchProductFeed } from '@/lib/catalog';
@@ -60,7 +61,8 @@ export default function FavoritesScreen() {
   const [refreshingProd, setRefreshingProd] = useState(false);
   const [errorProd, setErrorProd] = useState<string | null>(null);
 
-  const bottomPad = Math.max(insets.bottom, 16) + TAB_BAR_CONTENT_PADDING_BOTTOM;
+  const isDesktop = useIsWebDesktop();
+  const bottomPad = isDesktop ? 24 : Math.max(insets.bottom, 16) + TAB_BAR_CONTENT_PADDING_BOTTOM;
 
   // Garde d'instance : ignore les réponses d'un chargement obsolète si un
   // nouveau chargement a démarré entre-temps (pull-to-refresh + focus).
@@ -181,7 +183,13 @@ export default function FavoritesScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <View style={[styles.head, { paddingTop: Math.max(insets.top, 14) }]}>
+      <View style={[styles.head, {
+        paddingTop: Math.max(insets.top, 14),
+        paddingHorizontal: isDesktop ? 32 : 16,
+        maxWidth: isDesktop ? 1200 : undefined,
+        alignSelf: isDesktop ? 'center' : undefined,
+        width: isDesktop ? '100%' : undefined,
+      }]}>
         <ThemedText type="title" style={[styles.title, { color: colors.primaryDeep }]}>
           Favoris
         </ThemedText>
@@ -217,12 +225,18 @@ export default function FavoritesScreen() {
         </View>
       </View>
 
-      {tab === 'commerces' ? (
-        <FlatList
+      {tab === 'commerces' ? (        <FlatList
           key="favorites-enterprises"
           data={enterprises}
           keyExtractor={(item) => `ent-${item.id}`}
-          contentContainerStyle={[styles.list, { paddingBottom: bottomPad }]}
+          numColumns={isDesktop ? 3 : 1}
+          columnWrapperStyle={isDesktop ? { gap: 12, marginBottom: 12 } : undefined}
+          contentContainerStyle={[styles.list, {
+            paddingBottom: bottomPad,
+            maxWidth: isDesktop ? 1200 : undefined,
+            alignSelf: isDesktop ? 'center' : undefined,
+            paddingHorizontal: isDesktop ? 32 : 16,
+          }]} 
           ListEmptyComponent={
             loadingEnt ? (
               <View style={styles.center}>
@@ -260,7 +274,38 @@ export default function FavoritesScreen() {
             <RefreshControl refreshing={refreshingEnt} onRefresh={onRefreshEnt} tintColor={colors.primary} />
           }
           renderItem={({ item }) => {
-            const img = resolveRemoteImageUrl(item.image_url, { width: 160, format: 'webp', quality: 75 });
+            const img = resolveRemoteImageUrl(item.image_url, { width: 300, format: 'webp', quality: 75 });
+            if (isDesktop) {
+              return (
+                <Pressable
+                  style={[styles.entGridCard, { borderColor: colors.border, backgroundColor: colors.surface }]}
+                  onPress={() => router.push(`/marketplace/${item.id}`)}>
+                  <View style={[styles.entGridImg, { backgroundColor: colors.primarySoft }]}>
+                    {img ? (
+                      <Image source={{ uri: img }} style={{ width: '100%', height: '100%' }} contentFit="cover" transition={150} />
+                    ) : (
+                      item.type === 'restaurant' ? <UtensilsCrossed size={28} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+                      : <Store size={28} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+                    )}
+                  </View>
+                  <View style={styles.entCardBody}>
+                    <ThemedText type="defaultSemiBold" style={[styles.entCardName, { color: colors.text }]} numberOfLines={1}>
+                      {item.nom ?? 'Commerce'}
+                    </ThemedText>
+                    <View style={[styles.badge, { backgroundColor: colors.primarySoft }]}>
+                      <ThemedText style={[styles.badgeText, { color: colors.primary }]}>
+                        {item.type === 'restaurant' ? 'Restaurant' : 'Boutique'}
+                      </ThemedText>
+                    </View>
+                    {item.adresse ? (
+                      <ThemedText style={[styles.rowAddr, { color: colors.textMuted }]} numberOfLines={1}>
+                        {item.adresse}
+                      </ThemedText>
+                    ) : null}
+                  </View>
+                </Pressable>
+              );
+            }
             return (
               <Pressable
                 style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}
@@ -311,7 +356,12 @@ export default function FavoritesScreen() {
           key="favorites-products"
           data={favProducts}
           keyExtractor={(item) => `p-${item.kind}-${item.id}`}
-          contentContainerStyle={[styles.list, { paddingBottom: bottomPad }]}
+          contentContainerStyle={[styles.list, {
+            paddingBottom: bottomPad,
+            maxWidth: isDesktop ? 1200 : undefined,
+            alignSelf: isDesktop ? 'center' : undefined,
+            paddingHorizontal: isDesktop ? 32 : 16,
+          }]}
           ListEmptyComponent={
             loadingProd ? (
               <View style={styles.center}>
@@ -348,14 +398,18 @@ export default function FavoritesScreen() {
           refreshControl={
             <RefreshControl refreshing={refreshingProd} onRefresh={onRefreshProd} tintColor={colors.primary} />
           }
+          numColumns={isDesktop ? 4 : 1}
+          columnWrapperStyle={isDesktop ? { gap: 12, marginBottom: 12 } : undefined}
           renderItem={({ item }) => (
-            <ListingCard
-              product={item}
-              variant="feed"
-              onPress={() => router.push(productDetailHref(item) as never)}
-              isFav
-              onToggleFav={() => void onUnfavProduct(item)}
-            />
+            <View style={isDesktop ? { flex: 1, maxWidth: '25%' } : undefined}>
+              <ListingCard
+                product={item}
+                variant={isDesktop ? 'grid' : 'feed'}
+                onPress={() => router.push(productDetailHref(item) as never)}
+                isFav
+                onToggleFav={() => void onUnfavProduct(item)}
+              />
+            </View>
           )}
         />
       )}
@@ -409,7 +463,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   tabTxt: { fontSize: 14, fontWeight: '700' },
-  list: { paddingHorizontal: 16, flexGrow: 1, gap: 14 },
+  list: { flexGrow: 1, gap: 14 },
   center: { paddingVertical: 48, alignItems: 'center', gap: 12 },
   muted: { fontSize: 15 },
   card: {
@@ -468,6 +522,27 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   retryText: { fontWeight: '800' },
+  // Desktop enterprise grid card
+  entGridCard: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowColor: '#0C3020',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  entGridImg: {
+    width: '100%',
+    height: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  entCardBody: { padding: 12, gap: 4 },
+  entCardName: { fontSize: 14, fontWeight: '700' },
   // Product grid
   gridRow: { gap: 0, marginBottom: 10 },
   productCard: {

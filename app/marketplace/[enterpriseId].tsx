@@ -30,6 +30,7 @@ import { PressableScale } from '@/components/ui/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { ZoomableImage } from '@/components/zoomable-image';
+import { useIsWebDesktop } from '@/hooks/use-is-web-desktop';
 import { createEnterpriseDetailStyles } from '@/constants/enterprise-detail-styles';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
@@ -70,6 +71,7 @@ export default function EnterpriseDetailScreen() {
   const router = useRouter();
   const id = typeof enterpriseId === 'string' ? enterpriseId : '';
   const colors = useAppColors();
+  const isDesktop = useIsWebDesktop();
   const styles = useThemedStyles(createEnterpriseDetailStyles);
   const queryClient = useQueryClient();
 
@@ -268,7 +270,7 @@ export default function EnterpriseDetailScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scroll, isDesktop && styles.scrollDesktop]}>
         <View style={styles.heroWrap}>
           {hero ? (
             <ZoomableImage

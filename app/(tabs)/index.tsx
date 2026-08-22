@@ -41,6 +41,9 @@ import { ThemedView } from '@/components/themed-view';
 import { HomeFeedSkeleton } from '@/components/ui/skeleton';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { TAB_BAR_CONTENT_PADDING_BOTTOM } from '@/constants/layout';
+import { useIsWebDesktop } from '@/hooks/use-is-web-desktop';
+import { NAVBAR_HEIGHT } from '@/components/web-navbar';
+import { useDesktopSearch } from '@/app/(tabs)/_layout';
 import { useActiveOrders } from '@/hooks/useActiveOrders';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
@@ -69,6 +72,9 @@ import { trackInteraction } from '@/lib/tracking';
 // ─── Constants ────────────────────────────────────────────────────
 
 const H_PAD = 16;
+const DESKTOP_H_PAD = 32;
+const DESKTOP_MAX_WIDTH = 1200;
+const DESKTOP_GRID_COLUMNS = 4;
 const FEED_PAGE_SIZE = 24;
 // Vignettes commerces (rangée / liste) : version webp redimensionnée pour
 // éviter de télécharger l'original pleine taille dans une case de 52px.
@@ -134,6 +140,7 @@ const PremiumCard = memo(function PremiumCard({
   onToggleFav,
   colors,
   enterpriseImageUrl,
+  isDesktop,
 }: {
   product: ProductPublic;
   onPress: () => void;
@@ -142,6 +149,7 @@ const PremiumCard = memo(function PremiumCard({
   colors: ReturnType<typeof useAppColors>;
   /** Photo de profil du commerce (repli local si absente du feed). */
   enterpriseImageUrl?: string | null;
+  isDesktop?: boolean;
 }) {
   const imageUrl = resolveRemoteImageUrl(
     product.images_urls?.[0] ?? product.image_url,
@@ -162,10 +170,10 @@ const PremiumCard = memo(function PremiumCard({
       scaleTo={0.97}
       style={({ pressed }) => [
         styles.premiumCard,
-        { backgroundColor: colors.surface, opacity: pressed ? 0.93 : 1 },
+        { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.93 : 1 },
       ]}>
       {/* Image */}
-      <View style={[styles.premiumCardImg, { backgroundColor: colors.primarySoft }]}>
+      <View style={[styles.premiumCardImg, isDesktop && styles.premiumCardImgDesktop, { backgroundColor: colors.primarySoft }]}>
         {imageUrl ? (
           <Image
             source={{ uri: imageUrl }}
@@ -199,7 +207,7 @@ const PremiumCard = memo(function PremiumCard({
       </View>
 
       {/* Info */}
-      <View style={styles.premiumCardBody}>
+      <View style={[styles.premiumCardBody, isDesktop && styles.premiumCardBodyDesktop]}>
         <Text style={[styles.premiumCardName, { color: colors.text }]} numberOfLines={1}>
           {product.nom || 'Produit'}
         </Text>
@@ -218,7 +226,7 @@ const PremiumCard = memo(function PremiumCard({
 
         {/* Price */}
         <View style={styles.premiumCardPriceRow}>
-          <Text style={[styles.premiumCardPrice, { color: colors.primary }]}>
+          <Text style={[styles.premiumCardPrice, isDesktop && styles.premiumCardPriceDesktop, { color: colors.primary }]}>
             {formatFcfa(price)}
           </Text>
           {isPromo ? (
@@ -239,12 +247,14 @@ const EnterpriseCard = memo(function EnterpriseCard({
   onPress,
   colors,
   deliveryMinutes,
+  isDesktop,
 }: {
   enterprise: EnterprisePublic;
   onPress: () => void;
   colors: ReturnType<typeof useAppColors>;
   /** Temps de livraison GoLivra estimé par zone (25/35/45) — sinfon commerce. */
   deliveryMinutes?: number | null;
+  isDesktop?: boolean;
 }) {
   const imgUrl = resolveRemoteImageUrl(enterprise.image_url, { width: 300, format: 'webp', quality: 80 });
 
@@ -254,9 +264,10 @@ const EnterpriseCard = memo(function EnterpriseCard({
       scaleTo={0.97}
       style={({ pressed }) => [
         styles.enterpriseCard,
-        { backgroundColor: colors.surface, opacity: pressed ? 0.93 : 1 },
+        isDesktop && styles.enterpriseCardDesktop,
+        { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.93 : 1 },
       ]}>
-      <View style={[styles.enterpriseCardImg, { backgroundColor: colors.primarySoft }]}>
+      <View style={[styles.enterpriseCardImg, isDesktop && styles.enterpriseCardImgDesktop, { backgroundColor: colors.primarySoft }]}>
         {imgUrl ? (
           <Image
             source={{ uri: imgUrl }}
@@ -308,6 +319,7 @@ export default function HomeScreen() {
   const { heroOrder, isLoading: loadingOrders, refetch: refetchOrders } = useActiveOrders();
   // ⚡ Temps de livraison dynamique (GoLivra) selon la zone de l'adresse principale.
   const { minutes: deliveryMinutes } = useDeliveryEstimate();
+  const isDesktop = useIsWebDesktop();
 
   // ── Campagnes marketing actives (offre du jour) ────────
   // staleTime court : si une campagne est désactivée côté admin,
@@ -323,7 +335,11 @@ export default function HomeScreen() {
 
   const flatListRef = useRef<FlatList>(null);
   const scrollViewRef = useRef<ScrollView>(null);
-  const [search, setSearch] = useState('');
+  const desktopSearch = useDesktopSearch();
+  const [localSearch, setLocalSearch] = useState('');
+  // On desktop, the search is controlled by the WebNavbar context
+  const search = isDesktop ? desktopSearch.searchValue : localSearch;
+  const setSearch = isDesktop ? desktopSearch.setSearchValue : setLocalSearch;
   const [category, setCategory] = useState<FilterTab>('all');
   const [sort, setSort] = useState<SortKey>('recent');
   const [favProductKeys, setFavProductKeys] = useState<Set<string>>(new Set());
@@ -444,10 +460,10 @@ export default function HomeScreen() {
     return [];
   }, [searchActive, searchResult, category, restaurants, boutiques, sort]);
 
-  /** « À découvrir » : restos + boutiques mélangés, mieux notés, max 3 + « Voir plus ». */
+  /** « À découvrir » : restos + boutiques mélangés, mieux notés. Sur desktop on montre plus. */
   const discoverEnterprises = useMemo(
-    () => sortEnterprisesByPopularity([...restaurants, ...boutiques]).slice(0, 3),
-    [restaurants, boutiques],
+    () => sortEnterprisesByPopularity([...restaurants, ...boutiques]).slice(0, isDesktop ? 8 : 3),
+    [restaurants, boutiques, isDesktop],
   );
 
   /** Photo de profil par commerce (repli si le feed ne l'hydrate pas). */
@@ -601,10 +617,11 @@ export default function HomeScreen() {
           onToggleFav={() => void onToggleFav(item)}
           colors={colors}
           enterpriseImageUrl={enterpriseImageById.get(item.entreprise_id) ?? null}
+          isDesktop={isDesktop}
         />
       </View>
     ),
-    [favProductKeys, onToggleFav, router, colors, enterpriseImageById],
+    [favProductKeys, onToggleFav, router, colors, enterpriseImageById, isDesktop],
   );
 
   const loading = searchActive
@@ -640,9 +657,10 @@ export default function HomeScreen() {
   // ── En-tête fixe repliable : top bar + recherche + filtres ─────
 
   const fixedHeaderContent = (
+    <View style={isDesktop ? styles.fixedHeaderContent : undefined}>
     <View style={styles.fixedHeaderInner}>
 
-      {/* ── Top bar: location + bell ─────────────────────── */}
+      {/* ── Top bar: location + bell (bell hidden on desktop) ── */}
       <View style={styles.topBar}>
         <Pressable
           style={styles.locationRow}
@@ -661,40 +679,52 @@ export default function HomeScreen() {
               <X size={16} color={colors.error} strokeWidth={2.5} />
             </Pressable>
           ) : null}
-          <Pressable
-            style={[styles.topBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            onPress={() => router.push('/notifications')}
-            hitSlop={8}>
-            <Bell size={18} color={colors.text} strokeWidth={LUCIDE_STROKE} />
-            {unreadCount > 0 ? (
-              <View style={[styles.notifDot, { backgroundColor: colors.error, borderColor: colors.background }]}>
-                <Text style={styles.notifDotTxt}>{unreadCount > 9 ? '9+' : String(unreadCount)}</Text>
-              </View>
-            ) : null}
-          </Pressable>
+          {!isDesktop ? (
+            <Pressable
+              style={[styles.topBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              onPress={() => router.push('/notifications')}
+              hitSlop={8}>
+              <Bell size={18} color={colors.text} strokeWidth={LUCIDE_STROKE} />
+              {unreadCount > 0 ? (
+                <View style={[styles.notifDot, { backgroundColor: colors.error, borderColor: colors.background }]}>
+                  <Text style={styles.notifDotTxt}>{unreadCount > 9 ? '9+' : String(unreadCount)}</Text>
+                </View>
+              ) : null}
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
-      {/* ── Search bar ───────────────────────────────────── */}
-      <View style={[styles.searchBar, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
-        <Search size={17} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-        <TextInput
-          style={[styles.searchInput, { color: colors.text }]}
-          placeholder="Rechercher un plat, un produit, un restaurant…"
-          placeholderTextColor={colors.placeholder}
-          value={search}
-          onChangeText={setSearch}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-        />
-        {search.length > 0 ? (
-          <Pressable onPress={() => setSearch('')} hitSlop={8}>
-            <X size={16} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-          </Pressable>
-        ) : null}
-      </View>
+      {/* ── Desktop welcome zone — greeting only, search is in the navbar ── */}
+      {isDesktop ? (
+        <View style={styles.desktopWelcomeZone}>
+          <Text style={[styles.desktopWelcomeTitle, { color: colors.text }]}>Bonjour 👋</Text>
+          <Text style={[styles.desktopWelcomeSub, { color: colors.textMuted }]}>Qu'est-ce que vous voulez commander aujourd'hui ?</Text>
+        </View>
+      ) : null}
 
-      {/* ── Filter tabs (pill chips, no icons) ───────────── */}
+      {/* ── Search bar (mobile only — hidden on desktop) ── */}
+      {!isDesktop ? (
+        <View style={[styles.searchBar, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
+          <Search size={17} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Rechercher un plat, un produit, un restaurant…"
+            placeholderTextColor={colors.placeholder}
+            value={search}
+            onChangeText={setSearch}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+          {search.length > 0 ? (
+            <Pressable onPress={() => setSearch('')} hitSlop={8}>
+              <X size={16} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
+      {/* ── Filter tabs (pill chips) ───────────── */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -726,12 +756,13 @@ export default function HomeScreen() {
 
       </ScrollView>
     </View>
+    </View>
   );
 
   // ── Liste : contenu défilant sous l'en-tête fixe ───────────────
 
   const listHeader = (
-    <View style={styles.headerWrap}>
+    <View style={isDesktop ? styles.headerWrapDesktop : styles.headerWrap}>
 
       {/* ── Active order widget ───────────────────────────── */}
       {!loadingOrders && heroOrder && !searchActive ? (
@@ -761,13 +792,13 @@ export default function HomeScreen() {
       {!searchActive && category === 'all' && discoverEnterprises.length > 0 ? (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>À découvrir</Text>
+            <Text style={[styles.sectionTitle, isDesktop && styles.sectionTitleDesktop, { color: colors.text }]}>À découvrir</Text>
             <Pressable
               style={styles.sectionSeeAll}
               onPress={() => router.push('/discover-all')}
               hitSlop={8}>
-              <Text style={[styles.sectionSeeAllTxt, { color: colors.primary }]}>Voir plus</Text>
-              <ChevronRight size={14} color={colors.primary} strokeWidth={2.5} />
+              <Text style={[styles.sectionSeeAllTxt, isDesktop && styles.sectionSeeAllTxtDesktop, { color: colors.primary }]}>Voir plus</Text>
+              <ChevronRight size={isDesktop ? 16 : 14} color={colors.primary} strokeWidth={2.5} />
             </Pressable>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
@@ -778,6 +809,7 @@ export default function HomeScreen() {
                 onPress={() => router.push(`/marketplace/${ent.id}` as never)}
                 colors={colors}
                 deliveryMinutes={deliveryMinutes}
+                isDesktop={isDesktop}
               />
             ))}
           </ScrollView>
@@ -788,9 +820,18 @@ export default function HomeScreen() {
           RECOMMANDÉS POUR VOUS
       ───────────────────────────────────────────────────── */}
       {!searchActive && category === 'all' && feedProducts.length > 0 ? (
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Recommandés pour vous</Text>
+        <>
+          {isDesktop && discoverEnterprises.length > 0 ? <View style={styles.sectionDividerDesktop} /> : null}
+          <View style={[styles.sectionHeader, isDesktop && { marginBottom: 14, marginTop: 10 }]}>
+          <Text style={[styles.sectionTitle, isDesktop && styles.sectionTitleDesktop, { color: colors.text }]}>Recommandés pour vous</Text>
+          {isDesktop ? (
+            <Pressable style={styles.sectionSeeAll} hitSlop={8}>
+              <Text style={[styles.sectionSeeAllTxt, isDesktop && styles.sectionSeeAllTxtDesktop, { color: colors.primary }]}>Voir tout</Text>
+              <ChevronRight size={16} color={colors.primary} strokeWidth={2.5} />
+            </Pressable>
+          ) : null}
         </View>
+        </>
       ) : null}
 
       {/* ─────────────────────────────────────────────────────
@@ -798,52 +839,86 @@ export default function HomeScreen() {
       ───────────────────────────────────────────────────── */}
       {!searchActive && (category === 'restaurant' || category === 'boutique') ? (
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }, { marginBottom: 10 }]}>
+          <Text style={[styles.sectionTitle, isDesktop && styles.sectionTitleDesktop, { color: colors.text, marginBottom: 10 }]}>
             {category === 'restaurant' ? 'Restaurants' : 'Boutiques'}
           </Text>
-          {/* Tri des commerces, juste au-dessus de la liste */}
           {renderSortRow(sortOptions)}
-          {displayEnterprises.map((ent) => (
-            <Pressable
-              key={ent.id}
-              style={({ pressed }) => [
-                styles.entRow,
-                { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.93 : 1 },
-              ]}
-              onPress={() => router.push(`/marketplace/${ent.id}` as never)}>
-              <View style={[styles.entRowImg, { backgroundColor: colors.primarySoft }]}>
-                {resolveRemoteImageUrl(ent.image_url, ENT_IMG) ? (
-                  <Image
-                    source={{ uri: resolveRemoteImageUrl(ent.image_url, ENT_IMG)! }}
-                    style={{ width: '100%', height: '100%' }}
-                    contentFit="cover"
-                    transition={150}
-                  />
-                ) : (
-                  <Store size={20} color={colors.primary} strokeWidth={1.5} />
-                )}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.entRowName, { color: colors.text }]} numberOfLines={1}>
-                  {ent.nom}
-                </Text>
-                <Text style={[styles.entRowMeta, { color: colors.textMuted }]} numberOfLines={1}>
-                  {[ent.categorie_nom, deliveryMinutes != null ? `~${enterprisePrepMinutes(ent) + deliveryMinutes} min` : null]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </Text>
-              </View>
-              {ent.note_moyenne ? (
-                <View style={styles.entRowRating}>
-                  <Star size={12} color="#F5A524" fill="#F5A524" strokeWidth={0} />
-                  <Text style={[styles.entRowRatingTxt, { color: colors.text }]}>
-                    {ent.note_moyenne.toFixed(1)}
+          {/* Desktop: grid of enterprise cards | Mobile: list rows */}
+          {isDesktop ? (
+            <View style={styles.entGrid}>
+              {displayEnterprises.map((ent) => (
+                <Pressable
+                  key={ent.id}
+                  style={({ pressed }) => [
+                    styles.entGridCard,
+                    { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.93 : 1 },
+                  ]}
+                  onPress={() => router.push(`/marketplace/${ent.id}` as never)}>
+                  <View style={[styles.entGridCardImg, { backgroundColor: colors.primarySoft }]}>
+                    {resolveRemoteImageUrl(ent.image_url, ENT_IMG) ? (
+                      <Image
+                        source={{ uri: resolveRemoteImageUrl(ent.image_url, ENT_IMG)! }}
+                        style={{ width: '100%', height: '100%' }}
+                        contentFit="cover"
+                        transition={150}
+                      />
+                    ) : (
+                      <Store size={22} color={colors.primary} strokeWidth={1.5} />
+                    )}
+                  </View>
+                  <View style={styles.entGridCardBody}>
+                    <Text style={[styles.entGridCardName, { color: colors.text }]} numberOfLines={1}>{ent.nom}</Text>
+                    <Text style={[styles.entGridCardMeta, { color: colors.textMuted }]} numberOfLines={1}>
+                      {[ent.categorie_nom, deliveryMinutes != null ? `~${enterprisePrepMinutes(ent) + deliveryMinutes} min` : null].filter(Boolean).join(' · ')}
+                    </Text>
+                    {ent.note_moyenne ? (
+                      <View style={styles.entRatingRow}>
+                        <Star size={12} color="#F5A524" fill="#F5A524" strokeWidth={0} />
+                        <Text style={[styles.enterpriseCardRating, { color: colors.text }]}>{ent.note_moyenne.toFixed(1)}</Text>
+                        {ent.nb_avis ? <Text style={[styles.enterpriseCardRatingAvis, { color: colors.textMuted }]}>({ent.nb_avis})</Text> : null}
+                      </View>
+                    ) : null}
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            displayEnterprises.map((ent) => (
+              <Pressable
+                key={ent.id}
+                style={({ pressed }) => [
+                  styles.entRow,
+                  { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.93 : 1 },
+                ]}
+                onPress={() => router.push(`/marketplace/${ent.id}` as never)}>
+                <View style={[styles.entRowImg, { backgroundColor: colors.primarySoft }]}>
+                  {resolveRemoteImageUrl(ent.image_url, ENT_IMG) ? (
+                    <Image
+                      source={{ uri: resolveRemoteImageUrl(ent.image_url, ENT_IMG)! }}
+                      style={{ width: '100%', height: '100%' }}
+                      contentFit="cover"
+                      transition={150}
+                    />
+                  ) : (
+                    <Store size={20} color={colors.primary} strokeWidth={1.5} />
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.entRowName, { color: colors.text }]} numberOfLines={1}>{ent.nom}</Text>
+                  <Text style={[styles.entRowMeta, { color: colors.textMuted }]} numberOfLines={1}>
+                    {[ent.categorie_nom, deliveryMinutes != null ? `~${enterprisePrepMinutes(ent) + deliveryMinutes} min` : null].filter(Boolean).join(' · ')}
                   </Text>
                 </View>
-              ) : null}
-              <ChevronRight size={16} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-            </Pressable>
-          ))}
+                {ent.note_moyenne ? (
+                  <View style={styles.entRowRating}>
+                    <Star size={12} color="#F5A524" fill="#F5A524" strokeWidth={0} />
+                    <Text style={[styles.entRowRatingTxt, { color: colors.text }]}>{ent.note_moyenne.toFixed(1)}</Text>
+                  </View>
+                ) : null}
+                <ChevronRight size={16} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+              </Pressable>
+            ))
+          )}
         </View>
       ) : null}
 
@@ -934,10 +1009,10 @@ export default function HomeScreen() {
           ref={flatListRef}
           data={displayProducts}
           key={`grid-${category}-${searchActive ? debouncedSearch : 'feed'}`}
-          numColumns={2}
+          numColumns={isDesktop ? DESKTOP_GRID_COLUMNS : 2}
           keyExtractor={(p) => `${p.kind || 'p'}-${p.id}`}
           renderItem={renderProduct}
-          columnWrapperStyle={styles.gridRow}
+          columnWrapperStyle={isDesktop ? styles.gridRowDesktop : styles.gridRow}
           ListHeaderComponent={listHeader}
           ListEmptyComponent={
             !loading ? (
@@ -960,8 +1035,11 @@ export default function HomeScreen() {
           }
           contentContainerStyle={{
             paddingTop: headerHeight,
-            paddingHorizontal: H_PAD,
-            paddingBottom: TAB_BAR_CONTENT_PADDING_BOTTOM + insets.bottom,
+            paddingHorizontal: isDesktop ? DESKTOP_H_PAD : H_PAD,
+            paddingBottom: isDesktop ? 24 : TAB_BAR_CONTENT_PADDING_BOTTOM + insets.bottom,
+            maxWidth: isDesktop ? DESKTOP_MAX_WIDTH : undefined,
+            alignSelf: isDesktop ? 'center' : undefined,
+            width: isDesktop ? '100%' : undefined,
           }}
           onEndReached={onEndReached}
           onEndReachedThreshold={0.4}
@@ -988,8 +1066,11 @@ export default function HomeScreen() {
           ref={scrollViewRef}
           contentContainerStyle={{
             paddingTop: headerHeight,
-            paddingHorizontal: H_PAD,
-            paddingBottom: TAB_BAR_CONTENT_PADDING_BOTTOM + insets.bottom,
+            paddingHorizontal: isDesktop ? DESKTOP_H_PAD : H_PAD,
+            paddingBottom: isDesktop ? 24 : TAB_BAR_CONTENT_PADDING_BOTTOM + insets.bottom,
+            maxWidth: isDesktop ? DESKTOP_MAX_WIDTH : undefined,
+            alignSelf: isDesktop ? 'center' : undefined,
+            width: isDesktop ? '100%' : undefined,
           }}
           refreshControl={
             <RefreshControl
@@ -1016,7 +1097,6 @@ export default function HomeScreen() {
           styles.fixedHeader,
           {
             backgroundColor: colors.background,
-            borderBottomColor: colors.border,
             paddingTop: Math.max(insets.top, 12),
           },
         ]}
@@ -1040,7 +1120,7 @@ export default function HomeScreen() {
             {
               backgroundColor: colors.surface,
               borderColor: colors.border,
-              bottom: Math.max(insets.bottom, 10) + 96,
+              bottom: isDesktop ? 24 : Math.max(insets.bottom, 10) + 96,
             },
           ]}
           onPress={() => {
@@ -1065,6 +1145,7 @@ const styles = StyleSheet.create({
 
   // Header
   headerWrap: { gap: 12, marginBottom: 8 },
+  headerWrapDesktop: { gap: 16, marginBottom: 12 },
 
   // En-tête fixe (top bar + recherche + filtres) : toujours visible,
   // fond plein + fine bordure basse pour une séparation propre (pas flottant).
@@ -1075,9 +1156,13 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 10,
     elevation: 4,
-    paddingHorizontal: H_PAD,
     paddingBottom: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  fixedHeaderContent: {
+    maxWidth: DESKTOP_MAX_WIDTH,
+    alignSelf: 'center',
+    width: '100%',
+    paddingHorizontal: 16,
   },
   fixedHeaderInner: { gap: 12 },
 
@@ -1166,6 +1251,12 @@ const styles = StyleSheet.create({
 
   // Sections
   section: { gap: 0 },
+  sectionDesktop: { marginTop: 8 },
+  sectionDividerDesktop: {
+    height: 1,
+    backgroundColor: '#E8F2EC',
+    marginVertical: 20,
+  },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1177,6 +1268,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -0.3,
   },
+  sectionTitleDesktop: {
+    fontSize: 20,
+  },
   sectionSeeAll: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1185,6 +1279,26 @@ const styles = StyleSheet.create({
   sectionSeeAllTxt: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  sectionSeeAllTxtDesktop: {
+    fontSize: 14,
+  },
+
+  // Desktop welcome zone
+  desktopWelcomeZone: {
+    paddingTop: 8,
+    paddingBottom: 4,
+    gap: 6,
+  },
+  desktopWelcomeTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  desktopWelcomeSub: {
+    fontSize: 15,
+    fontWeight: '400',
+    marginBottom: 4,
   },
 
   // Horizontal scroll
@@ -1201,6 +1315,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
     paddingBottom: 10,
+    borderWidth: 1,
+  },
+  enterpriseCardDesktop: {
+    width: 160,
+    paddingBottom: 12,
   },
   enterpriseCardImg: {
     width: 120,
@@ -1208,6 +1327,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+  },
+  enterpriseCardImgDesktop: {
+    width: 160,
+    height: 110,
   },
   closedOverlay: {
     position: 'absolute',
@@ -1266,15 +1389,49 @@ const styles = StyleSheet.create({
   entRowRating: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   entRowRatingTxt: { fontSize: 13, fontWeight: '700' },
 
-  // Premium product card (2-col grid)
-  premiumCard: {
+  // Enterprise grid (desktop)
+  entGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  entGridCard: {
+    flex: 1,
+    minWidth: 280,
+    maxWidth: 380,
     borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowColor: '#0C3020',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  entGridCardImg: {
+    width: '100%',
+    height: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  entGridCardBody: {
+    padding: 12,
+    gap: 4,
+  },
+  entGridCardName: { fontSize: 14, fontWeight: '700' },
+  entGridCardMeta: { fontSize: 12 },
+
+  // Premium product card (2-col grid → 4-col on desktop)
+  premiumCard: {
+    borderRadius: 14,
     overflow: 'hidden',
     shadowColor: '#0C3020',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
+    borderWidth: 1,
   },
   premiumCardImg: {
     width: '100%',
@@ -1283,6 +1440,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
     position: 'relative',
+  },
+  premiumCardImgDesktop: {
+    aspectRatio: 4 / 3,
   },
   promoBadge: {
     position: 'absolute',
@@ -1314,6 +1474,12 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     gap: 3,
   },
+  premiumCardBodyDesktop: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 12,
+    gap: 4,
+  },
   premiumCardName: {
     fontSize: 13,
     fontWeight: '700',
@@ -1343,6 +1509,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: -0.2,
   },
+  premiumCardPriceDesktop: {
+    fontSize: 15,
+  },
   premiumCardOldPrice: {
     fontSize: 11,
     textDecorationLine: 'line-through',
@@ -1351,7 +1520,8 @@ const styles = StyleSheet.create({
   // Grid — maxWidth : quand il reste un seul produit sur la dernière rangée,
   // la carte garde la même taille que les autres (pas de carte pleine largeur).
   gridRow: { gap: 10, marginBottom: 10 },
-  gridCell: { flex: 1, maxWidth: '48.5%' },
+  gridRowDesktop: { gap: 16, marginBottom: 16 },
+  gridCell: { flex: 1 },
 
   // Loader
   loaderRow: {

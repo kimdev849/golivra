@@ -16,6 +16,9 @@ import { z } from 'zod';
 import Constants from 'expo-constants';
 import { AppState, Platform } from 'react-native';
 
+/** Sur web, le serveur Render cold-start peut prendre 30-60s. */
+const IS_WEB = Platform.OS === 'web';
+
 export type ApiFetchOptions<T = unknown> = RequestInit & {
   token?: string | null;
   jsonBody?: unknown;
@@ -29,8 +32,9 @@ export type ApiFetchOptions<T = unknown> = RequestInit & {
 /**
  * Timeout réseau par défaut. Sans lui, un serveur lent (ex. cold start Render)
  * laisse l'app bloquée sur un écran de chargement pendant 1 min et plus.
+ * Sur web, on autorise 45s pour laisser le cold start Render se terminer.
  */
-const DEFAULT_TIMEOUT_MS = 15_000;
+const DEFAULT_TIMEOUT_MS = IS_WEB ? 45_000 : 15_000;
 
 function extractErrorMessage(parsed: unknown, text: string, status: number): string {
   if (typeof parsed === 'object' && parsed !== null && 'message' in parsed) {
@@ -78,7 +82,8 @@ function notifySlowConnection(): void {
   const now = Date.now();
   if (now - lastSlowToastAt < 25_000) return;
   if (now - appStartTime < 8_000) return;
-  if (AppState.currentState !== 'active') return;
+  // Sur web, on ne peut pas vérifier AppState — on affiche toujours le toast.
+  if (!IS_WEB && AppState.currentState !== 'active') return;
   lastSlowToastAt = now;
   showToast({
     message: 'Connexion lente…',

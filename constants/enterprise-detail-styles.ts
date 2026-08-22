@@ -6,6 +6,12 @@ export function createEnterpriseDetailStyles(c: AppPalette) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: c.background },
     scroll: { paddingBottom: 48, flexGrow: 1 },
+    scrollDesktop: {
+      maxWidth: 1200,
+      alignSelf: 'center',
+      width: '100%',
+      paddingHorizontal: 32,
+    },
     center: {
       flex: 1,
       alignItems: 'center',
@@ -27,6 +33,8 @@ export function createEnterpriseDetailStyles(c: AppPalette) {
     heroWrap: {
       height: 220,
       backgroundColor: c.surfaceMuted,
+      borderRadius: 0,
+      overflow: 'hidden',
     },
     heroImg: { width: '100%', height: '100%' },
     heroPh: { alignItems: 'center', justifyContent: 'center' },
@@ -86,7 +94,7 @@ export function createEnterpriseDetailStyles(c: AppPalette) {
     },
     ratingBadgeValue: { color: '#FFFFFF', fontWeight: '900', fontSize: 13 },
     ratingBadgeCount: { color: 'rgba(255,255,255,0.85)', fontWeight: '700', fontSize: 11 },
-    block: { paddingHorizontal: 16, paddingTop: 18, gap: 10 },
+    block: { paddingHorizontal: 0, paddingTop: 18, gap: 10 },
     name: { fontSize: 26, fontWeight: '800', color: c.text },
     // Pastille de statut compacte (Ouvert / Fermé / Plus de commandes).
     statusRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: -4 },
@@ -122,7 +130,7 @@ export function createEnterpriseDetailStyles(c: AppPalette) {
       gap: 10,
       // Marge horizontale alignée sur le reste du contenu (nom, produits) :
       // la bannière « fermé / réouverture » ne doit pas toucher les bords.
-      marginHorizontal: 20,
+      marginHorizontal: 0,
       marginTop: 6,
       paddingHorizontal: 14,
       paddingVertical: 12,
@@ -134,13 +142,13 @@ export function createEnterpriseDetailStyles(c: AppPalette) {
       flexDirection: 'row',
       alignItems: 'baseline',
       justifyContent: 'space-between',
-      paddingHorizontal: 20,
+      paddingHorizontal: 0,
       marginTop: 24,
       marginBottom: 12,
     },
     sectionTitle: { fontSize: 18, fontWeight: '800', color: c.text },
     emptyProducts: {
-      marginHorizontal: 20,
+      marginHorizontal: 0,
       padding: 24,
       borderRadius: 12,
       borderWidth: 1,
@@ -154,7 +162,7 @@ export function createEnterpriseDetailStyles(c: AppPalette) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
-      marginHorizontal: 20,
+      marginHorizontal: 0,
       marginBottom: 12,
       padding: 12,
       borderRadius: 12,

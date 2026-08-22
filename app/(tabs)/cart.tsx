@@ -25,6 +25,7 @@ import { ThemedView } from '@/components/themed-view';
 import { useCart } from '@/contexts/cart-context';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { TAB_BAR_CONTENT_PADDING_BOTTOM } from '@/constants/layout';
+import { useIsWebDesktop } from '@/hooks/use-is-web-desktop';
 import type { EnterprisePublic, ProductPublic } from '@/lib/catalog';
 import { fetchEnterpriseById, fetchProductsForEnterprise } from '@/lib/catalog';
 import { apiFetch } from '@/lib/api';
@@ -452,7 +453,8 @@ export default function CartScreen() {
     }
   };
 
-  const bottomPad = Math.max(insets.bottom, 12) + TAB_BAR_CONTENT_PADDING_BOTTOM;
+  const isDesktop = useIsWebDesktop();
+  const bottomPad = isDesktop ? 24 : Math.max(insets.bottom, 12) + TAB_BAR_CONTENT_PADDING_BOTTOM;
 
   const hasItems = cart && cart.segments.some((s) => s.lines.length > 0);
   const addressOk = !deliveryAddressError(address);
@@ -488,7 +490,14 @@ export default function CartScreen() {
           style={{ flex: 1 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.scroll, { paddingTop: Math.max(insets.top, 14), paddingBottom: bottomPad }]}>
+          contentContainerStyle={[styles.scroll, {
+            paddingTop: Math.max(insets.top, 14),
+            paddingBottom: bottomPad,
+            paddingHorizontal: isDesktop ? 32 : 16,
+            maxWidth: isDesktop ? 1200 : undefined,
+            alignSelf: isDesktop ? 'center' : undefined,
+            width: isDesktop ? '100%' : undefined,
+          }]}>
           <View style={styles.titleRow}>
             <ThemedText type="title" style={[styles.title, { color: colors.text }]}>
               Votre panier
