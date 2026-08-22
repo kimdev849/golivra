@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Dimensions, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { withTiming } from 'react-native-reanimated';
 
 type SharedValue<T> = { value: T };
@@ -37,6 +37,9 @@ export type WebImageGestureOptions = {
   allowHorizontalPageSwipe?: boolean;
   /** Galerie : la molette change de photo tant que l'image n'est pas zoomée. */
   wheelToPage?: (direction: 1 | -1) => void;
+  /** Dimensions dynamiques de l'écran. */
+  screenWidth?: number;
+  screenHeight?: number;
 };
 
 /**
@@ -63,7 +66,11 @@ export function useWebImageGestures({
   onClose,
   allowHorizontalPageSwipe = false,
   wheelToPage,
+  screenWidth: propScreenWidth,
+  screenHeight: propScreenHeight,
 }: WebImageGestureOptions): void {
+  const screenWidth = propScreenWidth ?? (typeof window !== 'undefined' ? window.innerWidth : 1200);
+  const screenHeight = propScreenHeight ?? (typeof window !== 'undefined' ? window.innerHeight : 800);
   useEffect(() => {
     if (Platform.OS !== 'web' || !enabled) return;
     const el = getDomNode(ref);
@@ -90,7 +97,7 @@ export function useWebImageGestures({
     };
 
     const applyZoom = (next: number, cx: number, cy: number) => {
-      const { width, height } = Dimensions.get('window');
+      const width = screenWidth; const height = screenHeight;
       const s = clamp(next, MIN_SCALE, MAX_SCALE);
       const focalX = cx - width / 2;
       const focalY = cy - height / 2;
@@ -130,7 +137,7 @@ export function useWebImageGestures({
       if (!dragging) return;
       const dx = x - startX;
       const dy = y - startY;
-      const { width, height } = Dimensions.get('window');
+      const width = screenWidth; const height = screenHeight;
 
       if (scale.value <= 1.02) {
         // Hors zoom : glissement surtout horizontal → on laisse la galerie défiler.

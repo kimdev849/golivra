@@ -3,13 +3,13 @@ import { ImageIcon, Maximize2, Minus, Plus, X } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   FlatList,
   Modal,
   Platform,
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
   type ViewToken,
 } from 'react-native';
@@ -26,7 +26,7 @@ import { LUCIDE_STROKE } from '@/constants/icons';
 import { useWebImageGestures } from '@/hooks/use-web-image-gestures';
 import { resolveZoomImageUrl } from '@/lib/images';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 5;
@@ -62,6 +62,7 @@ type Props = {
  */
 export function GalleryViewer({ visible, images, initialIndex = 0, caption, onClose }: Props) {
   const insets = useSafeAreaInsets();
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   // Clé de remontage : chaque ouverture repart d'un état de zoom vierge.
   const [openCount, setOpenCount] = useState(0);
@@ -137,6 +138,8 @@ export function GalleryViewer({ visible, images, initialIndex = 0, caption, onCl
               caption={index === activeIndex ? caption : null}
               onClose={handleClose}
               onPage={images.length > 1 ? goToPage : undefined}
+              screenWidth={SCREEN_WIDTH}
+              screenHeight={SCREEN_HEIGHT}
             />
           )}
         />
@@ -185,12 +188,16 @@ function GalleryItem({
   caption,
   onClose,
   onPage,
+  screenWidth,
+  screenHeight,
 }: {
   uri: string;
   isActive: boolean;
   caption?: string | null;
   onClose: () => void;
   onPage?: (dir: 1 | -1) => void;
+  screenWidth: number;
+  screenHeight: number;
 }) {
   // Image bornée (webp ≤ 1800 px) : zoom sans faire exploser la mémoire
   // Android (la pleine résolution d'origine provoquait un crash au zoom).
@@ -251,8 +258,8 @@ function GalleryItem({
         translateY.value = savedY.value + e.translationY;
         return;
       }
-      const maxX = (SCREEN_WIDTH * (scale.value - 1)) / 2;
-      const maxY = (SCREEN_HEIGHT * (scale.value - 1)) / 2;
+      const maxX = (screenWidth * (scale.value - 1)) / 2;
+      const maxY = (screenHeight * (scale.value - 1)) / 2;
       translateX.value = clamp(savedX.value + e.translationX, -maxX, maxX);
       translateY.value = clamp(savedY.value + e.translationY, -maxY, maxY);
     })
@@ -276,14 +283,14 @@ function GalleryItem({
         resetTransform();
       } else {
         // zoom centré sur le point tapé, borné à l'écran
-        const focalX = e.x - SCREEN_WIDTH / 2;
-        const focalY = e.y - SCREEN_HEIGHT / 2;
+        const focalX = e.x - screenWidth / 2;
+        const focalY = e.y - screenHeight / 2;
         scale.value = withTiming(DOUBLE_TAP_SCALE, { duration: 220 });
         savedScale.value = DOUBLE_TAP_SCALE;
-        translateX.value = withTiming(clamp(-focalX, -SCREEN_WIDTH / 2, SCREEN_WIDTH / 2), {
+        translateX.value = withTiming(clamp(-focalX, -screenWidth / 2, screenWidth / 2), {
           duration: 220,
         });
-        translateY.value = withTiming(clamp(-focalY, -SCREEN_HEIGHT / 2, SCREEN_HEIGHT / 2), {
+        translateY.value = withTiming(clamp(-focalY, -screenHeight / 2, screenHeight / 2), {
           duration: 220,
         });
         savedX.value = translateX.value;
@@ -319,11 +326,12 @@ function GalleryItem({
     onClose,
     allowHorizontalPageSwipe: true,
     wheelToPage: onPage,
+    screenWidth,
+    screenHeight,
   });
 
   const zoomWebBy = useCallback(
     (factor: number) => {
-      const { width, height } = Dimensions.get('window');
       const s = clamp(scale.value * factor, MIN_SCALE, MAX_SCALE);
       scale.value = s;
       savedScale.value = s;
@@ -333,13 +341,13 @@ function GalleryItem({
         savedX.value = 0;
         savedY.value = 0;
       } else {
-        const maxX = (width * (s - 1)) / 2;
-        const maxY = (height * (s - 1)) / 2;
+        const maxX = (screenWidth * (s - 1)) / 2;
+        const maxY = (screenHeight * (s - 1)) / 2;
         translateX.value = clamp(translateX.value, -maxX, maxX);
         translateY.value = clamp(translateY.value, -maxY, maxY);
       }
     },
-    [scale, savedScale, translateX, translateY, savedX, savedY],
+    [scale, savedScale, translateX, translateY, savedX, savedY, screenWidth, screenHeight],
   );
 
   const resetWebZoom = useCallback(() => {
@@ -359,12 +367,17 @@ function GalleryItem({
     ],
   }));
 
+  const slideStyle = [{ width: screenWidth, height: screenHeight } as const, styles.slide];
+  const imgWrapStyle = [{ width: screenWidth, height: screenHeight } as const, styles.imgWrap];
+  const imgStyle = [{ width: screenWidth, height: screenHeight } as const, styles.img];
+  const fallbackStyle = [{ width: screenWidth, height: screenHeight * 0.6 } as const, styles.imgFallback];
+
   const imageContent = (
     <>
       {resolved ? (
         <Image
           source={{ uri: resolved }}
-          style={styles.img}
+          style={imgStyle}
           contentFit="contain"
           onLoadStart={() => setLoadState((s) => (s === 'ok' ? s : 'idle'))}
           onLoad={() => setLoadState('ok')}
@@ -373,7 +386,7 @@ function GalleryItem({
       ) : null}
 
       {loadState === 'error' || !resolved ? (
-        <View style={styles.imgFallback} pointerEvents="none">
+        <View style={fallbackStyle} pointerEvents="none">
           <ImageIcon size={42} color="rgba(255,255,255,0.55)" strokeWidth={1.6} />
           <Text style={styles.fallbackTxt}>Image indisponible</Text>
         </View>
@@ -388,14 +401,14 @@ function GalleryItem({
   );
 
   return (
-    <View style={styles.slide}>
+    <View style={slideStyle}>
       {isWeb ? (
-        <Animated.View ref={zoomRef} style={[styles.imgWrap, animatedStyle]}>
+        <Animated.View ref={zoomRef} style={[...imgWrapStyle, animatedStyle]}>
           {imageContent}
         </Animated.View>
       ) : (
         <GestureDetector gesture={composed}>
-          <Animated.View style={[styles.imgWrap, animatedStyle]}>{imageContent}</Animated.View>
+          <Animated.View style={[...imgWrapStyle, animatedStyle]}>{imageContent}</Animated.View>
         </GestureDetector>
       )}
 
@@ -443,17 +456,13 @@ function GalleryItem({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000' },
   slide: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  imgWrap: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT, alignItems: 'center', justifyContent: 'center' },
-  img: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT },
+  imgWrap: { alignItems: 'center', justifyContent: 'center' },
+  img: {},
   imgFallback: {
     position: 'absolute',
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT * 0.6,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
