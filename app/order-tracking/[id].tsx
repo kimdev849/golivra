@@ -852,6 +852,33 @@ export default function OrderTrackingScreen() {
               </ThemedText>
             </View>
           ) : null}
+          {/* ── Ventilation du total (C1) ── */}
+          {(() => {
+            const articlesSubtotal = (order?.sousCommandes ?? []).reduce(
+              (sum, sc) => sum + (sc.articles ?? []).reduce(
+                (a, art) => a + (art.prix_unitaire ?? 0) * (art.quantite ?? 0), 0),
+              0,
+            );
+            const orderTotal = order?.total ?? 0;
+            const deliveryFee = Math.max(0, orderTotal - articlesSubtotal);
+            if (articlesSubtotal <= 0) return null;
+            return (
+              <View style={[styles.breakdown, { borderTopColor: colors.border }]}>
+                <View style={styles.breakdownRow}>
+                  <ThemedText style={{ fontSize: 13, color: colors.textMuted }}>Articles</ThemedText>
+                  <ThemedText style={{ fontSize: 13, color: colors.text }}>{formatFcfa(articlesSubtotal)}</ThemedText>
+                </View>
+                <View style={styles.breakdownRow}>
+                  <ThemedText style={{ fontSize: 13, color: colors.textMuted }}>Livraison</ThemedText>
+                  <ThemedText style={{ fontSize: 13, color: colors.text }}>{formatFcfa(deliveryFee)}</ThemedText>
+                </View>
+                <View style={[styles.breakdownRow, { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 6, marginTop: 4 }]}>
+                  <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>Total</ThemedText>
+                  <ThemedText style={{ fontSize: 14, fontWeight: '800', color: colors.primaryDeep }}>{formatFcfa(orderTotal)}</ThemedText>
+                </View>
+              </View>
+            );
+          })()}
           {isDelivered ? (
             <View style={[styles.deliveredBanner, { backgroundColor: colors.successSoft }]}>
               <CheckCircle2 size={16} color={colors.success} strokeWidth={LUCIDE_STROKE} />
@@ -1206,6 +1233,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addrText: { flex: 1, fontSize: 13.5, fontWeight: '600', lineHeight: 19, paddingTop: 4 },
+  breakdown: { marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
+  breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
   deliveredPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, marginLeft: 'auto' },
   deliveredPillText: { fontSize: 12, fontWeight: '800' },
   deliveredBanner: {

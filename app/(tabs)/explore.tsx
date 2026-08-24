@@ -158,7 +158,8 @@ function OrdersScreenInner({
     const refStr = glvOrderRef(o.id);
     const k = normStatut(o.statut);
     const prixNum =
-      o.prix_total !== undefined && o.prix_total !== null ? Number(o.prix_total) : null;
+      (o.prix_total !== undefined && o.prix_total !== null ? Number(o.prix_total) : null)
+      ?? (o as any).total != null ? Number((o as any).total) : null;
     const priceOk = prixNum !== null && Number.isFinite(prixNum);
 
     if (filter === 'livrees') {

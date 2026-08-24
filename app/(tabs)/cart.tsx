@@ -379,6 +379,8 @@ export default function CartScreen() {
   };
 
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const addressSectionRef = useRef<View>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const submitOrder = async () => {
     if (!cart || cart.segments.length === 0) return;
@@ -386,6 +388,12 @@ export default function CartScreen() {
     const addrErr = deliveryAddressError(address);
     if (addrErr) {
       showError('Adresse invalide', addrErr);
+      // Auto-scroll vers le champ d'adresse en erreur (I5)
+      setTimeout(() => {
+        addressSectionRef.current?.measure?.((_x, y) => {
+          scrollViewRef.current?.scrollTo({ y: Math.max(0, y - 20), animated: true });
+        });
+      }, 300);
       return;
     }
     // Afficher un récapitulatif de confirmation avant envoi (C2).
@@ -508,6 +516,7 @@ export default function CartScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}>
         <ScrollView
+          ref={scrollViewRef}
           style={{ flex: 1 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -716,7 +725,7 @@ export default function CartScreen() {
                 );
               })}
 
-              <View style={[styles.checkoutSection, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
+              <View ref={addressSectionRef} style={[styles.checkoutSection, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
                 <View style={styles.checkoutSectionHead}>
                   <ThemedText type="defaultSemiBold" style={[styles.checkoutSectionTitle, { color: colors.primaryDeep }]}>
                     Adresse de livraison
@@ -935,21 +944,21 @@ export default function CartScreen() {
       {/* ── Modal de confirmation avant envoi (C2) ── */}
       {confirmOpen && (
         <View style={styles.confirmOverlay}>
-          <View style={[styles.confirmModal, { backgroundColor: colors.surface, borderColor: colors.border }]}>}
-            <ThemedText type="defaultSemiBold" style={[styles.confirmTitle, { color: colors.text }]}>}
+          <View style={[styles.confirmModal, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <ThemedText type="defaultSemiBold" style={[styles.confirmTitle, { color: colors.text }]}>
               Récapitulatif de la commande
             </ThemedText>
             {cart?.segments.map((seg) => {
               const ent = enterpriseById[seg.enterpriseId];
               return (
-                <View key={seg.enterpriseId} style={[styles.confirmSegment, { borderBottomColor: colors.border }]}>}
-                  <ThemedText style={[styles.confirmEntName, { color: colors.text }]}>}
+                <View key={seg.enterpriseId} style={[styles.confirmSegment, { borderBottomColor: colors.border }]}>
+                  <ThemedText style={[styles.confirmEntName, { color: colors.text }]}>
                     {ent?.nom ?? 'Commerce'}
                   </ThemedText>
                   {seg.lines.map((l) => {
                     const prod = productById[l.productId];
                     return (
-                      <ThemedText key={l.productId} style={[styles.confirmItem, { color: colors.textMuted }]}>}
+                      <ThemedText key={l.productId} style={[styles.confirmItem, { color: colors.textMuted }]}>
                         {l.quantite}× {prod?.nom ?? l.productId}
                       </ThemedText>
                     );
@@ -957,32 +966,32 @@ export default function CartScreen() {
                 </View>
               );
             })}
-            <View style={[styles.confirmRow, { borderTopColor: colors.border }]}>}
+            <View style={[styles.confirmRow, { borderTopColor: colors.border }]}>
               <ThemedText style={{ color: colors.textMuted }}>Articles</ThemedText>
               <ThemedText style={{ color: colors.text }}>{formatFcfa(subtotal)}</ThemedText>
             </View>
-            <View style={styles.confirmRow}>}
+            <View style={styles.confirmRow}>
               <ThemedText style={{ color: colors.textMuted }}>Livraison</ThemedText>
               <ThemedText style={{ color: colors.text }}>{formatFcfa(deliveryFeeTotal)}</ThemedText>
             </View>
             {promoRemise > 0 && (
-              <View style={styles.confirmRow}>}
+              <View style={styles.confirmRow}>
                 <ThemedText style={{ color: colors.success }}>Réduction</ThemedText>
                 <ThemedText style={{ color: colors.success }}>−{formatFcfa(promoRemise)}</ThemedText>
               </View>
             )}
-            <View style={[styles.confirmRow, styles.confirmTotal, { borderTopColor: colors.border }]}>}
+            <View style={[styles.confirmRow, styles.confirmTotal, { borderTopColor: colors.border }]}>
               <ThemedText type="defaultSemiBold" style={{ color: colors.text }}>Total</ThemedText>
               <ThemedText type="defaultSemiBold" style={{ color: colors.text }}>{formatFcfa(grandTotal)}</ThemedText>
             </View>
-            <View style={styles.confirmAddr}>}
+            <View style={styles.confirmAddr}>
               <ThemedText style={[styles.confirmAddrLabel, { color: colors.textMuted }]}>Adresse :</ThemedText>
               <ThemedText style={{ color: colors.text }}>{formatDeliveryAddressText(address)}</ThemedText>
             </View>
-            <ThemedText style={[styles.confirmHint, { color: colors.textMuted }]}>}
+            <ThemedText style={[styles.confirmHint, { color: colors.textMuted }]}>
               Paiement par Mobile Money après acceptation du commerce.
             </ThemedText>
-            <View style={styles.confirmActions}>}
+            <View style={styles.confirmActions}>
               <PressableScale
                 style={[styles.confirmBtn, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
                 onPress={() => setConfirmOpen(false)}

@@ -68,6 +68,7 @@ import { getEffectiveUnitPrice, resolveProductPricing } from '@/lib/product-prom
 import { formatFcfa } from '@/lib/format';
 import { fetchActiveCampaigns } from '@/lib/campaigns';
 import { trackInteraction } from '@/lib/tracking';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // ─── Constants ────────────────────────────────────────────────────
 
@@ -335,6 +336,7 @@ export default function HomeScreen() {
 
   const flatListRef = useRef<FlatList>(null);
   const scrollViewRef = useRef<ScrollView>(null);
+  const filterScrollRef = useRef<ScrollView>(null);
   const desktopSearch = useDesktopSearch();
   const [localSearch, setLocalSearch] = useState('');
   // On desktop, the search is controlled by the WebNavbar context
@@ -725,7 +727,7 @@ export default function HomeScreen() {
             clearButtonMode="while-editing"
           />
           {search.length > 0 ? (
-            <Pressable onPress={() => setSearch('')} hitSlop={8}>
+            <Pressable onPress={() => { setSearch(''); filterScrollRef.current?.scrollTo({ x: 0, animated: true }); }} hitSlop={8}>
               <X size={16} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
             </Pressable>
           ) : null}
@@ -735,6 +737,7 @@ export default function HomeScreen() {
       {/* ── Filter tabs (pill chips) ───────────── */}
       <View style={styles.filterRowWrap}>
       <ScrollView
+        ref={filterScrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.filterRow}>
@@ -765,7 +768,13 @@ export default function HomeScreen() {
 
       </ScrollView>
       {/* Gradient de débordement pour signaler le défilement (I2) */}
-      <View style={styles.filterOverflowGradient} pointerEvents="none" />
+      <LinearGradient
+        colors={['transparent', colors.background]}
+        start={{ x: 0.6, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.filterOverflowGradient}
+        pointerEvents="none"
+      />
       </View>
     </View>
   );
@@ -1248,12 +1257,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 999,
     borderWidth: 1,
   },
-  filterChipTxt: { fontSize: 12, fontWeight: '500', textTransform: 'lowercase' },
+  filterChipTxt: { fontSize: 13, fontWeight: '600', textTransform: 'lowercase' },
 
   // Sort
   sortRowWrap: {

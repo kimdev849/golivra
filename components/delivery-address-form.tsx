@@ -36,6 +36,7 @@ export function DeliveryAddressForm({ value, onChange, accentColor, compact = fa
   const accent = accentColor ?? colors.primary;
   const accentDeep = accentColor ?? colors.primaryDeep;
   const [quartierOpen, setQuartierOpen] = useState(false);
+  const [quartierSearch, setQuartierSearch] = useState('');
   const [showOptional, setShowOptional] = useState(!compact);
   const reqMark = required ? ' *' : '';
 
@@ -162,13 +163,23 @@ export function DeliveryAddressForm({ value, onChange, accentColor, compact = fa
             <ThemedText type="defaultSemiBold" style={[styles.modalTitle, { color: colors.text }]}>
               Arrondissement / quartier
             </ThemedText>
+            <View style={[styles.searchBox, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
+              <TextInput
+                placeholder="Rechercher..."
+                placeholderTextColor={colors.textMuted}
+                value={quartierSearch}
+                onChangeText={setQuartierSearch}
+                style={[styles.searchInput, { color: colors.text }]}
+              />
+            </View>
             <ScrollView>
-              {QUARTIERS_BRAZZAVILLE.map((q) => (
+              {QUARTIERS_BRAZZAVILLE.filter((q) => !quartierSearch || q.toLowerCase().includes(quartierSearch.toLowerCase())).map((q) => (
                 <Pressable
                   key={q}
                   style={[styles.quartierRow, { borderBottomColor: colors.border }, value.quartier === q && { backgroundColor: colors.successSoft }]}
                   onPress={() => {
                     patch({ quartier: q });
+                    setQuartierSearch('');
                     setQuartierOpen(false);
                   }}>
                   <ThemedText style={[styles.quartierTxt, { color: colors.text }]}>{q}</ThemedText>
@@ -224,6 +235,8 @@ const styles = StyleSheet.create({
     maxHeight: '70%',
   },
   modalTitle: { fontSize: 17, marginBottom: 12 },
+  searchBox: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 8 },
+  searchInput: { fontSize: 14, padding: 0 },
   quartierRow: { paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   quartierTxt: { fontSize: 16 },
 });
