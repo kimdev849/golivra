@@ -657,7 +657,7 @@ export default function HomeScreen() {
   // ── En-tête fixe repliable : top bar + recherche + filtres ─────
 
   const fixedHeaderContent = (
-    <View style={isDesktop ? styles.fixedHeaderContent : undefined}>
+    <View style={styles.fixedHeaderContent}>
     <View style={styles.fixedHeaderInner}>
 
       {/* ── Top bar: location + bell (bell hidden on desktop) ── */}
