@@ -450,6 +450,8 @@ export default function CartScreen() {
               itemId: l.productId,
               quantite: l.quantite,
             })),
+            // Frais de livraison calculés par segment pour cohérence panier→suivi
+            deliveryFee: deliveryFeeForSegment(seg.enterpriseId),
           })),
         },
       });

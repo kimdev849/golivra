@@ -312,7 +312,7 @@ export default function VendorOrderDetailScreen() {
             onPress={() => o.statut === 'en_preparation'
               ? runStatus('prete', 'Commande prête.', 'ready')
               : runStatus('en_preparation', 'Préparation démarrée.', 'prep')}>
-            {actingAction === 'prep' ? (
+            {actingAction === 'prep' || actingAction === 'ready' ? (
               <ActivityIndicator color={colors.onPrimary} size="small" />
             ) : (
               <ThemedText style={styles.primaryTxt}>{o.statut === 'en_preparation' ? 'Marquer prête' : labels.orderPrimaryCta}</ThemedText>

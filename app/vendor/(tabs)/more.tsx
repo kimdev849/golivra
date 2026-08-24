@@ -123,7 +123,7 @@ export default function VendorMoreTabScreen() {
           {row(
             <Package size={20} color={palette.primary} strokeWidth={LUCIDE_STROKE} />,
             'Catalogue',
-            'Catégories produits',
+            'Voir mes produits',
             () => router.push(VENDOR_HREF.catalog)
           )}
           <View style={[styles.divider, { backgroundColor: colors.border }]} />

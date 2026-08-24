@@ -306,7 +306,8 @@ export default function VendorProductsTabScreen() {
               const pct = promoPercent(p);
               const showOldPrice = pct != null;
               return (
-                <View key={p.id} style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border, position: 'relative' }]}>
+                <View key={p.id} style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  {/* Colonne principale : vignette + texte, navigable */}
                   <Pressable
                     style={({ pressed }) => [
                       styles.rowPressable,
@@ -316,44 +317,65 @@ export default function VendorProductsTabScreen() {
                     onLongPress={() => confirmDelete(p.id, p.nom)}
                     delayLongPress={450}
                     android_ripple={{ color: colors.primarySoft }}>
-                  {/* Vignette */}
-                  <View style={[styles.thumbWrap, { backgroundColor: colors.surfaceMuted }]}>
-                    {img ? (
-                      <ZoomableImage source={{ uri: img }} style={styles.thumb} contentFit="cover" />
-                    ) : commerceType === 'restaurant' ? (
-                      <UtensilsCrossed size={22} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-                    ) : (
-                      <Package size={22} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-                    )}
-                    {pct != null ? (
-                      <View style={[styles.promoBadge, { backgroundColor: colors.error }]}>
-                        <ThemedText style={styles.promoBadgeTxt}>-{pct}%</ThemedText>
+                    {/* Vignette */}
+                    <View style={[styles.thumbWrap, { backgroundColor: colors.surfaceMuted }]}>
+                      {img ? (
+                        <ZoomableImage source={{ uri: img }} style={styles.thumb} contentFit="cover" />
+                      ) : commerceType === 'restaurant' ? (
+                        <UtensilsCrossed size={22} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+                      ) : (
+                        <Package size={22} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+                      )}
+                      {pct != null ? (
+                        <View style={[styles.promoBadge, { backgroundColor: colors.error }]}>
+                          <ThemedText style={styles.promoBadgeTxt}>-{pct}%</ThemedText>
+                        </View>
+                      ) : null}
+                    </View>
+                    {/* Corps : nom, prix, statut — tout dans le Pressable */}
+                    <View style={styles.body}>
+                      <View style={styles.topRow}>
+                        <View style={styles.nameWrap}>
+                          <ThemedText
+                            type="defaultSemiBold"
+                            style={[styles.name, { color: colors.text }]}
+                            numberOfLines={1}>
+                            {p.nom}
+                          </ThemedText>
+                          {p.enVedette ? (
+                            <View style={styles.vedetteRow}>
+                              <Star size={11} color="#F5A524" fill="#F5A524" strokeWidth={0} />
+                              <ThemedText style={[styles.vedetteTxt, { color: colors.textMuted }]}>
+                                En vedette
+                              </ThemedText>
+                            </View>
+                          ) : null}
+                        </View>
                       </View>
-                    ) : null}
-                  </View>
-
-                  {/* Corps */}
-                  <View style={styles.body}>
-                    <View style={styles.topRow}>
-                      <View style={styles.nameWrap}>
-                        <ThemedText
-                          type="defaultSemiBold"
-                          style={[styles.name, { color: colors.text }]}
-                          numberOfLines={1}>
-                          {p.nom}
+                      <View style={styles.priceRow}>
+                        <ThemedText style={[styles.price, { color: colors.primary }]}>
+                          {showOldPrice ? formatFcfa(p.prixPromo as number) : formatFcfa(p.prix)}
                         </ThemedText>
-                        {p.enVedette ? (
-                          <View style={styles.vedetteRow}>
-                            <Star size={11} color="#F5A524" fill="#F5A524" strokeWidth={0} />
-                            <ThemedText style={[styles.vedetteTxt, { color: colors.textMuted }]}>
-                              En vedette
-                            </ThemedText>
-                          </View>
+                        {showOldPrice ? (
+                          <ThemedText style={[styles.oldPrice, { color: colors.textMuted }]}>
+                            {formatFcfa(p.prix)}
+                          </ThemedText>
                         ) : null}
+                      </View>
+                      <View style={styles.statusRow}>
+                        <View
+                          style={[
+                            styles.statusDot,
+                            { backgroundColor: status.color, opacity: status.dot ? 1 : 0.35 },
+                          ]}
+                        />
+                        <ThemedText style={[styles.statusTxt, { color: status.color }]} numberOfLines={1}>
+                          {status.label}
+                        </ThemedText>
                       </View>
                     </View>
                   </Pressable>
-                  {/* Switch hors du Pressable navigable */}
+                  {/* Switch HORS du Pressable : tap sur le switch ne déclenche pas la navigation */}
                   <View style={styles.switchSlot}>
                     {busyId === p.id ? (
                       <View style={[styles.switchBusy, { backgroundColor: colors.surfaceMuted }]} />
@@ -367,31 +389,6 @@ export default function VendorProductsTabScreen() {
                       />
                     )}
                   </View>
-
-                    <View style={styles.priceRow}>
-                      <ThemedText style={[styles.price, { color: colors.primary }]}>
-                        {showOldPrice ? formatFcfa(p.prixPromo as number) : formatFcfa(p.prix)}
-                      </ThemedText>
-                      {showOldPrice ? (
-                        <ThemedText style={[styles.oldPrice, { color: colors.textMuted }]}>
-                          {formatFcfa(p.prix)}
-                        </ThemedText>
-                      ) : null}
-                    </View>
-
-                    <View style={styles.statusRow}>
-                      <View
-                        style={[
-                          styles.statusDot,
-                          { backgroundColor: status.color, opacity: status.dot ? 1 : 0.35 },
-                        ]}
-                      />
-                      <ThemedText style={[styles.statusTxt, { color: status.color }]} numberOfLines={1}>
-                        {status.label}
-                      </ThemedText>
-                    </View>
-                  </View>
-                </Pressable>
                 </View>
               );
             })}
