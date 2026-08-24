@@ -24,24 +24,36 @@ import { useAppColors } from '@/hooks/use-app-colors';
 
 const FAQ = [
   {
-    q: 'Comment suivre ma commande ?',
-    a: "Ouvrez l'onglet Commandes puis la commande concernée : vous y verrez le suivi en temps réel, du restaurant à la livraison.",
-  },
-  {
     q: 'Comment passer une commande ?',
-    a: "Choisissez un restaurant ou une boutique, ajoutez vos articles au panier, puis validez en renseignant votre adresse de livraison.",
+    a: "Choisissez un restaurant ou une boutique, ajoutez vos articles au panier, puis validez en renseignant votre adresse de livraison. Le délai de préparation est indiqué sur la fiche du commerce.",
   },
   {
     q: 'Quels moyens de paiement sont acceptés ?',
-    a: "Le paiement à la livraison est disponible. D'autres moyens de paiement seront ajoutés progressivement.",
+    a: "Le paiement se fait uniquement par Mobile Money : Airtel Money ou MTN MoMo. Après acceptation du commerce, vous recevrez une demande de paiement sur votre téléphone. Aucun paiement en espèces n'est accepté. Le débit a lieu au moment de la validation.",
   },
   {
-    q: 'Comment modifier mes informations ?',
-    a: "Depuis votre profil, touchez « Modifier le profil » pour changer votre nom, votre photo ou vos coordonnées.",
+    q: 'Combien coûte la livraison ?',
+    a: "Les frais de livraison dépendent de votre zone (arrondissement). Le montant exact est calculé automatiquement selon votre adresse et affiché avant la validation. Le tarif de base est de 500 FCFA.",
   },
   {
-    q: 'Un problème avec une commande livrée ?',
-    a: "Contactez le support avec votre numéro de commande : nous vous répondrons rapidement.",
+    q: 'Quel est le délai de livraison ?',
+    a: "Le délai total dépend du temps de préparation du commerce (10 à 30 min) et de la distance. Une estimation est affichée sur la fiche du commerce et dans votre panier.",
+  },
+  {
+    q: 'Comment suivre ma commande ?',
+    a: "Ouvrez l'onglet Commandes puis la commande concernée : vous y verrez le suivi en temps réel, du restaurant à la livraison. Vous pouvez contacter le livreur directement.",
+  },
+  {
+    q: 'Puis-je annuler ma commande ?',
+    a: "Oui, tant que le commerce ne l'a pas acceptée. Après acceptation, contactez le support pour une annulation. Le remboursement dépend du statut.",
+  },
+  {
+    q: 'Comment modifier mon adresse ?',
+    a: "Depuis votre profil, touchez Mes adresses. Vous pouvez ajouter, modifier ou supprimer des adresses. Sélectionnez l'adresse principale pour vos commandes.",
+  },
+  {
+    q: 'Un problème avec une commande ?',
+    a: "Contactez le support à support@golivra.cg avec votre numéro de commande. Nous vous répondrons rapidement.",
   },
 ] as const;
 

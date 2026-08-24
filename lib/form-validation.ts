@@ -31,8 +31,8 @@ const NAME_REGEX_PERSON = /^[\p{L}][\p{L}\p{M}\s'’\-.]{0,79}$/u;
 // Les emojis restent autorisés dans les noms de commerce / produits (app
 // moderne : « Boutique Javer 🛍️ », « 🍕 Pizza spéciale 🔥 ») : le nom doit
 // quand même contenir au moins une lettre (EMOJI_ONLY est rejeté plus bas).
-const NAME_REGEX_COMMERCE = /^[\p{L}0-9\p{Emoji_Presentation}\p{Extended_Pictographic}][\p{L}\p{M}0-9\s'’\-.,&()\p{Emoji_Presentation}\p{Extended_Pictographic}]{0,79}$/u;
-const NAME_REGEX_PRODUCT = /^[\p{L}0-9\p{Emoji_Presentation}\p{Extended_Pictographic}][\p{L}\p{M}0-9\s'’\-.,()/&°\p{Emoji_Presentation}\p{Extended_Pictographic}]{0,99}$/u;
+const NAME_REGEX_COMMERCE = /^[\p{L}0-9\p{Emoji_Presentation}\p{Extended_Pictographic}@][\p{L}\p{M}0-9\s'’\-.,&()@\p{Emoji_Presentation}\p{Extended_Pictographic}]{0,79}$/u;
+const NAME_REGEX_PRODUCT = /^[\p{L}0-9\p{Emoji_Presentation}\p{Extended_Pictographic}@][\p{L}\p{M}0-9\s'’\-.,()/&°@\p{Emoji_Presentation}\p{Extended_Pictographic}]{0,99}$/u;
 const EMAIL_REGEX = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
 const STRICT_PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
 const OTP_REGEX = /^[0-9]{6}$/;
@@ -154,10 +154,17 @@ export function validatePhone(value: string, indicatif?: string): ValidationResu
   return ok(v);
 }
 
-/** Génère un exemple de format pour l'indicatif donné (basé sur phone_digits de l'API). */
+/** Génère un exemple de format lisible pour l'indicatif donné.
+ *  +242 avec 9 chiffres → '+242 06 987 65 43'
+ */
 function generateExample(indicatif: string, digits: number): string {
-  const xs = 'X'.repeat(Math.min(digits, 12));
-  return `${indicatif} ${xs}`;
+  if (indicatif === '+242' && digits === 9) return '+242 06 987 65 43';
+  if (indicatif === '+242' && digits === 10) return '+242 06 9876 5432';
+  // Générer un exemple générique
+  const xs = '0'.repeat(Math.min(digits, 12));
+  // Insérer un espace tous les 2-3 chiffres pour la lisibilité
+  const spaced = xs.replace(/(\d{2})(?=\d)/g, '$1 ').trim();
+  return `${indicatif} ${spaced}`;
 }
 
 /**
@@ -209,21 +216,25 @@ export function validateAddress(value: string, required: boolean = true): Valida
   if (NUMERIC_ONLY_REGEX.test(v)) return fail('Une adresse ne peut pas être uniquement des chiffres. Ajoutez le quartier ou la rue, par exemple « Rue 12, Bacongo ».');
   if (PUNCTUATION_ONLY_REGEX.test(v)) return fail('Une adresse ne peut pas être uniquement des symboles. Écrivez le quartier ou la rue, par exemple « Bacongo ».');
   if (DANGEROUS_MARKUP_REGEX.test(v)) return fail('Cette adresse contient des caractères non autorisés. Écrivez simplement le quartier, la rue ou un repère.');
-  if (!HAS_LETTER_REGEX.test(v)) return fail('Indiquez le quartier, la rue ou un repère, par exemple « Face à la station Total ».');
+  // Les adresses de type « @6363 » ou « @Avenue » (repères) sont acceptées.
+  const isAtHandle = /^@\p{L}+[\p{L}\d\s'’\-.,&()]*$/u.test(v);
+  if (!isAtHandle && !HAS_LETTER_REGEX.test(v)) return fail('Indiquez le quartier, la rue ou un repère, par exemple « Face à la station Total ».');
   // Rejette les saisies de test absurdes du type « @##fff », « 555@#$$kk » :
   // il faut au moins 2 lettres ET pas plus de 2 symboles avant la première
   // lettre (les adresses réelles commencent par une lettre ou un numéro de
   // rue, ex. « PK 45 », « 12 rue de la Paix », « Av. de la Paix »).
-  const letters = (v.match(/\p{L}/gu) ?? []).length;
-  if (letters < 2) return fail('Votre adresse doit contenir au moins 2 lettres, par exemple « Rue Mbochis ».');
-  // Poubelle avant la première lettre : seuls les SYMBOLES / ponctuation
-  // comptent. Les chiffres (numéro de rue), les espaces et les emojis sont
-  // autorisés (« 📍 Avenue de la Paix », « 🏠 Résidence X ») — mais pas
-  // « @##fff » ni « 555@#$$kk ».
-  const firstLetterIdx = v.search(/\p{L}/u);
-  const prefix = firstLetterIdx === -1 ? v : v.slice(0, firstLetterIdx);
-  const leadingGarbage = prefix.replace(/[\d\s\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '').length;
-  if (leadingGarbage > 2) return fail('Votre adresse commence de façon étrange. Commencez par le quartier, la rue ou un repère, par exemple « Bacongo, rue de la Paix ».');
+  if (!isAtHandle) {
+    const letters = (v.match(/\p{L}/gu) ?? []).length;
+    if (letters < 2) return fail('Votre adresse doit contenir au moins 2 lettres, par exemple « Rue Mbochis ».');
+    // Poubelle avant la première lettre : seuls les SYMBOLES / ponctuation
+    // comptent. Les chiffres (numéro de rue), les espaces et les emojis sont
+    // autorisés (« 📍 Avenue de la Paix », « 🏠 Résidence X ») — mais pas
+    // « @##fff » ni « 555@#$$kk ».
+    const firstLetterIdx = v.search(/\p{L}/u);
+    const prefix = firstLetterIdx === -1 ? v : v.slice(0, firstLetterIdx);
+    const leadingGarbage = prefix.replace(/[\d\s\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '').length;
+    if (leadingGarbage > 2) return fail('Votre adresse commence de façon étrange. Commencez par le quartier, la rue ou un repère, par exemple « Bacongo, rue de la Paix ».');
+  }
   return ok(v);
 }
 
@@ -303,7 +314,7 @@ export function validateDescription(value: string, max: number = 500): Validatio
  * Les montants étant exprimés en FCFA (plus petite unité), aucun produit ne
  * peut être vendu en dessous de 25 FCFA.
  */
-export const MIN_PRICE = 25;
+export const MIN_PRICE = 10;
 
 /**
  * Prix maximal autorisé pour un produit / plat (FCFA) — miroir du backend.

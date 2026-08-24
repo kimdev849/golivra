@@ -460,10 +460,18 @@ export default function HomeScreen() {
     return [];
   }, [searchActive, searchResult, category, restaurants, boutiques, sort]);
 
-  /** « À découvrir » : restos + boutiques mélangés, mieux notés. Sur desktop on montre plus. */
+  /** IDs des commerces qui ont au moins un produit dans le feed. */
+  const enterprisesWithProducts = useMemo(() => {
+    const ids = new Set(feedProducts.map((p) => p.entreprise_id));
+    return ids;
+  }, [feedProducts]);
+
+  /** « À découvrir » : restos + boutiques mélangés, mieux notés, avec au moins 1 produit. */
   const discoverEnterprises = useMemo(
-    () => sortEnterprisesByPopularity([...restaurants, ...boutiques]).slice(0, isDesktop ? 8 : 3),
-    [restaurants, boutiques, isDesktop],
+    () => sortEnterprisesByPopularity([...restaurants, ...boutiques])
+      .filter((e) => enterprisesWithProducts.has(e.id))
+      .slice(0, isDesktop ? 8 : 3),
+    [restaurants, boutiques, isDesktop, enterprisesWithProducts],
   );
 
   /** Photo de profil par commerce (repli si le feed ne l'hydrate pas). */

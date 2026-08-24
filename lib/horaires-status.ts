@@ -5,6 +5,21 @@ import type { EnterpriseHoraires } from '@/lib/enterprise';
  * ouverture). Aucune dépendance React Native → testable en Node.
  */
 
+/**
+ * Retourne la date/heure en timezone de Brazzaville (Africa/Brazzaville, UTC+1).
+ * Les horaires des commerces sont exprimés en heure locale de Brazzaville,
+ * pas en UTC. Sans cette conversion, un navigateur en UTC verrait les
+ * commerces fermés 1h trop tôt (ex. « fermé à 12h29 UTC » alors qu'il
+ * est 13h29 à Brazzaville).
+ */
+function nowInBrazzaville(): Date {
+  const now = new Date();
+  // Convertir en heure de Brazzaville (UTC+1)
+  const utcMs = now.getTime() + now.getTimezoneOffset() * 60_000;
+  const BRAZZA_OFFSET = 1 * 60_000; // UTC+1
+  return new Date(utcMs + BRAZZA_OFFSET);
+}
+
 /** Index JS des jours : 0=dimanche … 6=samedi (même base que `Date.getDay()`). */
 export const DAY_SHORT = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 export const DAY_LONG = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
@@ -37,7 +52,7 @@ function toMinutes(h: string | null | undefined): number | null {
  */
 export function computeOpenStatus(
   horaires: EnterpriseHoraires[],
-  now: Date = new Date(),
+  now: Date = nowInBrazzaville(),
 ): { open: boolean; todayHours: string; nextLabel: string } {
   const todayIdx = now.getDay();
   const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -109,7 +124,7 @@ function minutesToHHMM(total: number): string {
 export function computeOrderFeasibility(
   horaires: EnterpriseHoraires[],
   prepMinutes = 0,
-  now: Date = new Date(),
+  now: Date = nowInBrazzaville(),
 ): { peutCommander: boolean; fermeture: string | null; derniereCommande: string | null } {
   const list = Array.isArray(horaires) ? horaires : [];
   if (list.length === 0) return { peutCommander: false, fermeture: null, derniereCommande: null };
@@ -177,7 +192,7 @@ export type LiveStatus = {
 export function computeLiveStatus(
   horaires: EnterpriseHoraires[],
   options: LiveStatusOptions,
-  now: Date = new Date(),
+  now: Date = nowInBrazzaville(),
 ): LiveStatus {
   const list = Array.isArray(horaires) ? horaires : [];
   const kind = options.kind === 'boutique' ? 'boutique' : 'restaurant';
