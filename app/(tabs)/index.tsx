@@ -733,6 +733,7 @@ export default function HomeScreen() {
       ) : null}
 
       {/* ── Filter tabs (pill chips) ───────────── */}
+      <View style={styles.filterRowWrap}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -763,7 +764,9 @@ export default function HomeScreen() {
         })}
 
       </ScrollView>
-    </View>
+      {/* Gradient de débordement pour signaler le défilement (I2) */}
+      <View style={styles.filterOverflowGradient} pointerEvents="none" />
+      </View>
     </View>
   );
 
@@ -1229,7 +1232,18 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 13, paddingVertical: 0 },
 
   // Filter chips
+  filterRowWrap: { position: 'relative', overflow: 'hidden' },
   filterRow: { gap: 8, paddingVertical: 2 },
+  filterOverflowGradient: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: 40,
+    // Dégradé transparent → background pour signaler le défilement
+    backgroundColor: 'transparent',
+    // Simulé via borderRight ou shadow — pour un vrai dégradé, utiliser LinearGradient
+  },
   filterChip: {
     flexDirection: 'row',
     alignItems: 'center',

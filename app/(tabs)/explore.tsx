@@ -258,6 +258,11 @@ function OrdersScreenInner({
             <ThemedText type="defaultSemiBold" style={[styles.orderId, { color: colors.text }]}>
               #{refStr}
             </ThemedText>
+            {priceOk ? (
+              <ThemedText type="defaultSemiBold" style={[styles.priceStrong, { color: colors.text }]}>
+                {formatFcfa(prixNum)}
+              </ThemedText>
+            ) : null}
           </View>
           <ThemedText type="defaultSemiBold" style={[styles.merchantTitle, { color: colors.text }]}>
             {merchant}
@@ -292,6 +297,11 @@ function OrdersScreenInner({
           <ThemedText type="defaultSemiBold" style={[styles.orderId, { color: colors.text }]}>
             #{refStr}
           </ThemedText>
+          {priceOk ? (
+            <ThemedText type="defaultSemiBold" style={[styles.priceStrong, { color: colors.text }]}>
+              {formatFcfa(prixNum)}
+            </ThemedText>
+          ) : null}
         </View>
         <ThemedText type="defaultSemiBold" style={[styles.merchantTitle, { color: colors.text }]}>
           {merchant}

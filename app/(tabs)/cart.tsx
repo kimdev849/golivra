@@ -2,6 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { Href } from 'expo-router';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -96,6 +97,7 @@ function segmentLabel(seg: CartSegment, ent: EnterprisePublic | null | undefined
 
 export default function CartScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const { showSuccess, showError, showConfirm, FeedbackOverlay } = useActionFeedback();
@@ -376,6 +378,8 @@ export default function CartScreen() {
     });
   };
 
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
   const submitOrder = async () => {
     if (!cart || cart.segments.length === 0) return;
     if (orderInFlight.current || submitting) return;
@@ -384,6 +388,14 @@ export default function CartScreen() {
       showError('Adresse invalide', addrErr);
       return;
     }
+    // Afficher un récapitulatif de confirmation avant envoi (C2).
+    setConfirmOpen(true);
+  };
+
+  const confirmAndSendOrder = async () => {
+    if (!cart || cart.segments.length === 0) return;
+    setConfirmOpen(false);
+    if (orderInFlight.current || submitting) return;
     // Capture GPS en arrière-plan en même temps que la validation
     // (jamais bloquante — 5 s max, si échoue on passe sans).
     const gpsPromise = savedAddressId ? Promise.resolve(null) : captureCurrentPosition();
@@ -417,6 +429,11 @@ export default function CartScreen() {
           ...(savedAddressId ? { adresseLivraisonId: savedAddressId } : {}),
           methodePaiement,
           ...(appliedPromo?.code ? { codePromo: appliedPromo.code } : {}),
+          // Envoyer le total côté client pour éviter les divergences de calcul
+          // entre panier, confirmation et suivi (C1).
+          clientTotal: grandTotal,
+          clientSubtotal: subtotal,
+          clientDeliveryFee: deliveryFeeTotal,
           segments: cart.segments.map((seg) => ({
             entrepriseId: seg.enterpriseId,
             establishmentType:
@@ -436,6 +453,9 @@ export default function CartScreen() {
       setSavedAddressId(null);
       await refreshMeta(null);
       const trackingHref = `/order-tracking/${created.id}` as Href;
+      // Invalider le cache des commandes pour rafraîchir immédiatement (I1).
+      void queryClient.invalidateQueries({ queryKey: ['orders'] });
+      void queryClient.invalidateQueries({ queryKey: ['active-orders'] });
       showSuccess(
         'Commande envoyée !',
         segmentCount > 1
@@ -911,6 +931,74 @@ export default function CartScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* ── Modal de confirmation avant envoi (C2) ── */}
+      {confirmOpen && (
+        <View style={styles.confirmOverlay}>
+          <View style={[styles.confirmModal, { backgroundColor: colors.surface, borderColor: colors.border }]}>}
+            <ThemedText type="defaultSemiBold" style={[styles.confirmTitle, { color: colors.text }]}>}
+              Récapitulatif de la commande
+            </ThemedText>
+            {cart?.segments.map((seg) => {
+              const ent = enterpriseById[seg.enterpriseId];
+              return (
+                <View key={seg.enterpriseId} style={[styles.confirmSegment, { borderBottomColor: colors.border }]}>}
+                  <ThemedText style={[styles.confirmEntName, { color: colors.text }]}>}
+                    {ent?.nom ?? 'Commerce'}
+                  </ThemedText>
+                  {seg.lines.map((l) => {
+                    const prod = productById[l.productId];
+                    return (
+                      <ThemedText key={l.productId} style={[styles.confirmItem, { color: colors.textMuted }]}>}
+                        {l.quantite}× {prod?.nom ?? l.productId}
+                      </ThemedText>
+                    );
+                  })}
+                </View>
+              );
+            })}
+            <View style={[styles.confirmRow, { borderTopColor: colors.border }]}>}
+              <ThemedText style={{ color: colors.textMuted }}>Articles</ThemedText>
+              <ThemedText style={{ color: colors.text }}>{formatFcfa(subtotal)}</ThemedText>
+            </View>
+            <View style={styles.confirmRow}>}
+              <ThemedText style={{ color: colors.textMuted }}>Livraison</ThemedText>
+              <ThemedText style={{ color: colors.text }}>{formatFcfa(deliveryFeeTotal)}</ThemedText>
+            </View>
+            {promoRemise > 0 && (
+              <View style={styles.confirmRow}>}
+                <ThemedText style={{ color: colors.success }}>Réduction</ThemedText>
+                <ThemedText style={{ color: colors.success }}>−{formatFcfa(promoRemise)}</ThemedText>
+              </View>
+            )}
+            <View style={[styles.confirmRow, styles.confirmTotal, { borderTopColor: colors.border }]}>}
+              <ThemedText type="defaultSemiBold" style={{ color: colors.text }}>Total</ThemedText>
+              <ThemedText type="defaultSemiBold" style={{ color: colors.text }}>{formatFcfa(grandTotal)}</ThemedText>
+            </View>
+            <View style={styles.confirmAddr}>}
+              <ThemedText style={[styles.confirmAddrLabel, { color: colors.textMuted }]}>Adresse :</ThemedText>
+              <ThemedText style={{ color: colors.text }}>{formatDeliveryAddressText(address)}</ThemedText>
+            </View>
+            <ThemedText style={[styles.confirmHint, { color: colors.textMuted }]}>}
+              Paiement par Mobile Money après acceptation du commerce.
+            </ThemedText>
+            <View style={styles.confirmActions}>}
+              <PressableScale
+                style={[styles.confirmBtn, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
+                onPress={() => setConfirmOpen(false)}
+                scaleTo={0.97}>
+                <ThemedText style={{ color: colors.text }}>Annuler</ThemedText>
+              </PressableScale>
+              <PressableScale
+                style={[styles.confirmBtn, styles.confirmBtnPrimary, { backgroundColor: colors.primaryDeep }]}
+                onPress={() => void confirmAndSendOrder()}
+                scaleTo={0.97}>
+                <ThemedText style={{ color: colors.onPrimary, fontWeight: '800' }}>Envoyer la commande</ThemedText>
+              </PressableScale>
+            </View>
+          </View>
+        </View>
+      )}
     </ThemedView>
   );
 }
@@ -1198,4 +1286,32 @@ const styles = StyleSheet.create({
   footerLink: { marginBottom: 10, alignSelf: 'center', paddingVertical: 4 },
   footerLinkText: { fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' },
   legalHint: { fontSize: 12, lineHeight: 17, textAlign: 'center', marginBottom: 8 },
+  // Confirmation modal
+  confirmOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  confirmModal: {
+    width: '90%',
+    maxWidth: 400,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 20,
+    gap: 12,
+  },
+  confirmTitle: { fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  confirmSegment: { paddingBottom: 8, borderBottomWidth: 1, marginBottom: 4 },
+  confirmEntName: { fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  confirmItem: { fontSize: 13, marginLeft: 8 },
+  confirmRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  confirmTotal: { borderTopWidth: 1, paddingTop: 8 },
+  confirmAddr: { marginTop: 4 },
+  confirmAddrLabel: { fontSize: 12, marginBottom: 2 },
+  confirmHint: { fontSize: 12, textAlign: 'center', marginTop: 4 },
+  confirmActions: { flexDirection: 'row', gap: 10, marginTop: 8 },
+  confirmBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1 },
+  confirmBtnPrimary: { borderWidth: 0 },
 });
