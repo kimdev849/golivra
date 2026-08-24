@@ -51,10 +51,10 @@ export default function VendorHelpCenterScreen() {
             <Mail size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
             <ThemedText style={[styles.contactLink, { color: colors.primary }]}>support@golivra.cg</ThemedText>
           </Pressable>
-          <Pressable style={styles.contactRow} onPress={() => void Linking.openURL('tel:+242000000000')}>
+          <View style={styles.contactRow}>
             <Headphones size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-            <ThemedText style={[styles.contactLink, { color: colors.primary }]}>+242 XX XXX XXXX</ThemedText>
-          </Pressable>
+            <ThemedText style={[styles.contactMuted, { color: colors.textMuted }]}>Support téléphonique : bientôt disponible</ThemedText>
+          </View>
           <View style={styles.contactRow}>
             <MessageCircle size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
             <ThemedText style={[styles.contactMuted, { color: colors.textMuted }]}>WhatsApp : bientôt disponible</ThemedText>

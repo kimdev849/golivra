@@ -825,7 +825,7 @@ export default function HomeScreen() {
           <View style={[styles.sectionHeader, isDesktop && { marginBottom: 14, marginTop: 10 }]}>
           <Text style={[styles.sectionTitle, isDesktop && styles.sectionTitleDesktop, { color: colors.text }]}>Recommandés pour vous</Text>
           {isDesktop ? (
-            <Pressable style={styles.sectionSeeAll} hitSlop={8}>
+            <Pressable style={styles.sectionSeeAll} hitSlop={8} onPress={() => router.push('/explore')}>
               <Text style={[styles.sectionSeeAllTxt, isDesktop && styles.sectionSeeAllTxtDesktop, { color: colors.primary }]}>Voir tout</Text>
               <ChevronRight size={16} color={colors.primary} strokeWidth={2.5} />
             </Pressable>

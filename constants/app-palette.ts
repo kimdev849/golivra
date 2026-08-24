@@ -132,6 +132,10 @@ export const AppPaletteLight: AppPalette = {
   statusBar: 'dark',
 };
 
+// Vert plus clair pour le mode sombre : #0B6B45 sur fond #0B0C0E donne
+// un contraste ~2.5:1 (bien en dessous du minimum WCAG 4.5:1).
+const GOLIVRA_GREEN_DARK = '#4CAF50';
+
 export const AppPaletteDark: AppPalette = {
   background: '#0B0C0E',
   backgroundAlt: '#101214',
@@ -144,8 +148,8 @@ export const AppPaletteDark: AppPalette = {
   textSecondary: '#C4C8CC',
   textMuted: '#8B939C',
   textInverse: '#0B0C0E',
-  primary: GOLIVRA_GREEN,
-  primaryBright: GOLIVRA_GREEN,
+  primary: GOLIVRA_GREEN_DARK,
+  primaryBright: GOLIVRA_GREEN_DARK,
   primaryDeep: GOLIVRA_GREEN_DEEP,
   primarySoft: rgbaBrand(0.15),
   primaryMuted: rgbaBrand(0.2),
@@ -156,7 +160,7 @@ export const AppPaletteDark: AppPalette = {
   accentSoft: 'rgba(245, 165, 36, 0.14)',
   accentMuted: 'rgba(245, 165, 36, 0.22)',
   onAccent: '#0B0C0E',
-  success: GOLIVRA_GREEN,
+  success: GOLIVRA_GREEN_DARK,
   successSoft: rgbaBrand(0.12),
   error: '#F87171',
   errorSoft: 'rgba(248, 113, 113, 0.12)',

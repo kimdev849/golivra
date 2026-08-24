@@ -402,15 +402,13 @@ export default function FavoritesScreen() {
           numColumns={isDesktop ? 4 : 1}
           columnWrapperStyle={isDesktop ? { gap: 12, marginBottom: 12 } : undefined}
           renderItem={({ item }) => (
-            <View style={isDesktop ? { flex: 1, maxWidth: '25%' } : undefined}>
-              <ListingCard
-                product={item}
-                variant={isDesktop ? 'grid' : 'feed'}
-                onPress={() => router.push(productDetailHref(item) as never)}
-                isFav
-                onToggleFav={() => void onUnfavProduct(item)}
-              />
-            </View>
+            <ListingCard
+              product={item}
+              variant={isDesktop ? 'grid' : 'feed'}
+              onPress={() => router.push(productDetailHref(item) as never)}
+              isFav
+              onToggleFav={() => void onUnfavProduct(item)}
+            />
           )}
         />
       )}

@@ -105,14 +105,12 @@ export default function HelpCenterScreen() {
               support@golivra.cg
             </ThemedText>
           </Pressable>
-          <Pressable
-            style={styles.contactRow}
-            onPress={() => void Linking.openURL('tel:+242000000000')}>
+          <View style={styles.contactRow}>
             <Headphones size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-            <ThemedText style={[styles.contactLink, { color: colors.primary }]}>
-              +242 XX XXX XXXX
+            <ThemedText style={[styles.contactMuted, { color: colors.textMuted }]}>
+              Support téléphonique : bientôt disponible
             </ThemedText>
-          </Pressable>
+          </View>
           <View style={styles.contactRow}>
             <MessageCircle size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
             <ThemedText style={[styles.contactMuted, { color: colors.textMuted }]}>
