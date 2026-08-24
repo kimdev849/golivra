@@ -306,17 +306,16 @@ export default function VendorProductsTabScreen() {
               const pct = promoPercent(p);
               const showOldPrice = pct != null;
               return (
-                <Pressable
-                  key={p.id}
-                  style={({ pressed }) => [
-                    styles.row,
-                    { backgroundColor: colors.surface, borderColor: colors.border },
-                    pressed && styles.pressed,
-                  ]}
-                  onPress={() => router.push(hrefVendorStock(p.id))}
-                  onLongPress={() => confirmDelete(p.id, p.nom)}
-                  delayLongPress={450}
-                  android_ripple={{ color: colors.primarySoft }}>
+                <View key={p.id} style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border, position: 'relative' }]}>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.rowPressable,
+                      pressed && styles.pressed,
+                    ]}
+                    onPress={() => router.push(hrefVendorStock(p.id))}
+                    onLongPress={() => confirmDelete(p.id, p.nom)}
+                    delayLongPress={450}
+                    android_ripple={{ color: colors.primarySoft }}>
                   {/* Vignette */}
                   <View style={[styles.thumbWrap, { backgroundColor: colors.surfaceMuted }]}>
                     {img ? (
@@ -352,22 +351,22 @@ export default function VendorProductsTabScreen() {
                           </View>
                         ) : null}
                       </View>
-                      {busyId === p.id ? (
-                        <View style={styles.switchSlot}>
-                          <View style={[styles.switchBusy, { backgroundColor: colors.surfaceMuted }]} />
-                        </View>
-                      ) : (
-                        <Pressable onPress={() => {}} hitSlop={4}>
-                          <Switch
-                            value={p.enLigne}
-                            onValueChange={(v) => void toggle(p.id, v)}
-                            trackColor={{ false: colors.borderStrong, true: colors.success }}
-                            thumbColor={p.enLigne ? colors.surface : colors.textMuted}
-                            accessibilityLabel={p.enLigne ? `Masquer ${p.nom}` : `Publier ${p.nom}`}
-                          />
-                        </Pressable>
-                      )}
                     </View>
+                  </Pressable>
+                  {/* Switch hors du Pressable navigable */}
+                  <View style={styles.switchSlot}>
+                    {busyId === p.id ? (
+                      <View style={[styles.switchBusy, { backgroundColor: colors.surfaceMuted }]} />
+                    ) : (
+                      <Switch
+                        value={p.enLigne}
+                        onValueChange={(v) => void toggle(p.id, v)}
+                        trackColor={{ false: colors.borderStrong, true: colors.success }}
+                        thumbColor={p.enLigne ? colors.surface : colors.textMuted}
+                        accessibilityLabel={p.enLigne ? `Masquer ${p.nom}` : `Publier ${p.nom}`}
+                      />
+                    )}
+                  </View>
 
                     <View style={styles.priceRow}>
                       <ThemedText style={[styles.price, { color: colors.primary }]}>
@@ -393,6 +392,7 @@ export default function VendorProductsTabScreen() {
                     </View>
                   </View>
                 </Pressable>
+                </View>
               );
             })}
           </View>
@@ -472,6 +472,7 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 1,
   },
+  rowPressable: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   thumbWrap: {
     width: 52,
     height: 52,
