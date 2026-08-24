@@ -357,13 +357,15 @@ export default function VendorProductsTabScreen() {
                           <View style={[styles.switchBusy, { backgroundColor: colors.surfaceMuted }]} />
                         </View>
                       ) : (
-                        <Switch
-                          value={p.enLigne}
-                          onValueChange={(v) => void toggle(p.id, v)}
-                          trackColor={{ false: colors.borderStrong, true: colors.success }}
-                          thumbColor={p.enLigne ? colors.surface : colors.textMuted}
-                          accessibilityLabel={p.enLigne ? `Masquer ${p.nom}` : `Publier ${p.nom}`}
-                        />
+                        <Pressable onPress={() => {}} hitSlop={4}>
+                          <Switch
+                            value={p.enLigne}
+                            onValueChange={(v) => void toggle(p.id, v)}
+                            trackColor={{ false: colors.borderStrong, true: colors.success }}
+                            thumbColor={p.enLigne ? colors.surface : colors.textMuted}
+                            accessibilityLabel={p.enLigne ? `Masquer ${p.nom}` : `Publier ${p.nom}`}
+                          />
+                        </Pressable>
                       )}
                     </View>
 

@@ -185,6 +185,27 @@ export function DateField({
           maximumDate={maximumDate}
         />
       ) : null}
+
+      {/* Fallback web : input HTML natif */}
+      {Platform.OS === 'web' && (
+        <input
+          type="date"
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value || null)}
+          min={minimumDate ? toDateString(minimumDate) : undefined}
+          max={maximumDate ? toDateString(maximumDate) : undefined}
+          disabled={disabled}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            opacity: 0,
+            cursor: disabled ? 'not-allowed' : 'pointer',
+          }}
+        />
+      )}
     </View>
   );
 }

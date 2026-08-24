@@ -309,11 +309,13 @@ export default function VendorOrderDetailScreen() {
           <Pressable
             style={[styles.primaryBtn, { backgroundColor: palette.primaryDeep }]}
             disabled={actingAction !== null}
-            onPress={() => runStatus('en_preparation', 'Préparation démarrée.', 'prep')}>
+            onPress={() => o.statut === 'en_preparation'
+              ? runStatus('prete', 'Commande prête.', 'ready')
+              : runStatus('en_preparation', 'Préparation démarrée.', 'prep')}>
             {actingAction === 'prep' ? (
               <ActivityIndicator color={colors.onPrimary} size="small" />
             ) : (
-              <ThemedText style={styles.primaryTxt}>{labels.orderPrimaryCta}</ThemedText>
+              <ThemedText style={styles.primaryTxt}>{o.statut === 'en_preparation' ? 'Marquer prête' : labels.orderPrimaryCta}</ThemedText>
             )}
           </Pressable>
         ) : null}
