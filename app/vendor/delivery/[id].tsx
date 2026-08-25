@@ -365,6 +365,18 @@ export default function VendorDeliveryDetailScreen() {
             ) : null}
           </View>
 
+          {/* Date et heure */}
+          {liv.created_at ? (
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={styles.payRow}>
+                <ThemedText style={[styles.payLabel, { color: colors.textMuted }]}>Créée le</ThemedText>
+                <ThemedText style={[styles.payValue, { color: colors.text, fontSize: 13 }]}>
+                  {new Date(liv.created_at).toLocaleString('fr-FR')}
+                </ThemedText>
+              </View>
+            </View>
+          ) : null}
+
           {/* Paiement */}
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={styles.cardHead}>
