@@ -2,7 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Tabs, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { AlertTriangle, Truck, Users, BarChart3, Home } from 'lucide-react-native';
+import { AlertTriangle, Truck, Users, BarChart3, Home, Bell } from 'lucide-react-native';
 
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { apiFetch } from '@/lib/api';
@@ -74,6 +74,13 @@ export default function LogisticsTabLayout() {
         options={{
           title: 'Incidents',
           tabBarIcon: ({ color, size }) => <AlertTriangle size={size} color={color} strokeWidth={LUCIDE_STROKE} />,
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: 'Alertes',
+          tabBarIcon: ({ color, size }) => <Bell size={size} color={color} strokeWidth={LUCIDE_STROKE} />,
         }}
       />
       <Tabs.Screen
