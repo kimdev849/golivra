@@ -12,12 +12,18 @@ import type { EnterpriseHoraires } from '@/lib/enterprise';
  * commerces fermés 1h trop tôt (ex. « fermé à 12h29 UTC » alors qu'il
  * est 13h29 à Brazzaville).
  */
-function nowInBrazzaville(): Date {
-  const now = new Date();
-  // Convertir en heure de Brazzaville (UTC+1)
-  const utcMs = now.getTime() + now.getTimezoneOffset() * 60_000;
+/**
+ * Convertit une Date (peut importe le fuseau) en heure de Brazzaville (UTC+1).
+ */
+function nowInBrazzavilleFrom(date: Date): Date {
+  const utcMs = date.getTime() + date.getTimezoneOffset() * 60_000;
   const BRAZZA_OFFSET = 1 * 60_000; // UTC+1
   return new Date(utcMs + BRAZZA_OFFSET);
+}
+
+/** Maintenant en heure de Brazzaville (UTC+1). */
+function nowInBrazzaville(): Date {
+  return nowInBrazzavilleFrom(new Date());
 }
 
 /** Index JS des jours : 0=dimanche … 6=samedi (même base que `Date.getDay()`). */
@@ -192,8 +198,12 @@ export type LiveStatus = {
 export function computeLiveStatus(
   horaires: EnterpriseHoraires[],
   options: LiveStatusOptions,
-  now: Date = nowInBrazzaville(),
+  now?: Date,
 ): LiveStatus {
+  // Toujours convertir en heure de Brazzaville, que le `now` soit le
+  // paramètre par défaut (test) ou la valeur du hook `useCurrentTime`
+  // (navigateur mobile/web potentiellement en UTC).
+  const localNow = now ? nowInBrazzavilleFrom(now) : nowInBrazzaville();
   const list = Array.isArray(horaires) ? horaires : [];
   const kind = options.kind === 'boutique' ? 'boutique' : 'restaurant';
   const typeRef = kind === 'boutique' ? 'cette boutique' : 'ce restaurant';
@@ -246,8 +256,8 @@ export function computeLiveStatus(
     };
   }
 
-  const { open, nextLabel } = computeOpenStatus(list, now);
-  const feas = computeOrderFeasibility(list, prep, now);
+  const { open, nextLabel } = computeOpenStatus(list, localNow);
+  const feas = computeOrderFeasibility(list, prep, localNow);
 
   if (!open) {
     const suite = nextLabel ? ` Réouverture ${nextLabel}.` : '';

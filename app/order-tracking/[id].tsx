@@ -475,8 +475,15 @@ export default function OrderTrackingScreen() {
     }
     if (waitingConfirmation) return `Envoyée à ${commerceLabel}`;
     if (readyToPay) return acceptedLabel;
+    if (order?.statut === 'a_preparer' || order?.statut === 'en_preparation') {
+      if (eta?.totalMinutes != null) return `Arrivée estimée ${arriveeLabel ? `vers ${arriveeLabel}` : `dans ~${eta.totalMinutes} min`}`;
+      return 'Le commerce prépare votre commande…';
+    }
+    if (order?.statut === 'prete' || order?.statut === 'collectee') {
+      return 'Recherche d’un livreur pour votre commande…';
+    }
     if (eta?.totalMinutes != null) return `Arrivée estimée ${arriveeLabel ? `vers ${arriveeLabel}` : `dans ~${eta.totalMinutes} min`}`;
-    return 'Recherche d’un livreur pour votre commande…';
+    return 'Commande confirmée';
   })();
 
   const isLive = !isDelivered && !isRefunded && order?.statut !== 'annulee';
