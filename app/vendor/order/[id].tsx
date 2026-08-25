@@ -305,7 +305,7 @@ export default function VendorOrderDetailScreen() {
             </ThemedText>
           </View>
         ) : null}
-        {showPrep && paid ? (
+        {showPrep ? (
           <Pressable
             style={[styles.primaryBtn, { backgroundColor: palette.primaryDeep }]}
             disabled={actingAction !== null}
