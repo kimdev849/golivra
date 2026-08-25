@@ -445,6 +445,7 @@ export default function OrderTrackingScreen() {
     if (waitingConfirmation) return { label: 'En attente', bg: colors.warningSoft, txt: colors.warning };
     if (readyToPay) return { label: 'À payer', bg: colors.successSoft, txt: colors.success };
     if (order?.statut === 'en_livraison') return { label: 'En route', bg: colors.primarySoft, txt: colors.primary };
+    if (order?.statut === 'prete') return { label: 'Prête', bg: colors.primarySoft, txt: colors.primary };
     if (isDelivered) return { label: 'Livrée', bg: colors.successSoft, txt: colors.success };
     return { label: 'En cours', bg: colors.surfaceMuted, txt: colors.textSecondary };
   })();
@@ -466,6 +467,7 @@ export default function OrderTrackingScreen() {
     if (waitingConfirmation) return 'Commande envoyée';
     if (readyToPay) return 'Commande confirmée';
     if (order?.statut === 'a_preparer' || order?.statut === 'en_preparation') return 'En préparation';
+    if (order?.statut === 'prete') return 'Prête pour la livraison';
     return 'Commande confirmée';
   })();
 

@@ -261,10 +261,13 @@ export type CreateExternalDeliveryBody = {
   clientNom: string;
   clientTelephone: string;
   adresse: DeliveryAddressFields;
+  adresseLivraison?: string;
   note?: string;
   methodePaiement?: 'airtel_money' | 'mtn_money';
   /** Téléphone du commerce qui paie les frais (Mobile Money). */
   telephonePaiement?: string;
+  /** Tarif affiché côté client pour cohérence panier→backend. */
+  clientDeliveryFee?: number;
 };
 
 export type ExternalDeliveryPayment = {

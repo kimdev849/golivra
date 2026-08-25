@@ -23,7 +23,7 @@ import { useAppColors } from '@/hooks/use-app-colors';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { getSessionToken } from '@/lib/auth';
-import { deliveryAddressError, snapshotFromFields } from '@/lib/format-address';
+import { deliveryAddressError, formatDeliveryAddressText, snapshotFromFields } from '@/lib/format-address';
 import { formatFcfa } from '@/lib/format';
 import { formatPhone } from '@/lib/phone';
 import {
@@ -174,9 +174,13 @@ export default function VendorCreateDirectDeliveryScreen() {
         clientNom: nom,
         clientTelephone: tel,
         adresse: snapshotFromFields(address),
+        adresseLivraison: formatDeliveryAddressText(address),
         note: description.trim() || undefined,
         methodePaiement: payMethod,
         telephonePaiement: payPhone,
+        // Envoyer le tarif affiché au commerce pour éviter la divergence
+        // entre le tarif calculé côté client (cache) et le backend (DB).
+        clientDeliveryFee: price,
       });
       // Test / simulation → validé immédiatement ; live → confirmation à suivre.
       if (result.paiement.statut === 'valide') {
