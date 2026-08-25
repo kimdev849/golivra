@@ -777,6 +777,7 @@ export default function HomeScreen() {
       />
       </View>
     </View>
+    </View>
   );
 
   // ── Liste : contenu défilant sous l'en-tête fixe ───────────────
