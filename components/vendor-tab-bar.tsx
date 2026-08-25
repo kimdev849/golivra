@@ -125,7 +125,7 @@ export function VendorTabBar({ state, descriptors, navigation }: BottomTabBarPro
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 10);
-  const { orders } = useVendor();
+  const { orders, unreadNotifCount } = useVendor();
 
   const pendingCount = React.useMemo(
     () => orders.filter((o) => o.statut === 'en_attente').length,
@@ -185,7 +185,7 @@ export function VendorTabBar({ state, descriptors, navigation }: BottomTabBarPro
               colors={colors}
               onPress={onPress}
               onLongPress={onLongPress}
-              badge={route.name === 'orders' ? pendingCount : undefined}
+              badge={route.name === 'orders' ? pendingCount : route.name === 'more' ? unreadNotifCount : undefined}
             />
           );
         })}

@@ -1,4 +1,5 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { AppState } from 'react-native';
 import { create } from 'zustand';
 
 import { getSessionToken } from '@/lib/auth';
@@ -15,9 +16,13 @@ type VendorStore = {
   orders: VendorOrder[];
   products: VendorProduct[];
   pendingModeration: boolean;
+  /** Nombre de notifications non lues (mis à jour en temps réel). */
+  unreadNotifCount: number;
   refresh: () => Promise<void>;
   /** Rafraîchit uniquement les commandes, sans écran de chargement (actions de statut, realtime). */
   refreshOrders: () => Promise<void>;
+  /** Met à jour le compteur de notifications non lues. */
+  refreshUnreadCount: () => Promise<void>;
   setProducts: (updater: VendorProduct[] | ((prev: VendorProduct[]) => VendorProduct[])) => void;
   setOrders: (updater: VendorOrder[] | ((prev: VendorOrder[]) => VendorOrder[])) => void;
 };
@@ -50,6 +55,7 @@ export const useVendor = create<VendorStore>((set, get) => ({
   orders: [],
   products: [],
   pendingModeration: false,
+  unreadNotifCount: 0,
   refresh: async () => {
     // Le chargement plein écran n'apparaît qu'au tout premier chargement :
     // dès que des données existent, un refresh reste silencieux pour éviter
@@ -108,6 +114,17 @@ export const useVendor = create<VendorStore>((set, get) => ({
       products: typeof updater === 'function' ? updater(state.products) : updater,
     }));
   },
+  refreshUnreadCount: async () => {
+    const token = await getSessionToken();
+    if (!token) { set({ unreadNotifCount: 0 }); return; }
+    try {
+      const { fetchUnreadCount } = await import('@/lib/notifications-api');
+      const count = await fetchUnreadCount(token);
+      set({ unreadNotifCount: count });
+    } catch {
+      // Silencieux.
+    }
+  },
   setOrders: (updater) => {
     set((state) => ({
       orders: typeof updater === 'function' ? updater(state.orders) : updater,
@@ -118,6 +135,24 @@ export const useVendor = create<VendorStore>((set, get) => ({
 export function VendorProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void useVendor.getState().refresh();
+  }, []);
+
+  // Polling temps réel des notifications non lues toutes les 30 secondes.
+  // Ne tourne que si l'app est au premier plan.
+  const appActive = useRef(true);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      appActive.current = state === 'active';
+      if (appActive.current) void useVendor.getState().refreshUnreadCount();
+    });
+    return () => sub.remove();
+  }, []);
+  useEffect(() => {
+    void useVendor.getState().refreshUnreadCount();
+    const id = setInterval(() => {
+      if (appActive.current) void useVendor.getState().refreshUnreadCount();
+    }, 30_000);
+    return () => clearInterval(id);
   }, []);
 
   return <>{children}</>;

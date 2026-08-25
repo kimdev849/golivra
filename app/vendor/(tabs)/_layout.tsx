@@ -22,7 +22,7 @@ export default function VendorTabsLayout() {
   const colorScheme = useColorScheme();
   const colors = useAppColors();
   const router = useRouter();
-  const { shop, pendingModeration, loading: vendorLoading } = useVendor();
+  const { shop, pendingModeration, loading: vendorLoading, unreadNotifCount } = useVendor();
   const [ok, setOk] = useState(false);
   const commerceType = shop?.type === 'restaurant' ? 'restaurant' : 'boutique';
   const palette = vendorPalette(commerceType);

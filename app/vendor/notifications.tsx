@@ -1,11 +1,12 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Banknote, BellOff, CheckCheck, ShoppingBag, Star, Truck } from 'lucide-react-native';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, AppState, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { VendorScreenHeader } from '@/components/vendor-screen-header';
+import { useVendor } from '@/contexts/vendor-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
@@ -92,6 +93,40 @@ export default function VendorNotificationsScreen() {
       void load();
     }, [load]),
   );
+
+  // Polling léger en arrière-plan : rafraîchit les notifs silencieusement
+  // toutes les 20 secondes si l'app est au premier plan, sans flash de chargement.
+  const appActive = useRef(true);
+  const refreshSilent = useCallback(async () => {
+    try {
+      const token = await getSessionToken();
+      if (!token) return;
+      const res = await fetchNotifications(token, { limit: 60 });
+      setItems(res.items ?? []);
+      setUnreadCount(res.unread_count ?? 0);
+    } catch { /* silencieux */ }
+  }, []);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      appActive.current = state === 'active';
+      if (appActive.current) void refreshSilent();
+    });
+    return () => sub.remove();
+  }, [refreshSilent]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (appActive.current) void refreshSilent();
+    }, 20_000);
+    return () => clearInterval(id);
+  }, [refreshSilent]);
+
+  // Synchronise le badge global dans le vendor context.
+  const { refreshUnreadCount } = useVendor();
+  useEffect(() => {
+    void refreshUnreadCount();
+  }, [unreadCount, refreshUnreadCount]);
 
   const visible = useMemo(
     () => (filter === 'unread' ? items.filter((n) => !n.est_lue) : items),
