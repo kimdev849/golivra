@@ -17,16 +17,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppContentWidth } from '@/components/app-content-width';
 import { DeliveryProofModal } from '@/components/courier/delivery-proof-modal';
+import { ReportProblemModal } from '@/components/courier/report-problem-modal';
 import { ThemedText } from '@/components/themed-text';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useCourier } from '@/contexts/courier-context';
 import {
   acceptCourierMission,
   advanceCourierMission,
+  reportCourierProblem,
   missionStatutLabel,
   type CourierMission,
 } from '@/lib/courier-api';
 import { getSessionToken } from '@/lib/auth';
+import { AlertTriangle } from 'lucide-react-native';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useCourierPalette } from '@/lib/courier-theme';
 
@@ -129,6 +132,7 @@ export default function CourierMissionDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
   const [proofOpen, setProofOpen] = useState(false);
+  const [problemOpen, setProblemOpen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -145,6 +149,8 @@ export default function CourierMissionDetailScreen() {
     mission?.statut === 'attribuee' ? 'Recuperer la commande' : 'En route vers le client';
   const canComplete =
     mission && !isDone && !canAccept && (mission.statut === 'en_route' || mission.statut === 'collectee');
+  const canReportProblem =
+    mission && !isDone && !canAccept && (mission.statut === 'en_collecte' || mission.statut === 'collectee' || mission.statut === 'en_route');
 
   const accept = async () => {
     if (!id) return;
@@ -188,6 +194,15 @@ export default function CourierMissionDetailScreen() {
     } finally {
       setActing(null);
     }
+  };
+
+  const handleReportProblem = async (reason: string, detail: string) => {
+    if (!id) return;
+    const token = await getSessionToken();
+    if (!token) throw new Error('Session expiree');
+    await reportCourierProblem(token, id, reason, detail);
+    void refreshMissions();
+    showSuccess('Problème signalé', 'Votre entreprise a été notifiée et prend en charge la situation.');
   };
 
   const handleProofDone = (updated: CourierMission) => {
@@ -353,7 +368,18 @@ export default function CourierMissionDetailScreen() {
                 <CheckCircle2 size={18} color="#FFF" strokeWidth={LUCIDE_STROKE} />
                 <ThemedText style={styles.btnPrimaryText}>Confirmer la livraison</ThemedText>
               </Pressable>
-            ) : isDone ? (
+            ) : null}
+
+            {canReportProblem ? (
+              <Pressable
+                style={[styles.btnDanger, { borderColor: '#F59E0B', backgroundColor: '#F59E0B10' }]}
+                onPress={() => setProblemOpen(true)}>
+                <AlertTriangle size={18} color="#F59E0B" strokeWidth={LUCIDE_STROKE} />
+                <ThemedText style={[styles.btnDangerText, { color: '#F59E0B' }]}>Signaler un problème</ThemedText>
+              </Pressable>
+            ) : null}
+
+            {isDone ? (
               <View style={[styles.doneBox, { backgroundColor: '#22C55E15', borderColor: '#22C55E30' }]}>
                 <CheckCircle2 size={18} color="#22C55E" strokeWidth={LUCIDE_STROKE} />
                 <ThemedText style={[styles.doneText, { color: '#22C55E' }]}>Course terminee</ThemedText>
@@ -374,6 +400,14 @@ export default function CourierMissionDetailScreen() {
           reference={mission.commande?.numero || mission.id.slice(0, 8).toUpperCase()}
           onDone={handleProofDone}
           onClose={() => setProofOpen(false)}
+        />
+      ) : null}
+
+      {problemOpen ? (
+        <ReportProblemModal
+          visible={problemOpen}
+          onClose={() => setProblemOpen(false)}
+          onSubmit={handleReportProblem}
         />
       ) : null}
     </View>
@@ -502,6 +536,17 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   btnSecondaryText: { fontWeight: '800', fontSize: 15 },
+  btnDanger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    borderRadius: 16,
+    paddingVertical: 14,
+    marginTop: 8,
+    borderWidth: 1.5,
+  },
+  btnDangerText: { fontWeight: '800', fontSize: 15 },
   disabled: { opacity: 0.6 },
 
   doneBox: {

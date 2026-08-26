@@ -142,4 +142,21 @@ export async function completeCourierMission(
   });
 }
 
+/**
+ * Signaler un problème pendant une course (panne, trafic, colis, etc.).
+ * Crée un incident côté backend et notifie l'entreprise logistique.
+ */
+export async function reportCourierProblem(
+  token: string,
+  deliveryId: string,
+  reason: string,
+  detail?: string,
+): Promise<{ success: boolean; incident_id: string }> {
+  return apiFetch(`/api/delivery/courier/delay-reason/${deliveryId}`, {
+    method: 'POST',
+    token,
+    jsonBody: { reason, detail: detail || null },
+  });
+}
+
 export { courierMissionStatusLabel as missionStatutLabel } from '@/lib/ux-copy';
