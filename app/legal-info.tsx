@@ -108,10 +108,10 @@ export default function LegalInfoScreen() {
         {/* ── Version ── */}
         <View style={styles.versionBlock}>
           <ThemedText type="muted" style={styles.versionText}>
-            GoLivra v{appVersion}
+            GoLivra {appVersion}
           </ThemedText>
           <ThemedText type="muted" style={styles.versionSub}>
-            Fait avec ❤️ en RDC 🇨🇩
+            by Synex
           </ThemedText>
         </View>
       </ScrollView>

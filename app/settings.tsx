@@ -405,10 +405,10 @@ export default function SettingsScreen() {
         ══════════════════════════════════════════════════ */}
         <View style={[localStyles.versionBlock, { marginTop: 24 }]}>
           <ThemedText type="muted" style={localStyles.versionText}>
-            GoLivra v{appVersion}
+            GoLivra {appVersion}
           </ThemedText>
           <ThemedText type="muted" style={localStyles.versionSub}>
-            Fait avec ❤️ en RDC 🇨🇩
+            by Synex
           </ThemedText>
         </View>
       </ScrollView>
