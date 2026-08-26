@@ -613,7 +613,29 @@ export default function ProfileScreen() {
             </View>
 
             {/* ══════════════════════════════════════════════════
-                SUPPORT & AIDE
+                PARAMÈTRES & COMPTE
+            ══════════════════════════════════════════════════ */}
+            <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 20 }]}>
+              Paramètres & compte
+            </Text>
+
+            <View style={styles.menuList}>
+              <MenuRow
+                Icon={Settings}
+                title="Paramètres"
+                onPress={() => router.push('/settings')}
+                colors={colors}
+              />
+              <MenuRow
+                Icon={FileText}
+                title="Informations légales"
+                onPress={() => router.push('/legal-info')}
+                colors={colors}
+              />
+            </View>
+
+            {/* ══════════════════════════════════════════════════
+                AIDE & SUPPORT (juste avant déconnexion)
             ══════════════════════════════════════════════════ */}
             <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 20 }]}>
               Aide & support
@@ -638,28 +660,7 @@ export default function ProfileScreen() {
                 onPress={handleRate}
                 colors={colors}
               />
-            </View>
-
-            {/* ══════════════════════════════════════════════════
-                PARAMÈTRES & COMPTE
-            ══════════════════════════════════════════════════ */}
-            <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 20 }]}>
-              Paramètres & compte
-            </Text>
-
-            <View style={styles.menuList}>
-              <MenuRow
-                Icon={Settings}
-                title="Paramètres"
-                onPress={() => router.push('/settings')}
-                colors={colors}
-              />
-              <MenuRow
-                Icon={FileText}
-                title="Informations légales"
-                onPress={() => router.push('/legal-info')}
-                colors={colors}
-              />
+              <View style={{ height: 8 }} />
               <MenuRow
                 Icon={LogOut}
                 title="Se déconnecter"
