@@ -16,8 +16,8 @@ export const SITE_URLS = {
   about: `${SITE_URL}/a-propos`,
   blog: `${SITE_URL}/blog`,
   supportEmail: 'support@golivra.onrender.com',
-  supportPhone: '+243000000000',
-  whatsapp: 'https://wa.me/243000000000',
+  supportPhone: '+242067811462',
+  whatsapp: 'https://wa.me/242067811462',
   appStore: SITE_URL,
 } as const;
 
