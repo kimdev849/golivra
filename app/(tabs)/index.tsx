@@ -1467,7 +1467,7 @@ const styles = StyleSheet.create({
   },
   premiumCardImg: {
     width: '100%',
-    aspectRatio: 1,
+    aspectRatio: 4 / 3,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -1505,6 +1505,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 10,
     gap: 3,
+    minHeight: 60,
   },
   premiumCardBodyDesktop: {
     paddingHorizontal: 12,

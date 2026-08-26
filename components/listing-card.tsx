@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   imageWrapGrid: {
-    aspectRatio: 1,
+    aspectRatio: 4 / 3,
     borderRadius: 10,
   },
   imageWrapFeed: {

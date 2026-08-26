@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
   },
   productImgWrap: {
     width: '100%',
-    aspectRatio: 1,
+    aspectRatio: 4 / 3,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',

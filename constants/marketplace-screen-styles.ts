@@ -237,7 +237,7 @@ export function createMarketplaceStyles(c: AppPalette) {
       paddingBottom: 10,
     },
     productImgWrap: {
-      aspectRatio: 1,
+      aspectRatio: 4 / 3,
       backgroundColor: c.surfaceMuted,
       position: 'relative',
     },
