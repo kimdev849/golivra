@@ -69,7 +69,7 @@ const FAQ = [
 const APP_STORE_URL = Platform.select({
   ios: 'https://apps.apple.com/app/golivra/id000000000',
   android: 'https://play.google.com/store/apps/details?id=com.golivra.app',
-  default: 'https://golivra.com',
+  default: 'https://golivra.onrender.com',
 })!;
 
 export default function HelpSupportScreen() {
@@ -92,7 +92,7 @@ export default function HelpSupportScreen() {
   };
 
   const handleContactEmail = () => {
-    Linking.openURL('mailto:support@golivra.com?subject=Support GoLivra');
+    Linking.openURL('mailto:support@golivra.onrender.com?subject=Support GoLivra');
   };
 
   const handleWhatsApp = () => {
@@ -100,7 +100,7 @@ export default function HelpSupportScreen() {
   };
 
   const handleReportBug = () => {
-    Linking.openURL('mailto:support@golivra.com?subject=Signaler un bug&body=Décrivez le bug rencontré :');
+    Linking.openURL('mailto:support@golivra.onrender.com?subject=Signaler un bug&body=Décrivez le bug rencontré :');
   };
 
   return (
@@ -136,7 +136,7 @@ export default function HelpSupportScreen() {
             icon={<Mail size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />}
             iconBg={colors.primarySoft}
             title="E-mail"
-            subtitle="support@golivra.com"
+            subtitle="support@golivra.onrender.com"
             onPress={handleContactEmail}
             colors={colors}
           />
@@ -223,8 +223,8 @@ export default function HelpSupportScreen() {
             icon={<ExternalLink size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />}
             iconBg={colors.primarySoft}
             title="Site web"
-            subtitle="www.golivra.com"
-            onPress={() => Linking.openURL('https://golivra.com')}
+            subtitle="www.golivra.onrender.com"
+            onPress={() => Linking.openURL('https://golivra.onrender.com')}
             colors={colors}
           />
         </View>

@@ -327,7 +327,7 @@ export default function ProfileScreen() {
   const APP_STORE_URL = Platform.select({
     ios: 'https://apps.apple.com/app/golivra/id000000000',
     android: 'https://play.google.com/store/apps/details?id=com.golivra.app',
-    default: 'https://golivra.com',
+    default: 'https://golivra.onrender.com',
   })!;
 
   const handleShare = async () => {

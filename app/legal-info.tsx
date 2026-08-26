@@ -24,10 +24,10 @@ import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
 
-const PRIVACY_URL = 'https://golivra.com/politique-confidentialite';
-const TERMS_URL = 'https://golivra.com/conditions-generales';
-const WEBSITE_URL = 'https://golivra.com';
-const ABOUT_URL = 'https://golivra.com/a-propos';
+const PRIVACY_URL = 'https://golivra.onrender.com/politique-confidentialite';
+const TERMS_URL = 'https://golivra.onrender.com/conditions-generales';
+const WEBSITE_URL = 'https://golivra.onrender.com';
+const ABOUT_URL = 'https://golivra.onrender.com/a-propos';
 
 export default function LegalInfoScreen() {
   const router = useRouter();
@@ -90,7 +90,7 @@ export default function LegalInfoScreen() {
             icon={<Globe size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />}
             iconBg={colors.primarySoft}
             title="Site web"
-            subtitle="www.golivra.com"
+            subtitle="www.golivra.onrender.com"
             onPress={() => Linking.openURL(WEBSITE_URL)}
             colors={colors}
           />
@@ -100,7 +100,7 @@ export default function LegalInfoScreen() {
             iconBg={colors.primarySoft}
             title="Blog"
             subtitle="Actualités et conseils"
-            onPress={() => Linking.openURL('https://golivra.com/blog')}
+            onPress={() => Linking.openURL('https://golivra.onrender.com/blog')}
             colors={colors}
           />
         </View>
