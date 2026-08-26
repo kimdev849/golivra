@@ -300,7 +300,7 @@ export default function DeliveryDetailScreen() {
   const isActive = liv.statut !== 'livree' && liv.statut !== 'annulee' && liv.statut !== 'echec';
 
   // ── Suivi en direct : distance du livreur + arrivée estimée ──
-  const distanceKm = data.distance_km;
+  const distanceKm = data.distance_km ?? data.eta?.distance_km ?? null;
   const positionAt = livreur?.position_actuelle?.at || null;
   const isEnRoute = liv.statut === 'en_route' || liv.statut === 'collectee';
   const isProche = distanceKm != null && distanceKm > 0 && distanceKm < 0.5;
@@ -310,8 +310,16 @@ export default function DeliveryDetailScreen() {
       : distanceKm < 1
         ? `${Math.round(distanceKm * 1000)} m`
         : `${Number(distanceKm).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km`;
-  // Vitesse moyenne en ville (~20 km/h) : arrivée estimée indicative, jamais une promesse.
-  const etaFromDistance = isEnRoute && distanceKm != null ? Math.max(2, Math.round((distanceKm / 20) * 60)) : null;
+  // ETA réelle calculée par le backend (basée sur distance + vitesse véhicule + trafic)
+  const etaMinutes = data.eta?.eta_minutes ?? (isEnRoute && distanceKm != null ? Math.max(2, Math.round((distanceKm / 20) * 60)) : null);
+  const etaLabel =
+    etaMinutes == null
+      ? null
+      : etaMinutes < 1
+        ? "Moins d'une minute"
+        : etaMinutes === 1
+          ? '1 minute'
+          : `${etaMinutes} min`;
   const positionFreshness =
     positionAt == null
       ? null
@@ -442,9 +450,9 @@ export default function DeliveryDetailScreen() {
                     <ThemedText style={[styles.liveBoxSub, { color: colors.primary }]}>
                       Préparez-vous, il arrive bientôt
                     </ThemedText>
-                  ) : etaFromDistance != null ? (
+                  ) : etaLabel != null ? (
                     <ThemedText style={[styles.liveBoxSub, { color: colors.primary }]}>
-                      Arrivée estimée dans ~{etaFromDistance} min
+                      Arrivée estimée dans ~{etaLabel}
                     </ThemedText>
                   ) : null}
                 </View>
