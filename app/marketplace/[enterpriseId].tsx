@@ -367,7 +367,8 @@ export default function EnterpriseDetailScreen() {
               <ThemedText style={styles.infoText}>{enterprise.telephone}</ThemedText>
             </View>
           ) : null}
-          {/* 🚚 Livraison prévue — l'essentiel d'abord, le détail se plie */}
+          {/* 🚚 Livraison prévue — masquée si le commerce est fermé */}
+          {!commandesBloquees && (
           <View
             style={[
               styles.etaCard,
@@ -433,6 +434,7 @@ export default function EnterpriseDetailScreen() {
               </>
             )}
           </View>
+          )}
         </View>
 
         {/* Statut d'ouverture (horaires) */}
