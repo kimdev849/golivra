@@ -21,6 +21,7 @@ import {
   UtensilsCrossed,
 } from 'lucide-react-native';
 import { Image } from 'expo-image';
+import { WatermarkedImage } from '@/components/watermarked-image';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { GalleryViewer } from '@/components/gallery-viewer';
@@ -523,11 +524,9 @@ export default function EnterpriseDetailScreen() {
                   }}
                   disabled={!img}>
                   {img ? (
-                    <Image
+                    <WatermarkedImage
                       source={{ uri: img }}
                       style={styles.productImg}
-                      contentFit="cover"
-                      transition={150}
                       recyclingKey={img}
                       cachePolicy="memory-disk"
                     />

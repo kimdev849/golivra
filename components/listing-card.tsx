@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
 import { Heart, Images, Maximize2, Store, UtensilsCrossed } from 'lucide-react-native';
+import { WatermarkedImage } from '@/components/watermarked-image';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -83,7 +84,7 @@ export function ListingCard({ product, onPress, isFav = false, onToggleFav, vari
         ]}>
         {image ? (
           <>
-            <Image source={{ uri: image }} style={styles.image} contentFit="cover" transition={200} recyclingKey={image} />
+            <WatermarkedImage source={{ uri: image }} style={styles.image} recyclingKey={image} />
             <Pressable
               style={[styles.zoomBtn, isGrid && styles.zoomBtnGrid, isFeed && styles.zoomBtnFeed]}
               onPress={(e) => {

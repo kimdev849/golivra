@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { WatermarkedImage } from '@/components/watermarked-image';
 import * as Haptics from 'expo-haptics';
 import {
   ArrowLeft,
@@ -331,12 +332,10 @@ export default function ProductDetailScreen() {
                 setGalleryIndex(selectedGalleryIndex);
                 setGalleryOpen(true);
               }}>
-              <Image
+              <WatermarkedImage
                 key={`${productId}-${selectedGalleryIndex}`}
                 source={{ uri: galleryImages[selectedGalleryIndex] }}
                 style={styles.heroImg}
-                contentFit="cover"
-                transition={200}
                 recyclingKey={galleryImages[selectedGalleryIndex]}
               />
             </Pressable>

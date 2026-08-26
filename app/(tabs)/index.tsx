@@ -1,6 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
+import { WatermarkedImage } from '@/components/watermarked-image';
 import { useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -176,11 +177,8 @@ const PremiumCard = memo(function PremiumCard({
       {/* Image */}
       <View style={[styles.premiumCardImg, isDesktop && styles.premiumCardImgDesktop, { backgroundColor: colors.primarySoft }]}>
         {imageUrl ? (
-          <Image
+          <WatermarkedImage
             source={{ uri: imageUrl }}
-            style={{ width: '100%', height: '100%' }}
-            contentFit="cover"
-            transition={200}
             recyclingKey={imageUrl}
             cachePolicy="memory-disk"
           />
