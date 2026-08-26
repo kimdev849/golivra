@@ -2,6 +2,22 @@ import Constants from 'expo-constants';
 
 const DEFAULT_API_ORIGIN = 'https://golivra-api.onrender.com';
 
+/**
+ * URL du site officiel GoLivra.
+ * Change cette seule valeur pour mettre à jour tous les liens de l'app.
+ */
+export const SITE_URL = 'https://golivra.onrender.com';
+
+/** URLs dérivées du site — à utiliser dans toute l'app. */
+export const SITE_URLS = {
+  home: SITE_URL,
+  privacy: `${SITE_URL}/politique-confidentialite`,
+  terms: `${SITE_URL}/conditions-generales`,
+  about: `${SITE_URL}/a-propos`,
+  blog: `${SITE_URL}/blog`,
+  supportEmail: 'support@golivra.onrender.com',
+} as const;
+
 function normalizeOrigin(raw: string | undefined | null): string {
   let origin = (raw || DEFAULT_API_ORIGIN).trim().replace(/\/+$/, '');
   if (origin.toLowerCase().endsWith('/api')) {

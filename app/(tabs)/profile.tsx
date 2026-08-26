@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SITE_URL } from '@/lib/config';
 import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
@@ -327,7 +328,7 @@ export default function ProfileScreen() {
   const APP_STORE_URL = Platform.select({
     ios: 'https://apps.apple.com/app/golivra/id000000000',
     android: 'https://play.google.com/store/apps/details?id=com.golivra.app',
-    default: 'https://golivra.onrender.com',
+    default: SITE_URL,
   })!;
 
   const handleShare = async () => {

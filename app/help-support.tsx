@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { SITE_URL, SITE_URLS } from '@/lib/config';
 import {
   ChevronLeft,
   ChevronRight,
@@ -69,7 +70,7 @@ const FAQ = [
 const APP_STORE_URL = Platform.select({
   ios: 'https://apps.apple.com/app/golivra/id000000000',
   android: 'https://play.google.com/store/apps/details?id=com.golivra.app',
-  default: 'https://golivra.onrender.com',
+  default: SITE_URL,
 })!;
 
 export default function HelpSupportScreen() {
@@ -92,7 +93,7 @@ export default function HelpSupportScreen() {
   };
 
   const handleContactEmail = () => {
-    Linking.openURL('mailto:support@golivra.onrender.com?subject=Support GoLivra');
+    Linking.openURL(`mailto:${SITE_URLS.supportEmail}?subject=Support GoLivra`);
   };
 
   const handleWhatsApp = () => {
@@ -100,7 +101,7 @@ export default function HelpSupportScreen() {
   };
 
   const handleReportBug = () => {
-    Linking.openURL('mailto:support@golivra.onrender.com?subject=Signaler un bug&body=Décrivez le bug rencontré :');
+    Linking.openURL(`mailto:${SITE_URLS.supportEmail}?subject=Signaler un bug&body=Décrivez le bug rencontré :`);
   };
 
   return (
@@ -136,7 +137,7 @@ export default function HelpSupportScreen() {
             icon={<Mail size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />}
             iconBg={colors.primarySoft}
             title="E-mail"
-            subtitle="support@golivra.onrender.com"
+            subtitle={SITE_URLS.supportEmail}
             onPress={handleContactEmail}
             colors={colors}
           />
@@ -223,8 +224,8 @@ export default function HelpSupportScreen() {
             icon={<ExternalLink size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />}
             iconBg={colors.primarySoft}
             title="Site web"
-            subtitle="www.golivra.onrender.com"
-            onPress={() => Linking.openURL('https://golivra.onrender.com')}
+            subtitle="Site officiel GoLivra"
+            onPress={() => Linking.openURL(SITE_URLS.home)}
             colors={colors}
           />
         </View>
