@@ -97,7 +97,7 @@ export default function HelpSupportScreen() {
   };
 
   const handleWhatsApp = () => {
-    Linking.openURL('https://wa.me/243000000000?text=Bonjour, j\\'ai besoin d\\'aide');
+    Linking.openURL("https://wa.me/243000000000?text=Bonjour, j'ai besoin d'aide");
   };
 
   const handleReportBug = () => {
