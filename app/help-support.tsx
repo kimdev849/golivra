@@ -62,7 +62,7 @@ const FAQ = [
     a: "Allez dans « Mon profil » → « Mes adresses ». Vous pouvez ajouter, modifier ou supprimer des adresses. Sélectionnez l'adresse par défaut pour vos prochaines commandes.",
   },
   {
-    q: 'Je n'ai pas reçu ma commande, que faire ?',
+    q: "Je n'ai pas reçu ma commande, que faire ?",
     a: "Contactez notre support via WhatsApp ou email. Nous vérifierons le statut de votre commande et organiserons une livraison alternative ou un remboursement si nécessaire.",
   },
 ];
