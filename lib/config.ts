@@ -16,6 +16,9 @@ export const SITE_URLS = {
   about: `${SITE_URL}/a-propos`,
   blog: `${SITE_URL}/blog`,
   supportEmail: 'support@golivra.onrender.com',
+  supportPhone: '+243000000000',
+  whatsapp: 'https://wa.me/243000000000',
+  appStore: SITE_URL,
 } as const;
 
 function normalizeOrigin(raw: string | undefined | null): string {

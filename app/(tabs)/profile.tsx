@@ -29,7 +29,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
-  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -325,16 +324,10 @@ export default function ProfileScreen() {
     });
   };
 
-  const APP_STORE_URL = Platform.select({
-    ios: 'https://apps.apple.com/app/golivra/id000000000',
-    android: 'https://play.google.com/store/apps/details?id=com.golivra.app',
-    default: SITE_URL,
-  })!;
-
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Découvrez GoLivra 🚀\nLa meilleure application de livraison et marketplace.\n\nTéléchargez-la ici : ${APP_STORE_URL}`,
+        message: `Découvrez GoLivra 🚀\nLa meilleure application de livraison et marketplace.\n\nTéléchargez-la ici : ${SITE_URL}`,
         title: 'Partager GoLivra',
       });
     } catch { /* cancelled */ }
@@ -342,7 +335,7 @@ export default function ProfileScreen() {
 
   const handleRate = async () => {
     try {
-      await Linking.openURL(APP_STORE_URL);
+      await Linking.openURL(SITE_URL);
     } catch { /* ignore */ }
   };
 

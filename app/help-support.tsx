@@ -17,7 +17,6 @@ import {
 import { useState } from 'react';
 import {
   Linking,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -67,12 +66,6 @@ const FAQ = [
   },
 ];
 
-const APP_STORE_URL = Platform.select({
-  ios: 'https://apps.apple.com/app/golivra/id000000000',
-  android: 'https://play.google.com/store/apps/details?id=com.golivra.app',
-  default: SITE_URL,
-})!;
-
 export default function HelpSupportScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -82,14 +75,14 @@ export default function HelpSupportScreen() {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Découvrez GoLivra 🚀\nLa meilleure application de livraison et marketplace.\n\nTéléchargez-la ici : ${APP_STORE_URL}`,
+        message: `Découvrez GoLivra 🚀\nLa meilleure application de livraison et marketplace.\n\nTéléchargez-la ici : ${SITE_URL}`,
         title: 'Partager GoLivra',
       });
     } catch { /* cancelled */ }
   };
 
   const handleRate = async () => {
-    try { await Linking.openURL(APP_STORE_URL); } catch { /* ignore */ }
+    try { await Linking.openURL(SITE_URL); } catch { /* ignore */ }
   };
 
   const handleContactEmail = () => {
@@ -97,7 +90,7 @@ export default function HelpSupportScreen() {
   };
 
   const handleWhatsApp = () => {
-    Linking.openURL("https://wa.me/243000000000?text=Bonjour, j'ai besoin d'aide");
+    Linking.openURL(`${SITE_URLS.whatsapp}?text=Bonjour, j'ai besoin d'aide`);
   };
 
   const handleReportBug = () => {
@@ -147,7 +140,7 @@ export default function HelpSupportScreen() {
             iconBg={colors.primarySoft}
             title="Téléphone"
             subtitle="Contactez-nous directement"
-            onPress={() => Linking.openURL('tel:+243000000000')}
+            onPress={() => Linking.openURL(`tel:${SITE_URLS.supportPhone}`)}
             colors={colors}
           />
         </View>
