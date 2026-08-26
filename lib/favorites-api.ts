@@ -6,6 +6,9 @@ export type FavoriteEnterprise = {
   nom: string | null;
   statut?: string | null;
   est_ouvert?: boolean | null;
+  est_ouvert_maintenant?: boolean | null;
+  message_fermeture?: string | null;
+  prochaine_ouverture?: string | null;
   favorited_at?: string;
 };
 
