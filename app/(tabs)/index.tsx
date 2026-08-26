@@ -277,7 +277,7 @@ const EnterpriseCard = memo(function EnterpriseCard({
         ) : (
           <Store size={24} color={colors.primary} strokeWidth={1.5} />
         )}
-        {enterprise.ouvert === false ? (
+        {(enterprise.est_ouvert_maintenant === false || (enterprise.est_ouvert_maintenant == null && enterprise.ouvert === false)) ? (
           <View style={styles.closedOverlay}>
             <Text style={styles.closedTxt}>Fermé</Text>
           </View>
