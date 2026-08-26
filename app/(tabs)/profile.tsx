@@ -10,6 +10,7 @@ import {
   ChevronRight,
   ClipboardList,
   Clock,
+  FileText,
   Heart,
   HelpCircle,
   LogOut,
@@ -17,15 +18,20 @@ import {
   Pencil,
   Phone,
   Settings,
+  Share2,
   ShoppingBag,
+  Star,
   User,
   type LucideIcon,
 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
+  Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -318,6 +324,27 @@ export default function ProfileScreen() {
     });
   };
 
+  const APP_STORE_URL = Platform.select({
+    ios: 'https://apps.apple.com/app/golivra/id000000000',
+    android: 'https://play.google.com/store/apps/details?id=com.golivra.app',
+    default: 'https://golivra.com',
+  })!;
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Découvrez GoLivra 🚀\nLa meilleure application de livraison et marketplace.\n\nTéléchargez-la ici : ${APP_STORE_URL}`,
+        title: 'Partager GoLivra',
+      });
+    } catch { /* cancelled */ }
+  };
+
+  const handleRate = async () => {
+    try {
+      await Linking.openURL(APP_STORE_URL);
+    } catch { /* ignore */ }
+  };
+
   // ── Render ─────────────────────────────────────────────────────
 
   return (
@@ -589,6 +616,44 @@ export default function ProfileScreen() {
                 colors={colors}
                 count={stats.activeOrders}
               />
+            </View>
+
+            {/* ══════════════════════════════════════════════════
+                SUPPORT & AIDE
+            ══════════════════════════════════════════════════ */}
+            <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 20 }]}>
+              Aide & support
+            </Text>
+
+            <View style={styles.menuList}>
+              <MenuRow
+                Icon={HelpCircle}
+                title="Aide & support"
+                onPress={() => router.push('/help-support')}
+                colors={colors}
+              />
+              <MenuRow
+                Icon={Share2}
+                title="Partager GoLivra"
+                onPress={handleShare}
+                colors={colors}
+              />
+              <MenuRow
+                Icon={Star}
+                title="Noter l'application"
+                onPress={handleRate}
+                colors={colors}
+              />
+            </View>
+
+            {/* ══════════════════════════════════════════════════
+                PARAMÈTRES & COMPTE
+            ══════════════════════════════════════════════════ */}
+            <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 20 }]}>
+              Paramètres & compte
+            </Text>
+
+            <View style={styles.menuList}>
               <MenuRow
                 Icon={Settings}
                 title="Paramètres"
@@ -596,9 +661,9 @@ export default function ProfileScreen() {
                 colors={colors}
               />
               <MenuRow
-                Icon={HelpCircle}
-                title="Centre d'aide"
-                onPress={() => router.push('/help-center')}
+                Icon={FileText}
+                title="Informations légales"
+                onPress={() => router.push('/legal-info')}
                 colors={colors}
               />
               <MenuRow

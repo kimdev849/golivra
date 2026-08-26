@@ -3,24 +3,14 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import {
   Bell,
-  BookOpen,
   ChevronLeft,
   ChevronRight,
   CreditCard,
-  Eye,
-  FileText,
-  Globe,
-  HelpCircle,
   Info,
   KeyRound,
   Mail,
-  MessageCircle,
   Moon,
-  Phone,
-  Shield,
-  Share2,
   Smartphone,
-  Star,
   Sun,
   Trash2,
   Type,
@@ -68,14 +58,7 @@ const THEME_OPTIONS: ThemeOption[] = [
   { id: 'system', label: 'Système', Icon: Smartphone },
 ];
 
-const APP_STORE_URL = Platform.select({
-  ios: 'https://apps.apple.com/app/golivra/id000000000',
-  android: 'https://play.google.com/store/apps/details?id=com.golivra.app',
-  default: 'https://golivra.com',
-})!;
 
-const PRIVACY_URL = 'https://golivra.com/politique-confidentialite';
-const TERMS_URL = 'https://golivra.com/conditions-generales';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -127,17 +110,6 @@ export default function SettingsScreen() {
       /* ignore */
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleShare = async () => {
-    try {
-      await Share.share({
-        message: `Découvrez GoLivra 🚀\nLa meilleure application de livraison et marketplace.\n\nTéléchargez-la ici : ${APP_STORE_URL}`,
-        title: 'Partager GoLivra',
-      });
-    } catch {
-      /* user cancelled */
     }
   };
 
@@ -387,167 +359,6 @@ export default function SettingsScreen() {
           colors={colors}
           hint="Verrouillage biométrique au retour sur l'app"
         />
-
-        {/* ══════════════════════════════════════════════════
-            AIDE & SUPPORT
-        ══════════════════════════════════════════════════ */}
-        {renderSectionLabel('Aide & support')}
-        <View style={localStyles.menuCard}>
-          <Pressable
-            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
-            onPress={() => router.push('/help-center')}
-            android_ripple={{ color: colors.primaryMuted }}>
-            <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
-              <HelpCircle size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <ThemedText type="defaultSemiBold">Centre d'aide</ThemedText>
-              <ThemedText type="muted" style={localStyles.rowSub}>
-                FAQ, questions fréquentes
-              </ThemedText>
-            </View>
-            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-          </Pressable>
-          <View style={localStyles.divider} />
-          <Pressable
-            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
-            onPress={() => Linking.openURL('mailto:support@golivra.com')}
-            android_ripple={{ color: colors.primaryMuted }}>
-            <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
-              <MessageCircle size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <ThemedText type="defaultSemiBold">Contacter le support</ThemedText>
-              <ThemedText type="muted" style={localStyles.rowSub}>
-                support@golivra.com
-              </ThemedText>
-            </View>
-            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-          </Pressable>
-          <View style={localStyles.divider} />
-          <Pressable
-            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
-            onPress={() => Linking.openURL('https://wa.me/243000000000')}
-            android_ripple={{ color: colors.primaryMuted }}>
-            <View style={[localStyles.rowIcon, { backgroundColor: '#25D366' }]}>
-              <Phone size={20} color="#FFFFFF" strokeWidth={LUCIDE_STROKE} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <ThemedText type="defaultSemiBold">WhatsApp</ThemedText>
-              <ThemedText type="muted" style={localStyles.rowSub}>
-                Discuter avec notre équipe
-              </ThemedText>
-            </View>
-            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-          </Pressable>
-          <View style={localStyles.divider} />
-          <Pressable
-            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
-            onPress={handleShare}
-            android_ripple={{ color: colors.primaryMuted }}>
-            <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
-              <Share2 size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <ThemedText type="defaultSemiBold">Partager GoLivra</ThemedText>
-              <ThemedText type="muted" style={localStyles.rowSub}>
-                Recommandez à vos amis
-              </ThemedText>
-            </View>
-            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-          </Pressable>
-          <View style={localStyles.divider} />
-          <Pressable
-            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
-            onPress={() => {
-              Share.share({
-                message: 'Évaluez GoLivra sur l\'App Store ⭐',
-                title: 'Noter GoLivra',
-              });
-            }}
-            android_ripple={{ color: colors.primaryMuted }}>
-            <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
-              <Star size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <ThemedText type="defaultSemiBold">Noter l'application</ThemedText>
-              <ThemedText type="muted" style={localStyles.rowSub}>
-                Donnez-nous 5 étoiles ⭐
-              </ThemedText>
-            </View>
-            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-          </Pressable>
-        </View>
-
-        {/* ══════════════════════════════════════════════════
-            INFORMATIONS LÉGALES
-        ══════════════════════════════════════════════════ */}
-        {renderSectionLabel('Informations légales')}
-        <View style={localStyles.menuCard}>
-          <Pressable
-            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
-            onPress={() => Linking.openURL(PRIVACY_URL)}
-            android_ripple={{ color: colors.primaryMuted }}>
-            <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
-              <Shield size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <ThemedText type="defaultSemiBold">Politique de confidentialité</ThemedText>
-              <ThemedText type="muted" style={localStyles.rowSub}>
-                Comment nous protégeons vos données
-              </ThemedText>
-            </View>
-            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-          </Pressable>
-          <View style={localStyles.divider} />
-          <Pressable
-            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
-            onPress={() => Linking.openURL(TERMS_URL)}
-            android_ripple={{ color: colors.primaryMuted }}>
-            <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
-              <FileText size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <ThemedText type="defaultSemiBold">Conditions générales</ThemedText>
-              <ThemedText type="muted" style={localStyles.rowSub}>
-                Termes et conditions d'utilisation
-              </ThemedText>
-            </View>
-            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-          </Pressable>
-          <View style={localStyles.divider} />
-          <Pressable
-            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
-            onPress={() => Linking.openURL('https://golivra.com')}
-            android_ripple={{ color: colors.primaryMuted }}>
-            <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
-              <Globe size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <ThemedText type="defaultSemiBold">Site web</ThemedText>
-              <ThemedText type="muted" style={localStyles.rowSub}>
-                www.golivra.com
-              </ThemedText>
-            </View>
-            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-          </Pressable>
-          <View style={localStyles.divider} />
-          <Pressable
-            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
-            onPress={() => Linking.openURL('https://golivra.com/a-propos')}
-            android_ripple={{ color: colors.primaryMuted }}>
-            <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
-              <BookOpen size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <ThemedText type="defaultSemiBold">À propos de GoLivra</ThemedText>
-              <ThemedText type="muted" style={localStyles.rowSub}>
-                Notre mission et notre équipe
-              </ThemedText>
-            </View>
-            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-          </Pressable>
-        </View>
 
         {/* ══════════════════════════════════════════════════
             PARAMÈTRES AVANCÉS
