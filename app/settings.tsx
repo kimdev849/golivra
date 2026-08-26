@@ -3,28 +3,44 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import {
   Bell,
+  BookOpen,
   ChevronLeft,
   ChevronRight,
   CreditCard,
+  Eye,
+  FileText,
+  Globe,
+  HelpCircle,
   Info,
   KeyRound,
   Mail,
+  MessageCircle,
   Moon,
+  Phone,
+  Shield,
+  Share2,
   Smartphone,
+  Star,
   Sun,
+  Trash2,
   Type,
+  UserCircle,
 } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
+  Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Switch,
   Text,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -52,6 +68,15 @@ const THEME_OPTIONS: ThemeOption[] = [
   { id: 'system', label: 'Système', Icon: Smartphone },
 ];
 
+const APP_STORE_URL = Platform.select({
+  ios: 'https://apps.apple.com/app/golivra/id000000000',
+  android: 'https://play.google.com/store/apps/details?id=com.golivra.app',
+  default: 'https://golivra.com',
+})!;
+
+const PRIVACY_URL = 'https://golivra.com/politique-confidentialite';
+const TERMS_URL = 'https://golivra.com/conditions-generales';
+
 export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -67,6 +92,7 @@ export default function SettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [notifPush, setNotifPush] = useState(true);
   const [notifEmail, setNotifEmail] = useState(true);
+  const [cacheCleared, setCacheCleared] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -104,6 +130,27 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `Découvrez GoLivra 🚀\nLa meilleure application de livraison et marketplace.\n\nTéléchargez-la ici : ${APP_STORE_URL}`,
+        title: 'Partager GoLivra',
+      });
+    } catch {
+      /* user cancelled */
+    }
+  };
+
+  const handleClearCache = async () => {
+    try {
+      await AsyncStorage.clear();
+      setCacheCleared(true);
+      setTimeout(() => setCacheCleared(false), 3000);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const renderSectionLabel = (text: string) => (
     <ThemedText style={localStyles.sectionLabel}>{text}</ThemedText>
   );
@@ -115,7 +162,7 @@ export default function SettingsScreen() {
           <ChevronLeft size={26} color={colors.primaryDeep} strokeWidth={LUCIDE_STROKE} />
         </Pressable>
         <ThemedText type="subtitle" style={styles.headerTitle}>
-          Réglages
+          Paramètres
         </ThemedText>
         <View style={styles.headerSpacer} />
       </View>
@@ -129,7 +176,63 @@ export default function SettingsScreen() {
           </ThemedText>
         ) : null}
 
-        {/* ── Apparence : thème + taille du texte ── */}
+        {/* ══════════════════════════════════════════════════
+            MON COMPTE
+        ══════════════════════════════════════════════════ */}
+        {renderSectionLabel('Mon compte')}
+        <View style={localStyles.menuCard}>
+          <Pressable
+            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
+            onPress={() => router.push('/profile-edit')}
+            android_ripple={{ color: colors.primaryMuted }}>
+            <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+              <UserCircle size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="defaultSemiBold">Mon profil</ThemedText>
+              <ThemedText type="muted" style={localStyles.rowSub}>
+                Nom, photo, téléphone
+              </ThemedText>
+            </View>
+            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          </Pressable>
+          <View style={localStyles.divider} />
+          <Pressable
+            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
+            onPress={() => router.push('/payment-methods')}
+            android_ripple={{ color: colors.primaryMuted }}>
+            <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+              <CreditCard size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="defaultSemiBold">Paiements</ThemedText>
+              <ThemedText type="muted" style={localStyles.rowSub}>
+                Mobile Money, historique
+              </ThemedText>
+            </View>
+            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          </Pressable>
+          <View style={localStyles.divider} />
+          <Pressable
+            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
+            onPress={() => router.push('/account-settings')}
+            android_ripple={{ color: colors.primaryMuted }}>
+            <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+              <KeyRound size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="defaultSemiBold">Sécurité du compte</ThemedText>
+              <ThemedText type="muted" style={localStyles.rowSub}>
+                Mot de passe, suppression
+              </ThemedText>
+            </View>
+            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          </Pressable>
+        </View>
+
+        {/* ══════════════════════════════════════════════════
+            APPARENCE
+        ══════════════════════════════════════════════════ */}
         {renderSectionLabel('Apparence')}
         <View style={localStyles.menuCard}>
           {THEME_OPTIONS.map((opt, idx) => {
@@ -190,9 +293,9 @@ export default function SettingsScreen() {
 
         <View style={[localStyles.switchRow, { marginTop: 14 }]}>
           <View style={{ flex: 1 }}>
-            <ThemedText type="defaultSemiBold">Raccourci mode sombre</ThemedText>
+            <ThemedText type="defaultSemiBold">Mode sombre forcé</ThemedText>
             <ThemedText type="muted" style={localStyles.rowSub}>
-              Forcer le mode sombre
+              Forcer le thème sombre
             </ThemedText>
           </View>
           <Switch
@@ -203,154 +306,299 @@ export default function SettingsScreen() {
           />
         </View>
 
-        {loading ? (
-          <ActivityIndicator color={colors.primary} style={{ marginVertical: 24 }} />
-        ) : (
-          <>
-            {/* ── Notifications ── */}
-            {renderSectionLabel('Notifications')}
-            <View style={localStyles.menuCard}>
-              {/* Accès à la liste des notifications, avec compteur de non-lues */}
-              <Pressable
-                style={({ pressed }) => [
-                  localStyles.row,
-                  pressed && { backgroundColor: colors.primarySoft },
-                ]}
-                onPress={() => router.push('/notifications')}
-                android_ripple={{ color: colors.primaryMuted }}>
-                <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
-                  <Bell size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <ThemedText type="defaultSemiBold">Mes notifications</ThemedText>
-                  <ThemedText type="muted" style={localStyles.rowSub}>
-                    {unreadCount > 0
-                      ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}`
-                      : 'Aucune notification non lue'}
-                  </ThemedText>
-                </View>
-                {unreadCount > 0 ? (
-                  <View
-                    style={[
-                      localStyles.notifBadge,
-                      { backgroundColor: colors.error, borderColor: colors.surface },
-                    ]}>
-                    <Text style={localStyles.notifBadgeTxt}>
-                      {unreadCount > 9 ? '9+' : String(unreadCount)}
-                    </Text>
-                  </View>
-                ) : null}
-                <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-              </Pressable>
-              <View style={localStyles.divider} />
-              <View style={localStyles.row}>
-                <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
-                  <Bell size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <ThemedText type="defaultSemiBold">Alertes in-app</ThemedText>
-                  <ThemedText type="muted" style={localStyles.rowSub}>
-                    Commandes et livraisons
-                  </ThemedText>
-                </View>
-                <Switch
-                  value={notifPush}
-                  onValueChange={(v) => {
-                    setNotifPush(v);
-                    void patchNotif({ notif_push_enabled: v });
-                  }}
-                  trackColor={{ false: colors.borderStrong, true: colors.primaryMuted }}
-                  thumbColor={notifPush ? colors.primary : colors.surfaceElevated}
-                />
-              </View>
-              <View style={localStyles.divider} />
-              <View style={localStyles.row}>
-                <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
-                  <Mail size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <ThemedText type="defaultSemiBold">E-mail</ThemedText>
-                  <ThemedText type="muted" style={localStyles.rowSub}>
-                    Si une adresse est renseignée
-                  </ThemedText>
-                </View>
-                <Switch
-                  value={notifEmail}
-                  onValueChange={(v) => {
-                    setNotifEmail(v);
-                    void patchNotif({ notif_email_enabled: v });
-                  }}
-                  trackColor={{ false: colors.borderStrong, true: colors.primaryMuted }}
-                  thumbColor={notifEmail ? colors.primary : colors.surfaceElevated}
-                />
-              </View>
-            </View>
-
-            {/* ── Sécurité ── */}
-            {renderSectionLabel('Sécurité')}
-            <BiometricLockToggle
-              colors={colors}
-              hint="Au retour sur l’app (optionnel, désactivable à tout moment)"
-            />
-          </>
-        )}
-
-        {/* ── Compte & sécurité ── */}
-        {renderSectionLabel('Compte')}
+        {/* ══════════════════════════════════════════════════
+            NOTIFICATIONS
+        ══════════════════════════════════════════════════ */}
+        {renderSectionLabel('Notifications')}
         <View style={localStyles.menuCard}>
           <Pressable
-            style={({ pressed }) => [
-              localStyles.row,
-              pressed && { backgroundColor: colors.primarySoft },
-            ]}
-            onPress={() => router.push('/account-settings')}
+            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
+            onPress={() => router.push('/notifications')}
             android_ripple={{ color: colors.primaryMuted }}>
             <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
-              <KeyRound size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+              <Bell size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
             </View>
             <View style={{ flex: 1 }}>
-              <ThemedText type="defaultSemiBold">Connexion & sécurité</ThemedText>
+              <ThemedText type="defaultSemiBold">Mes notifications</ThemedText>
               <ThemedText type="muted" style={localStyles.rowSub}>
-                Mot de passe, biométrie, suppression du compte
+                {unreadCount > 0
+                  ? `${unreadCount} non lue${unreadCount > 1 ? 's' : ''}`
+                  : 'Aucune notification non lue'}
+              </ThemedText>
+            </View>
+            {unreadCount > 0 ? (
+              <View style={[localStyles.notifBadge, { backgroundColor: colors.error }]}>
+                <Text style={localStyles.notifBadgeTxt}>
+                  {unreadCount > 9 ? '9+' : String(unreadCount)}
+                </Text>
+              </View>
+            ) : null}
+            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          </Pressable>
+          <View style={localStyles.divider} />
+          <View style={localStyles.row}>
+            <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+              <Bell size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="defaultSemiBold">Notifications push</ThemedText>
+              <ThemedText type="muted" style={localStyles.rowSub}>
+                Commandes et livraisons
+              </ThemedText>
+            </View>
+            <Switch
+              value={notifPush}
+              onValueChange={(v) => {
+                setNotifPush(v);
+                void patchNotif({ notif_push_enabled: v });
+              }}
+              trackColor={{ false: colors.borderStrong, true: colors.primaryMuted }}
+              thumbColor={notifPush ? colors.primary : colors.surfaceElevated}
+            />
+          </View>
+          <View style={localStyles.divider} />
+          <View style={localStyles.row}>
+            <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+              <Mail size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="defaultSemiBold">Notifications e-mail</ThemedText>
+              <ThemedText type="muted" style={localStyles.rowSub}>
+                Si une adresse est renseignée
+              </ThemedText>
+            </View>
+            <Switch
+              value={notifEmail}
+              onValueChange={(v) => {
+                setNotifEmail(v);
+                void patchNotif({ notif_email_enabled: v });
+              }}
+              trackColor={{ false: colors.borderStrong, true: colors.primaryMuted }}
+              thumbColor={notifEmail ? colors.primary : colors.surfaceElevated}
+            />
+          </View>
+        </View>
+
+        {/* ══════════════════════════════════════════════════
+            SÉCURITÉ
+        ══════════════════════════════════════════════════ */}
+        {renderSectionLabel('Sécurité')}
+        <BiometricLockToggle
+          colors={colors}
+          hint="Verrouillage biométrique au retour sur l'app"
+        />
+
+        {/* ══════════════════════════════════════════════════
+            AIDE & SUPPORT
+        ══════════════════════════════════════════════════ */}
+        {renderSectionLabel('Aide & support')}
+        <View style={localStyles.menuCard}>
+          <Pressable
+            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
+            onPress={() => router.push('/help-center')}
+            android_ripple={{ color: colors.primaryMuted }}>
+            <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+              <HelpCircle size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="defaultSemiBold">Centre d'aide</ThemedText>
+              <ThemedText type="muted" style={localStyles.rowSub}>
+                FAQ, questions fréquentes
               </ThemedText>
             </View>
             <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
           </Pressable>
           <View style={localStyles.divider} />
           <Pressable
-            style={({ pressed }) => [
-              localStyles.row,
-              pressed && { backgroundColor: colors.primarySoft },
-            ]}
-            onPress={() => router.push('/payment-methods')}
+            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
+            onPress={() => Linking.openURL('mailto:support@golivra.com')}
             android_ripple={{ color: colors.primaryMuted }}>
             <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
-              <CreditCard size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+              <MessageCircle size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
             </View>
             <View style={{ flex: 1 }}>
-              <ThemedText type="defaultSemiBold">Paiements</ThemedText>
+              <ThemedText type="defaultSemiBold">Contacter le support</ThemedText>
               <ThemedText type="muted" style={localStyles.rowSub}>
-                Méthodes de paiement et sécurité
+                support@golivra.com
+              </ThemedText>
+            </View>
+            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          </Pressable>
+          <View style={localStyles.divider} />
+          <Pressable
+            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
+            onPress={() => Linking.openURL('https://wa.me/243000000000')}
+            android_ripple={{ color: colors.primaryMuted }}>
+            <View style={[localStyles.rowIcon, { backgroundColor: '#25D366' }]}>
+              <Phone size={20} color="#FFFFFF" strokeWidth={LUCIDE_STROKE} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="defaultSemiBold">WhatsApp</ThemedText>
+              <ThemedText type="muted" style={localStyles.rowSub}>
+                Discuter avec notre équipe
+              </ThemedText>
+            </View>
+            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          </Pressable>
+          <View style={localStyles.divider} />
+          <Pressable
+            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
+            onPress={handleShare}
+            android_ripple={{ color: colors.primaryMuted }}>
+            <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+              <Share2 size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="defaultSemiBold">Partager GoLivra</ThemedText>
+              <ThemedText type="muted" style={localStyles.rowSub}>
+                Recommandez à vos amis
+              </ThemedText>
+            </View>
+            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          </Pressable>
+          <View style={localStyles.divider} />
+          <Pressable
+            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
+            onPress={() => {
+              Share.share({
+                message: 'Évaluez GoLivra sur l\'App Store ⭐',
+                title: 'Noter GoLivra',
+              });
+            }}
+            android_ripple={{ color: colors.primaryMuted }}>
+            <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+              <Star size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="defaultSemiBold">Noter l'application</ThemedText>
+              <ThemedText type="muted" style={localStyles.rowSub}>
+                Donnez-nous 5 étoiles ⭐
               </ThemedText>
             </View>
             <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
           </Pressable>
         </View>
 
-        {/* ── À propos ── */}
-        {renderSectionLabel('À propos')}
+        {/* ══════════════════════════════════════════════════
+            INFORMATIONS LÉGALES
+        ══════════════════════════════════════════════════ */}
+        {renderSectionLabel('Informations légales')}
         <View style={localStyles.menuCard}>
-          <View style={localStyles.row}>
+          <Pressable
+            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
+            onPress={() => Linking.openURL(PRIVACY_URL)}
+            android_ripple={{ color: colors.primaryMuted }}>
+            <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+              <Shield size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="defaultSemiBold">Politique de confidentialité</ThemedText>
+              <ThemedText type="muted" style={localStyles.rowSub}>
+                Comment nous protégeons vos données
+              </ThemedText>
+            </View>
+            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          </Pressable>
+          <View style={localStyles.divider} />
+          <Pressable
+            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
+            onPress={() => Linking.openURL(TERMS_URL)}
+            android_ripple={{ color: colors.primaryMuted }}>
+            <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+              <FileText size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="defaultSemiBold">Conditions générales</ThemedText>
+              <ThemedText type="muted" style={localStyles.rowSub}>
+                Termes et conditions d'utilisation
+              </ThemedText>
+            </View>
+            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          </Pressable>
+          <View style={localStyles.divider} />
+          <Pressable
+            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
+            onPress={() => Linking.openURL('https://golivra.com')}
+            android_ripple={{ color: colors.primaryMuted }}>
+            <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+              <Globe size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="defaultSemiBold">Site web</ThemedText>
+              <ThemedText type="muted" style={localStyles.rowSub}>
+                www.golivra.com
+              </ThemedText>
+            </View>
+            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          </Pressable>
+          <View style={localStyles.divider} />
+          <Pressable
+            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
+            onPress={() => Linking.openURL('https://golivra.com/a-propos')}
+            android_ripple={{ color: colors.primaryMuted }}>
+            <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
+              <BookOpen size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="defaultSemiBold">À propos de GoLivra</ThemedText>
+              <ThemedText type="muted" style={localStyles.rowSub}>
+                Notre mission et notre équipe
+              </ThemedText>
+            </View>
+            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          </Pressable>
+        </View>
+
+        {/* ══════════════════════════════════════════════════
+            PARAMÈTRES AVANCÉS
+        ══════════════════════════════════════════════════ */}
+        {renderSectionLabel('Paramètres avancés')}
+        <View style={localStyles.menuCard}>
+          <Pressable
+            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
+            onPress={handleClearCache}
+            android_ripple={{ color: colors.primaryMuted }}>
+            <View style={[localStyles.rowIcon, { backgroundColor: colors.errorSoft }]}>
+              <Trash2 size={20} color={colors.error} strokeWidth={LUCIDE_STROKE} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="defaultSemiBold">
+                {cacheCleared ? '✅ Cache vidé !' : 'Vider le cache'}
+              </ThemedText>
+              <ThemedText type="muted" style={localStyles.rowSub}>
+                Libérez de l'espace de stockage
+              </ThemedText>
+            </View>
+            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          </Pressable>
+          <View style={localStyles.divider} />
+          <Pressable
+            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
+            onPress={() => router.push('/how-multi-delivery')}
+            android_ripple={{ color: colors.primaryMuted }}>
             <View style={[localStyles.rowIcon, { backgroundColor: colors.primarySoft }]}>
               <Info size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
             </View>
             <View style={{ flex: 1 }}>
-              <ThemedText type="defaultSemiBold">Version</ThemedText>
+              <ThemedText type="defaultSemiBold">Livraison multi-commerces</ThemedText>
               <ThemedText type="muted" style={localStyles.rowSub}>
-                GoLivra {appVersion}
+                Comment ça fonctionne
               </ThemedText>
             </View>
-          </View>
+            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+          </Pressable>
+        </View>
+
+        {/* ══════════════════════════════════════════════════
+            VERSION
+        ══════════════════════════════════════════════════ */}
+        <View style={[localStyles.versionBlock, { marginTop: 24 }]}>
+          <ThemedText type="muted" style={localStyles.versionText}>
+            GoLivra v{appVersion}
+          </ThemedText>
+          <ThemedText type="muted" style={localStyles.versionSub}>
+            Fait avec ❤️ en RDC 🇨🇩
+          </ThemedText>
         </View>
       </ScrollView>
     </ThemedView>
@@ -366,7 +614,7 @@ function makeLocalStyles(c: AppPalette) {
       fontWeight: '800',
       color: c.primaryDeep,
       marginBottom: 8,
-      marginTop: 18,
+      marginTop: 20,
       textTransform: 'uppercase',
       letterSpacing: 0.65,
       marginLeft: 2,
@@ -386,6 +634,7 @@ function makeLocalStyles(c: AppPalette) {
       paddingVertical: 13,
     },
     rowActive: { backgroundColor: c.primarySoft },
+    rowPressed: { backgroundColor: c.primarySoft },
     rowIcon: {
       width: 40,
       height: 40,
@@ -422,11 +671,22 @@ function makeLocalStyles(c: AppPalette) {
       minWidth: 20,
       height: 20,
       borderRadius: 10,
-      borderWidth: 1.5,
       paddingHorizontal: 5,
       alignItems: 'center',
       justifyContent: 'center',
     },
     notifBadgeTxt: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
+    versionBlock: {
+      alignItems: 'center',
+      paddingVertical: 16,
+      gap: 4,
+    },
+    versionText: {
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    versionSub: {
+      fontSize: 12,
+    },
   });
 }
