@@ -1554,7 +1554,7 @@ const styles = StyleSheet.create({
   // la carte garde la même taille que les autres (pas de carte pleine largeur).
   gridRow: { gap: 10, marginBottom: 10 },
   gridRowDesktop: { gap: 16, marginBottom: 16 },
-  gridCell: { flex: 1 },
+  gridCell: { flex: 1, maxWidth: '49%' },
 
   // Loader
   loaderRow: {
