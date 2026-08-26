@@ -1,5 +1,5 @@
 import { Image, type ImageProps } from 'expo-image';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 
 import { GOLIVRA_GREEN } from '@/constants/app-palette';
 
@@ -10,8 +10,11 @@ type Props = Omit<ImageProps, 'style'> & {
 };
 
 /**
- * Image avec watermark GoLivra discret (coin bas-droite, opacité faible).
+ * Image avec watermark GoLivra discret (coin bas-droite).
  * Utilisé pour toutes les photos de produits/plats du marketplace.
+ *
+ * Le watermark est un texte "GoLivra" en semi-transparent,
+ * facilement lisible mais non intrusif.
  */
 export function WatermarkedImage({ showWatermark = true, style, ...rest }: Props) {
   return (
@@ -19,13 +22,7 @@ export function WatermarkedImage({ showWatermark = true, style, ...rest }: Props
       <Image contentFit="cover" transition={200} {...rest} style={[styles.image, style]} />
       {showWatermark ? (
         <View style={styles.watermark}>
-          <View style={styles.watermarkBg}>
-            <Image
-              source={require('@/assets/images/logo.png')}
-              style={styles.watermarkLogo}
-              contentFit="contain"
-            />
-          </View>
+          <Text style={styles.watermarkText}>GoLivra</Text>
         </View>
       ) : null}
     </View>
@@ -44,21 +41,18 @@ const styles = StyleSheet.create({
   },
   watermark: {
     position: 'absolute',
-    bottom: 4,
-    right: 4,
-    opacity: 0.35,
-  },
-  watermarkBg: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.85)',
+    bottom: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.45)',
     borderRadius: 4,
-    paddingHorizontal: 3,
+    paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  watermarkLogo: {
-    width: 16,
-    height: 12,
-    tintColor: GOLIVRA_GREEN,
+  watermarkText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    fontStyle: 'italic',
   },
 });
