@@ -1,7 +1,5 @@
 import { Image, type ImageProps } from 'expo-image';
-import { View, StyleSheet, Text } from 'react-native';
-
-import { GOLIVRA_GREEN } from '@/constants/app-palette';
+import { View, StyleSheet } from 'react-native';
 
 type Props = Omit<ImageProps, 'style'> & {
   style?: ImageProps['style'];
@@ -10,11 +8,8 @@ type Props = Omit<ImageProps, 'style'> & {
 };
 
 /**
- * Image avec watermark GoLivra discret (coin bas-droite).
- * Utilisé pour toutes les photos de produits/plats du marketplace.
- *
- * Le watermark est un texte "GoLivra" en semi-transparent,
- * facilement lisible mais non intrusif.
+ * Image avec watermark GoLivra (coin bas-droite).
+ * Bande semi-transparente avec texte "GoLivra" en italique.
  */
 export function WatermarkedImage({ showWatermark = true, style, ...rest }: Props) {
   return (
@@ -22,7 +17,14 @@ export function WatermarkedImage({ showWatermark = true, style, ...rest }: Props
       <Image contentFit="cover" transition={200} {...rest} style={[styles.image, style]} />
       {showWatermark ? (
         <View style={styles.watermark}>
-          <Text style={styles.watermarkText}>GoLivra</Text>
+          <View style={styles.watermarkBg}>
+            <Image
+              source={require('@/assets/images/logo.png')}
+              style={styles.watermarkLogo}
+              contentFit="contain"
+              transition={0}
+            />
+          </View>
         </View>
       ) : null}
     </View>
@@ -41,18 +43,19 @@ const styles = StyleSheet.create({
   },
   watermark: {
     position: 'absolute',
-    bottom: 6,
-    right: 6,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    bottom: 8,
+    right: 8,
   },
-  watermarkText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    fontStyle: 'italic',
+  watermarkBg: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  watermarkLogo: {
+    width: 22,
+    height: 22,
   },
 });

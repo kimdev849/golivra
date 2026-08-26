@@ -432,6 +432,18 @@ export default function HomeScreen() {
     return sortProducts(list, sort);
   }, [searchActive, searchResult, feedProducts, category, sort, debouncedSearch]);
 
+  // Pour la grille 2 colonnes mobile : si le nombre de produits est impair,
+  // on ajoute un élément invisible pour que le dernier vrai produit ne
+  // prenne pas toute la largeur (bug connu de FlatList numColumns).
+  const paddedProducts = useMemo(() => {
+    if (isDesktop || displayProducts.length === 0 || displayProducts.length % 2 === 0) {
+      return displayProducts;
+    }
+    // Élément sentinel : même shape qu'un ProductPublic mais id vide
+    const sentinel = { ...displayProducts[0], id: '__pad__' } as ProductPublic;
+    return [...displayProducts, sentinel];
+  }, [displayProducts, isDesktop]);
+
   const isEnterpriseView = !searchActive && (category === 'restaurant' || category === 'boutique');
 
   /** Options de tri selon le contenu affiché : commerces ≠ produits. */
@@ -616,7 +628,10 @@ export default function HomeScreen() {
   // ── Render helpers ────────────────────────────────────────────
 
   const renderProduct = useCallback(
-    ({ item }: { item: ProductPublic }) => (
+    ({ item }: { item: ProductPublic }) => {
+      // Élément sentinel invisible (padding grille)
+      if (item.id === '__pad__') return <View style={styles.gridCell} />;
+      return (
       <View style={styles.gridCell}>
         <PremiumCard
           product={item}
@@ -628,7 +643,8 @@ export default function HomeScreen() {
           isDesktop={isDesktop}
         />
       </View>
-    ),
+      );
+    },
     [favProductKeys, onToggleFav, router, colors, enterpriseImageById, isDesktop],
   );
 
@@ -1026,7 +1042,7 @@ export default function HomeScreen() {
       {showProductGrid ? (
         <FlatList
           ref={flatListRef}
-          data={displayProducts}
+          data={paddedProducts}
           key={`grid-${category}-${searchActive ? debouncedSearch : 'feed'}`}
           numColumns={isDesktop ? DESKTOP_GRID_COLUMNS : 2}
           keyExtractor={(p) => `${p.kind || 'p'}-${p.id}`}
