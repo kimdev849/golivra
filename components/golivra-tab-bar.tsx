@@ -181,6 +181,11 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 8,
     paddingHorizontal: 4,
+    shadowColor: '#0C3020',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 12,
   },
   tab: {
     flex: 1,

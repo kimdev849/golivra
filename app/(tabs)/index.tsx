@@ -1356,14 +1356,14 @@ const styles = StyleSheet.create({
 
   // Enterprise card (horizontal)
   enterpriseCard: {
-    width: 120,
+    width: 124,
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#0C3020',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    elevation: 3,
     paddingBottom: 10,
     borderWidth: 1,
   },
@@ -1474,13 +1474,13 @@ const styles = StyleSheet.create({
 
   // Premium product card (2-col grid → 4-col on desktop)
   premiumCard: {
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#0C3020',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    elevation: 3,
     borderWidth: 1,
   },
   premiumCardImg: {
@@ -1521,9 +1521,9 @@ const styles = StyleSheet.create({
   premiumCardBody: {
     paddingHorizontal: 10,
     paddingTop: 8,
-    paddingBottom: 10,
-    gap: 3,
-    minHeight: 60,
+    paddingBottom: 12,
+    gap: 4,
+    minHeight: 62,
   },
   premiumCardBodyDesktop: {
     paddingHorizontal: 12,
