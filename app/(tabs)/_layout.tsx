@@ -50,8 +50,13 @@ export default function TabLayout() {
     void hydrateSessionToken().then((token) => {
       if (!alive) return;
       if (!token) {
-        setSessionOk(false);
-        router.replace('/auth');
+        // ══════════════════════════════════════════════════════════
+        // DA « zéro blocage » : pas de token → mode invité.
+        // L'utilisateur découvre l'app librement.
+        // L'auth n'est demandée que pour les actions personnelles.
+        // ══════════════════════════════════════════════════════════
+        setSessionOk(true);
+        prefetchClientCatalog();
         return;
       }
       setSessionOk(true);
@@ -65,11 +70,10 @@ export default function TabLayout() {
   useFocusEffect(
     useCallback(() => {
       void hydrateSessionToken().then((token) => {
-        if (!token) {
-          router.replace('/auth');
-          return;
+        // DA « zéro blocage » : pas de token → on reste sur la page.
+        if (token) {
+          void verifySessionInBackground(token);
         }
-        void verifySessionInBackground(token);
       });
     }, [router, verifySessionInBackground]),
   );
