@@ -91,7 +91,7 @@ export function GuestLoginSheet({ visible, onLogin, onSignup, onDismiss }: Props
         </Pressable>
 
         {/* Merchant link */}
-        <Pressable onPress={onLogin} style={styles.merchantLink} hitSlop={6}>
+        <Pressable onPress={onSignup} style={styles.merchantLink} hitSlop={6}>
           <Text style={[styles.merchantText, { color: colors.textMuted }]}>
             🏪 Vous avez un commerce ?{' '}
             <Text style={{ color: colors.primary, fontWeight: '700' }}>

@@ -20,7 +20,6 @@ import { useIsWebDesktop } from '@/hooks/use-is-web-desktop';
 import { DESKTOP_MAX_WIDTH, DESKTOP_PADDING } from '@/components/desktop-layout';
 import { apiFetch } from '@/lib/api';
 import { getSessionToken } from '@/lib/auth';
-import { GuestLoginSheet } from '@/components/guest-login-sheet';
 import { fetchAllEnterprises, peekAllEnterprises } from '@/lib/client-data';
 import { fetchCached, invalidateCached, peekCached } from '@/lib/request-cache';
 import { formatDateTimeFr } from '@/lib/datetime';
@@ -319,7 +318,6 @@ export default function OrdersScreen() {
   });
   const [pendingReviews, setPendingReviews] = useState<{ id: string; sous_commande_id: string; enterprise_nom: string | null }[]>([]);
   const [hasToken, setHasToken] = useState<boolean | null>(null);
-  const [showGuestSheet, setShowGuestSheet] = useState(false);
   const isDesktop = useIsWebDesktop();
 
   const bottomPad = isDesktop ? 24 : Math.max(insets.bottom, 12) + TAB_BAR_CONTENT_PADDING_BOTTOM;
@@ -473,8 +471,13 @@ export default function OrdersScreen() {
             </ThemedText>
             <Pressable
               style={[styles.emptyBtn, { backgroundColor: colors.primary }]}
-              onPress={() => setShowGuestSheet(true)}>
+              onPress={() => router.push('/auth')}>
               <ThemedText style={[styles.emptyBtnText, { color: colors.onPrimary }]}>Se connecter</ThemedText>
+            </Pressable>
+            <Pressable
+              style={[styles.emptyBtn, { borderColor: colors.border, borderWidth: 1.5, backgroundColor: 'transparent' }]}
+              onPress={() => router.push('/signup/choose')}>
+              <ThemedText style={[styles.emptyBtnText, { color: colors.primary }]}>Créer un compte</ThemedText>
             </Pressable>
           </View>
         ) : loading ? (
@@ -513,7 +516,6 @@ export default function OrdersScreen() {
           />
         )}
       </ScrollView>
-      <GuestLoginSheet visible={showGuestSheet} onClose={() => setShowGuestSheet(false)} />
     </ThemedView>
   );
 }

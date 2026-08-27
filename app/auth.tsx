@@ -403,13 +403,7 @@ export default function AuthScreen() {
             </View>
           </View>
 
-          {/* ── Mention version bêta ── */}
-          <View style={styles.betaBadge}>
-            <FlaskConical size={13} color={colors.primary} strokeWidth={2.4} />
-            <ThemedText style={[styles.betaText, { color: colors.textMuted }]}>
-              GoLivra · Version bêta
-            </ThemedText>
-          </View>
+
         </ScrollView>
       </KeyboardAvoidingView>
     </ThemedView>

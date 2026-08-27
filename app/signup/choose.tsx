@@ -272,8 +272,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   choiceText: { flex: 1, gap: 3 },
-  choiceTitle: { fontSize: 16.5, fontWeight: '900' },
-  choiceSubtitle: { fontSize: 12.5, lineHeight: 17 },
+  choiceTitle: { fontSize: 16, fontWeight: '700' },
+  choiceSubtitle: { fontSize: 13, lineHeight: 18 },
   pressed: {
     opacity: 0.88,
     transform: [{ scale: 0.992 }],
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     marginTop: 34,
     alignItems: 'center',
   },
-  footerText: { fontSize: 14.5, fontWeight: '700' },
+  footerText: { fontSize: 14, fontWeight: '500' },
   loginButton: {
     marginTop: 14,
     alignSelf: 'center',
