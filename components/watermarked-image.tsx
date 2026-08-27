@@ -1,5 +1,19 @@
 import { Image, type ImageProps } from 'expo-image';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
+
+/**
+ * Tiny GoLivra wordmark rendered as a text badge (always visible, no asset loading).
+ */
+function GoLivraBadge({ size = 'sm' }: { size?: 'sm' | 'lg' }) {
+  const isLg = size === 'lg';
+  return (
+    <View style={[styles.watermarkBg, isLg && styles.watermarkBgLg]}>
+      <Text style={[styles.watermarkTxt, isLg && styles.watermarkTxtLg]}>
+        GoLivra
+      </Text>
+    </View>
+  );
+}
 
 type Props = Omit<ImageProps, 'style'> & {
   style?: ImageProps['style'];
@@ -9,22 +23,15 @@ type Props = Omit<ImageProps, 'style'> & {
 
 /**
  * Image avec watermark GoLivra (coin bas-droite).
- * Bande semi-transparente avec texte "GoLivra" en italique.
+ * Badge semi-transparent avec texte "GoLivra" en italique.
  */
 export function WatermarkedImage({ showWatermark = true, style, ...rest }: Props) {
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, (style as any)?.height || (style as any)?.aspectRatio ? {} : { minHeight: 120 }]}>
       <Image contentFit="cover" transition={200} {...rest} style={[styles.image, style]} />
       {showWatermark ? (
         <View style={styles.watermark}>
-          <View style={styles.watermarkBg}>
-            <Image
-              source={require('@/assets/images/logo.png')}
-              style={styles.watermarkLogo}
-              contentFit="contain"
-              transition={0}
-            />
-          </View>
+          <GoLivraBadge />
         </View>
       ) : null}
     </View>
@@ -35,29 +42,38 @@ const styles = StyleSheet.create({
   container: {
     position: 'relative',
     width: '100%',
-    // No fixed height — let the Image determine its own size.
-    // The parent View should provide height constraints (aspectRatio, fixed height, etc.)
   },
   image: {
     width: '100%',
-    // height is NOT forced here — it comes from the parent style prop
-    // (e.g. aspectRatio: 4/3 for product cards, fixed height for hero)
   },
   watermark: {
     position: 'absolute',
     bottom: 8,
     right: 8,
+    zIndex: 10,
   },
   watermarkBg: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 3,
   },
-  watermarkLogo: {
-    width: 22,
-    height: 22,
+  watermarkBgLg: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  watermarkTxt: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+    fontStyle: 'italic',
+    letterSpacing: 0.4,
+  },
+  watermarkTxtLg: {
+    fontSize: 13,
+    fontWeight: '900',
   },
 });
