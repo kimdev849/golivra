@@ -323,7 +323,7 @@ export default function ProductDetailScreen() {
   return (
     <ThemedView style={[styles.screen, { backgroundColor: colors.background }]}>
       <ScrollView
-        style={{ maxWidth: contentWidth, alignSelf: 'center', width: '100%' }}
+        style={{ flex: 1, maxWidth: contentWidth, alignSelf: 'center', width: '100%' }}
         contentContainerStyle={{ paddingBottom: DETAIL_SCREEN_PADDING_BOTTOM + insets.bottom + 96 }}
         showsVerticalScrollIndicator={false}>
         {/* HERO IMAGE */}
@@ -701,7 +701,7 @@ export default function ProductDetailScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  heroWrap: { position: 'relative' },
+  heroWrap: { position: 'relative', maxHeight: 340, overflow: 'hidden' },
   // Hero compact (4:3, hauteur max 340) : l'image prend la place d'un beau
   // bandeau, pas quasiment tout l'écran comme le carré pleine largeur.
   heroImg: { width: '100%', aspectRatio: 4 / 3, maxHeight: 340, backgroundColor: '#eee' },
