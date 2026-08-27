@@ -38,10 +38,14 @@ function TabItem({
   onPress: () => void;
   onLongPress: () => void;
 }) {
-  const pressed = useSharedValue(0);
+  const bgOpacity = useSharedValue(isFocused ? 1 : 0);
 
-  const iconAnim = useAnimatedStyle(() => ({
-    transform: [{ scale: pressed.value > 0 ? 0.88 : 1 }],
+  React.useEffect(() => {
+    bgOpacity.value = withTiming(isFocused ? 1 : 0, { duration: 200 });
+  }, [isFocused, bgOpacity]);
+
+  const bgAnim = useAnimatedStyle(() => ({
+    opacity: bgOpacity.value,
   }));
 
   return (
@@ -51,20 +55,31 @@ function TabItem({
       accessibilityLabel={title}
       onPress={onPress}
       onLongPress={onLongPress}
-      onPressIn={() => { pressed.value = 1; }}
-      onPressOut={() => { pressed.value = 0; }}
       style={styles.tab}
       hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-      <Animated.View style={iconAnim}>
+      {/* Green capsule behind icon — fades in/out */}
+      <Animated.View
+        style={[
+          styles.pill,
+          { backgroundColor: colors.primary },
+          bgAnim,
+        ]}
+      />
+      <View style={styles.iconWrap}>
         {Icon ? (
           <Icon
             focused={isFocused}
-            color={isFocused ? colors.primary : colors.tabInactive}
+            color={isFocused ? '#FFFFFF' : colors.tabInactive}
             size={22}
             strokeWidth={isFocused ? 2.5 : LUCIDE_STROKE}
           />
         ) : null}
-      </Animated.View>
+        {title === 'Panier' && cartCount > 0 ? (
+          <View style={[styles.badge, { backgroundColor: colors.error }]}>
+            <Text style={styles.badgeText}>{cartCount > 99 ? '99+' : String(cartCount)}</Text>
+          </View>
+        ) : null}
+      </View>
       <Text
         style={[
           styles.label,
@@ -73,11 +88,6 @@ function TabItem({
         numberOfLines={1}>
         {title}
       </Text>
-      {title === 'Panier' && cartCount > 0 ? (
-        <View style={[styles.badge, { backgroundColor: colors.error }]}>
-          <Text style={styles.badgeText}>{cartCount > 99 ? '99+' : String(cartCount)}</Text>
-        </View>
-      ) : null}
     </PlatformPressable>
   );
 }
@@ -173,8 +183,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-around',
     borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 8,
-    paddingHorizontal: 4,
+    paddingTop: 10,
+    paddingBottom: 8,
+    paddingHorizontal: 6,
   },
   tab: {
     flex: 1,
@@ -182,19 +193,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 3,
     paddingTop: 4,
-    paddingBottom: 2,
+    paddingBottom: 4,
+    position: 'relative',
+  },
+  pill: {
+    position: 'absolute',
+    top: 0,
+    width: 52,
+    height: 32,
+    borderRadius: 16,
+  },
+  iconWrap: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   label: { fontSize: 10, letterSpacing: -0.2, fontWeight: '500' },
   badge: {
     position: 'absolute',
-    top: 0,
-    right: '25%',
+    top: -6,
+    right: -10,
     minWidth: 17,
     height: 17,
     borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
+    zIndex: 1,
   },
   badgeText: { color: '#FFF', fontSize: 10, fontWeight: '800' },
 });

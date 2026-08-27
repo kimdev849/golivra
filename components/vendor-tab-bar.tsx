@@ -38,6 +38,16 @@ function TabItem({
   onPress: () => void;
   onLongPress: () => void;
 }) {
+  const bgOpacity = useSharedValue(isFocused ? 1 : 0);
+
+  React.useEffect(() => {
+    bgOpacity.value = withTiming(isFocused ? 1 : 0, { duration: 200 });
+  }, [isFocused, bgOpacity]);
+
+  const bgAnim = useAnimatedStyle(() => ({
+    opacity: bgOpacity.value,
+  }));
+
   return (
     <PlatformPressable
       accessibilityRole="button"
@@ -47,11 +57,19 @@ function TabItem({
       onLongPress={onLongPress}
       style={styles.tab}
       hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-      <View>
+      {/* Green capsule behind icon — fades in/out */}
+      <Animated.View
+        style={[
+          styles.pill,
+          { backgroundColor: colors.primary },
+          bgAnim,
+        ]}
+      />
+      <View style={styles.iconWrap}>
         {Icon ? (
           <Icon
             focused={isFocused}
-            color={isFocused ? colors.primary : colors.tabInactive}
+            color={isFocused ? '#FFFFFF' : colors.tabInactive}
             size={22}
             strokeWidth={isFocused ? 2.5 : LUCIDE_STROKE}
           />
@@ -177,8 +195,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-around',
     borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 8,
-    paddingHorizontal: 4,
+    paddingTop: 10,
+    paddingBottom: 8,
+    paddingHorizontal: 6,
   },
   tab: {
     flex: 1,
@@ -186,19 +205,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 3,
     paddingTop: 4,
-    paddingBottom: 2,
+    paddingBottom: 4,
+    position: 'relative',
+  },
+  pill: {
+    position: 'absolute',
+    top: 0,
+    width: 52,
+    height: 32,
+    borderRadius: 16,
+  },
+  iconWrap: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   label: { fontSize: 10, letterSpacing: -0.2, fontWeight: '500' },
   badge: {
     position: 'absolute',
-    top: -4,
-    right: -8,
+    top: -6,
+    right: -10,
     minWidth: 17,
     height: 17,
     borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
+    zIndex: 1,
   },
   badgeText: { color: '#FFF', fontSize: 10, fontWeight: '800' },
 });
