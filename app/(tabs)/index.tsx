@@ -182,6 +182,7 @@ const PremiumCard = memo(function PremiumCard({
             source={{ uri: imageUrl }}
             recyclingKey={imageUrl}
             cachePolicy="memory-disk"
+            style={{ width: '100%', height: '100%' }}
           />
         ) : (
           <UtensilsCrossed size={28} color={colors.primary} strokeWidth={1.5} />

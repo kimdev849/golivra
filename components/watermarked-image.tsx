@@ -35,9 +35,13 @@ const styles = StyleSheet.create({
   container: {
     position: 'relative',
     width: '100%',
+    // No fixed height — let the Image determine its own size.
+    // The parent View should provide height constraints (aspectRatio, fixed height, etc.)
   },
   image: {
     width: '100%',
+    // height is NOT forced here — it comes from the parent style prop
+    // (e.g. aspectRatio: 4/3 for product cards, fixed height for hero)
   },
   watermark: {
     position: 'absolute',
