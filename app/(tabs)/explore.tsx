@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -154,6 +154,7 @@ function OrdersScreenInner({
   onOrderRated: (orderId: string, sousCommandeId?: string | null) => void;
   colors: ReturnType<typeof useAppColors>;
 }) {
+  const navigating = useRef(false);
   const visible = expanded ? ordersForTab : ordersForTab.slice(0, PREVIEW_LIMIT);
   const hasMore = ordersForTab.length > PREVIEW_LIMIT;
 
@@ -177,7 +178,7 @@ function OrdersScreenInner({
         <Pressable
           key={o.id}
           style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-          onPress={() => router.push(`/order-tracking/${o.id}`)}
+          onPress={() => { if (navigating.current) return; navigating.current = true; router.push(`/order-tracking/${o.id}`); setTimeout(() => { navigating.current = false; }, 500); }}
           android_ripple={{ color: colors.primarySoft }}>
           <View style={styles.cardHeader}>
             <View style={styles.cardHeaderLeft}>

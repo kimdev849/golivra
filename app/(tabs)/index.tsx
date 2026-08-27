@@ -336,6 +336,7 @@ export default function HomeScreen() {
   const flatListRef = useRef<FlatList>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const filterScrollRef = useRef<ScrollView>(null);
+  const navigatingRef = useRef(false);
   const desktopSearch = useDesktopSearch();
   const [localSearch, setLocalSearch] = useState('');
   // On desktop, the search is controlled by the WebNavbar context
@@ -635,7 +636,7 @@ export default function HomeScreen() {
       <View style={styles.gridCell}>
         <PremiumCard
           product={item}
-          onPress={() => router.push(productDetailHref(item) as never)}
+          onPress={() => { if (navigatingRef.current) return; navigatingRef.current = true; router.push(productDetailHref(item) as never); setTimeout(() => { navigatingRef.current = false; }, 500); }}
           isFav={favProductKeys.has(`${item.kind === 'article' ? 'article' : 'plat'}:${item.id}`)}
           onToggleFav={() => void onToggleFav(item)}
           colors={colors}

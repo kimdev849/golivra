@@ -117,6 +117,7 @@ export default function ProductDetailScreen() {
   const [selectedOptions, setSelectedOptions] = useState<SelectedOptionChoice[]>([]);
   const [note, setNote] = useState('');
   const [selectedGalleryIndex, setSelectedGalleryIndex] = useState(0);
+  const navigatingBack = useRef(false);
 
   const { data: product, isLoading, error } = useQuery({
     queryKey: ['product', productId, kind],
@@ -350,7 +351,7 @@ export default function ProductDetailScreen() {
             <PressableScale
               style={[styles.iconBtn, { backgroundColor: colors.surface }]}
               scaleTo={0.9}
-              onPress={() => router.back()}
+              onPress={() => { if (navigatingBack.current) return; navigatingBack.current = true; router.back(); setTimeout(() => { navigatingBack.current = false; }, 600); }}
               hitSlop={8}
               accessibilityLabel="Retour">
               <ArrowLeft size={20} color={colors.text} strokeWidth={LUCIDE_STROKE} />

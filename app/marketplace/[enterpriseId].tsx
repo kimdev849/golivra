@@ -80,6 +80,7 @@ export default function EnterpriseDetailScreen() {
   const [token, setToken] = useState<string | null>(null);
   const [galleryState, setGalleryState] = useState<{ images: string[]; index: number } | null>(null);
   const [etaDetailOpen, setEtaDetailOpen] = useState(false);
+  const navigatingRef = useRef(false);
 
   const { data: enterprise, isLoading: loadingEnt, error: entError } = useQuery<EnterprisePublic>({
     queryKey: ['enterprise', id],
@@ -514,7 +515,7 @@ export default function EnterpriseDetailScreen() {
               <Pressable
                 key={p.id}
                 style={styles.productCard}
-                onPress={() => router.push(productDetailHref(p) as never)}
+                onPress={() => { if (navigatingRef.current) return; navigatingRef.current = true; router.push(productDetailHref(p) as never); setTimeout(() => { navigatingRef.current = false; }, 500); }}
                 android_ripple={{ color: colors.primaryMuted }}>
                 <Pressable
                   style={styles.productThumb}

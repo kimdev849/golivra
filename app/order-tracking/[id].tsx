@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -227,6 +227,7 @@ export default function OrderTrackingScreen() {
   const [payMethod, setPayMethod] = useState<'airtel' | 'mtn'>('airtel');
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
+  const navigatingBack = useRef(false);
 
   // Horloge locale : fait tourner les comptes à rebours (MM:SS) chaque seconde,
   // uniquement tant qu'une échéance est active (attente de confirmation ou
@@ -501,7 +502,7 @@ export default function OrderTrackingScreen() {
     <ThemedView style={styles.screen} lightColor={colors.backgroundAlt} darkColor={colors.backgroundAlt}>
       {/* ── Header ── */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 10), backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <Pressable onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: colors.surfaceMuted }]} hitSlop={12}>
+        <Pressable onPress={() => { if (navigatingBack.current) return; navigatingBack.current = true; router.back(); setTimeout(() => { navigatingBack.current = false; }, 600); }} style={[styles.backBtn, { backgroundColor: colors.surfaceMuted }]} hitSlop={12}>
           <ArrowLeft size={20} color={colors.text} strokeWidth={2.5} />
         </Pressable>
         <View style={styles.headerCenter}>
