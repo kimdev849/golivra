@@ -42,16 +42,16 @@ export function stackModalOptions(colors: AppPalette): NativeStackNavigationOpti
   };
 }
 
-/** Retour écran connexion après déconnexion (tous rôles). */
+/** Retour à l'accueil en mode invité après déconnexion. */
 export function navigateToAuthAfterLogout(): void {
-  router.replace('/auth');
+  router.replace('/(tabs)');
 
   // Sur le web, la pile imbriquée (vendor/courier) peut ignorer replace : repli doux.
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     setTimeout(() => {
       const path = window.location.pathname.replace(/\/$/, '');
-      if (!path.endsWith('/auth') && !path.includes('/auth')) {
-        window.location.replace('/auth');
+      if (path.includes('/auth')) {
+        window.location.replace('/');
       }
     }, 150);
   }
