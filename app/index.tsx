@@ -16,7 +16,7 @@ import {
   signalBootstrapSettled,
 } from '@/lib/app-bootstrap';
 
-const SLOGAN = 'On vous apporte ce dont vous avez besoin ..';
+const SLOGAN = 'Découvrez vos restaurants, boutiques\net produits préférés à Brazzaville.';
 /** Orange marque GoLivra (utilisé dans le logo, le t-shirt et la casquette). */
 const GOLIVRA_ORANGE = '#F58A07';
 
@@ -29,6 +29,11 @@ export default function LandingScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [isCheckingFirstLaunch, setIsCheckingFirstLaunch] = useState(true);
+
+  const goToDiscover = async () => {
+    await markOnboardingComplete();
+    router.replace('/(tabs)');
+  };
 
   const goToAuth = async () => {
     await markOnboardingComplete();
@@ -131,14 +136,22 @@ export default function LandingScreen() {
         ]}>
         <ThemedText style={styles.slogan}>{SLOGAN}</ThemedText>
 
+        {/* CTA principal : Découvrir */}
         <Pressable
-          onPress={goToAuth}
+          onPress={goToDiscover}
           android_ripple={{ color: 'rgba(255,255,255,0.18)', borderless: false }}
           style={({ pressed }) => [
             styles.cta,
             { backgroundColor: GOLIVRA_ORANGE, width: buttonWidth, opacity: pressed ? 0.92 : 1 },
           ]}>
-          <ThemedText style={styles.ctaText}>Se connecter</ThemedText>
+          <ThemedText style={styles.ctaText}>Découvrir GoLivra</ThemedText>
+        </Pressable>
+
+        {/* Lien secondaire : J'ai déjà un compte */}
+        <Pressable onPress={goToAuth} hitSlop={8}>
+          <ThemedText style={styles.loginLink}>
+            Déjà membre ?{' '}<ThemedText style={styles.loginLinkBold}>Se connecter</ThemedText>
+          </ThemedText>
         </Pressable>
 
         <View style={styles.betaBadge}>
@@ -199,6 +212,16 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     letterSpacing: 0.3,
+  },
+  loginLink: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  loginLinkBold: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   betaBadge: {
     flexDirection: 'row',

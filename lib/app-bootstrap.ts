@@ -63,21 +63,20 @@ export async function resolveBootstrapTarget(): Promise<BootstrapTarget> {
   const token = await getSessionToken();
   const snapshot = await hydrateSessionSnapshot();
 
-  // Landing (image + slogan + bouton Connexion) : UNIQUEMENT à la toute
-  // première ouverture, quand aucun compte n'est connecté. Le flag est posé
-  // quand l'utilisateur appuie sur « Connexion » (markOnboardingComplete) —
-  // jamais automatiquement. Ensuite : connexion directe si déconnecté, accueil
-  // si une session est active.
-  if (!token && !(await isOnboardingComplete())) {
-    return { kind: 'onboarding' };
-  }
-
+  // ═══════════════════════════════════════════════════════════════════
+  // DA « zéro blocage » : tout le monde accède directement à l'accueil.
+  // L'inscription / connexion n'est demandée QUE quand l'utilisateur
+  // veut effectuer une action personnelle (favoris, profil, commande…).
+  // ═══════════════════════════════════════════════════════════════════
   if (token) {
     prefetchClientCatalog();
     return { kind: 'home', href: homeHrefForRole(snapshot?.role) };
   }
 
-  return { kind: 'auth' };
+  // Pas de token → on va quand même à l'accueil (mode invité).
+  // L'utilisateur découvre l'app librement.
+  prefetchClientCatalog();
+  return { kind: 'home', href: '/(tabs)' };
 }
 
 export function isAuthErrorMessage(message: string): boolean {

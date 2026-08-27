@@ -2,6 +2,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { useSafeNavigation } from '@/hooks/use-safe-navigation';
+import { useGuestAuth } from '@/hooks/use-guest-auth';
+import { GuestLoginSheet } from '@/components/guest-login-sheet';
 import {
   ActivityIndicator,
   FlatList,
@@ -48,6 +50,7 @@ export default function FavoritesScreen() {
   const { safePush } = useSafeNavigation();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
+  const { requireAuth, showLoginSheet, goToAuth, goToSignup, dismissSheet } = useGuestAuth();
   const [tab, setTab] = useState<TabKey>('commerces');
 
   // Commerces
@@ -186,6 +189,12 @@ export default function FavoritesScreen() {
 
   return (
     <ThemedView style={styles.screen}>
+      <GuestLoginSheet
+        visible={showLoginSheet}
+        onLogin={goToAuth}
+        onSignup={goToSignup}
+        onDismiss={dismissSheet}
+      />
       <View style={[styles.head, {
         paddingTop: Math.max(insets.top, 14),
         paddingHorizontal: isDesktop ? DESKTOP_PADDING : 16,
