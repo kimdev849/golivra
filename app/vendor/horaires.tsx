@@ -1,8 +1,8 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useLocalSearchParams } from 'expo-router';
 import { Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -76,9 +76,9 @@ function sameHours(a: DayState, b: DayState): boolean {
 /** Résumé humain et compact de la semaine (groupes de jours consécutifs). */
 function humanWeekSummary(days: DayState[]): string {
   const open = days.filter((d) => d.ouvert);
-  if (open.length === 0) return 'Aucun jour d\u2019ouverture — vous ne recevrez aucune commande.';
+  if (open.length === 0) return 'Aucun jour d\u2019ouverture \u2014 vous ne recevrez aucune commande.';
   if (open.length === 7 && open.every((d) => sameHours(d, open[0]))) {
-    return `Tous les jours · ${hourFromDate(open[0].ouverture)}\u2013${hourFromDate(open[0].fermeture)}`;
+    return `Tous les jours \u00b7 ${hourFromDate(open[0].ouverture)}\u2013${hourFromDate(open[0].fermeture)}`;
   }
   const groups: { days: number[]; hours: string }[] = [];
   for (const d of open) {
@@ -94,10 +94,12 @@ function humanWeekSummary(days: DayState[]): string {
     .map((g) => {
       const names = g.days.map((j) => DAY_SHORT[j]);
       const range = names.length > 1 ? `${names[0]}\u2013${names[names.length - 1]}` : names[0];
-      return `${range} · ${g.hours}`;
+      return `${range} \u00b7 ${g.hours}`;
     })
     .join('  |  ');
 }
+
+const IS_ANDROID = Platform.OS === 'android';
 
 export default function VendorHorairesScreen() {
   const insets = useSafeAreaInsets();
@@ -110,8 +112,16 @@ export default function VendorHorairesScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [picker, setPicker] = useState<PickerTarget | null>(null);
+
+  // --- Picker state ---
+  // Android: native dialog (no Modal needed). iOS: Modal + spinner.
+  const [androidPicker, setAndroidPicker] = useState<PickerTarget | null>(null);
+  const [iosPicker, setIosPicker] = useState<PickerTarget | null>(null);
   const [pendingTime, setPendingTime] = useState<Date | null>(null);
+
+  // Ref to track the picker target during Android onChange callbacks
+  const androidPickerRef = useRef<PickerTarget | null>(null);
+
   const [hasSavedHours, setHasSavedHours] = useState(false);
 
   useEffect(() => {
@@ -152,22 +162,49 @@ export default function VendorHorairesScreen() {
     setDays((prev) => prev.map((d) => (d.jour === jour ? { ...d, ...patch } : d)));
   }, []);
 
-  const openPicker = useCallback((target: PickerTarget) => {
-    setPendingTime(target.value);
-    setPicker(target);
-  }, []);
+  // ─── Picker openers ────────────────────────────────────────────────────
+  const openPicker = useCallback(
+    (target: PickerTarget) => {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (IS_ANDROID) {
+        androidPickerRef.current = target;
+        setAndroidPicker(target);
+      } else {
+        setPendingTime(target.value);
+        setIosPicker(target);
+      }
+    },
+    [],
+  );
 
-  const closePicker = useCallback(() => {
-    setPicker(null);
+  // ─── iOS: close / apply ────────────────────────────────────────────────
+  const closeIosPicker = useCallback(() => {
+    setIosPicker(null);
     setPendingTime(null);
   }, []);
 
-  const applyPicker = useCallback(() => {
-    if (!picker) return;
-    updateDay(picker.jour, { [picker.field]: pendingTime ?? picker.value });
-    setPicker(null);
+  const applyIosPicker = useCallback(() => {
+    if (!iosPicker) return;
+    updateDay(iosPicker.jour, { [iosPicker.field]: pendingTime ?? iosPicker.value });
+    setIosPicker(null);
     setPendingTime(null);
-  }, [picker, pendingTime, updateDay]);
+  }, [iosPicker, pendingTime, updateDay]);
+
+  // ─── Android: native dialog onChange ────────────────────────────────────
+  const handleAndroidChange = useCallback(
+    (event: DateTimePickerEvent, _date?: Date) => {
+      const target = androidPickerRef.current;
+      // Always clear the picker so the dialog closes
+      setAndroidPicker(null);
+      androidPickerRef.current = null;
+
+      if (event.type === 'set' && event.nativeEvent.timestamp && target) {
+        const date = new Date(event.nativeEvent.timestamp);
+        updateDay(target.jour, { [target.field]: date });
+      }
+    },
+    [updateDay],
+  );
 
   const allOpen = () => setDays(defaultDays());
   const allClosed = () =>
@@ -182,7 +219,6 @@ export default function VendorHorairesScreen() {
 
   const openCount = days.filter((d) => d.ouvert).length;
 
-  // Aperçu en direct : l'état recalculé à chaque édition, comme le verra le client.
   const previewRows = useMemo<EnterpriseHoraires[]>(
     () =>
       days
@@ -194,8 +230,7 @@ export default function VendorHorairesScreen() {
         })),
     [days],
   );
-  // Aperçu en direct : recalculé à chaque rendu (aucun useMemo) pour que le
-  // statut reste exact même si l'heure change pendant que l'écran est ouvert.
+
   const preview = computeOpenStatus(previewRows);
   const summary = useMemo(() => humanWeekSummary(days), [days]);
   const todayIdx = new Date().getDay();
@@ -212,7 +247,7 @@ export default function VendorHorairesScreen() {
   } else if (preview.open) {
     previewTitle = 'Ouvert aujourd\u2019hui';
     previewSub = preview.todayHours
-      ? `Vos clients peuvent commander · ${preview.todayHours}`
+      ? `Vos clients peuvent commander \u00b7 ${preview.todayHours}`
       : 'Vos clients peuvent commander.';
   } else if (preview.nextLabel.startsWith('aujourd')) {
     previewTitle = 'Fermé pour le moment';
@@ -285,7 +320,7 @@ export default function VendorHorairesScreen() {
         <View style={[styles.infoBanner, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
           <Info size={15} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
           <ThemedText style={[styles.infoText, { color: colors.textSecondary }]}>
-            Vos clients ne peuvent commander que pendant ces horaires. Le changement s’applique
+            Vos clients ne peuvent commander que pendant ces horaires. Le changement s'applique
             immédiatement.
           </ThemedText>
         </View>
@@ -344,7 +379,6 @@ export default function VendorHorairesScreen() {
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             {days.map((d, i) => {
               const isToday = d.jour === todayIdx;
-              // Style des chips d'heure (uniquement rendues quand le jour est ouvert).
               const dayStyle = { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong };
               return (
                 <View key={d.jour}>
@@ -359,7 +393,7 @@ export default function VendorHorairesScreen() {
                         {isToday ? (
                           <View style={[styles.todayPill, { backgroundColor: colors.primarySoft }]}>
                             <ThemedText style={[styles.todayPillTxt, { color: colors.primary }]}>
-                              Aujourd’hui
+                              Aujourd'hui
                             </ThemedText>
                           </View>
                         ) : null}
@@ -455,52 +489,65 @@ export default function VendorHorairesScreen() {
         </Pressable>
       </View>
 
-      {/* Sélecteur d'heure (bottom sheet) */}
-      <Modal visible={picker !== null} transparent animationType="fade" onRequestClose={closePicker}>
-        <Pressable style={styles.modalBackdrop} onPress={closePicker} />
-        <View
-          style={[
-            styles.sheet,
-            { backgroundColor: colors.surfaceElevated, borderTopColor: colors.border },
-          ]}>
-          <View style={[styles.sheetHandle, { backgroundColor: colors.borderStrong }]} />
-          <ThemedText style={[styles.sheetTitle, { color: colors.text }]}>
-            {picker
-              ? `${DAY_NAMES[picker.jour]} · ${picker.field === 'ouverture' ? 'Ouverture' : 'Fermeture'}`
-              : ''}
-          </ThemedText>
-          {picker ? (
-            <DateTimePicker
-              value={pendingTime ?? picker.value}
-              mode="time"
-              is24Hour
-              display={Platform.OS === 'android' ? 'default' : 'spinner'}
-              accentColor={colors.primary}
-              onChange={(event, date) => {
-                if (event.type === 'set' && date) setPendingTime(date);
-                else if (event.type === 'dismissed') closePicker();
-              }}
-            />
-          ) : null}
-          <View style={styles.sheetActions}>
-            <Pressable
-              style={[styles.sheetCancel, { borderColor: colors.border }]}
-              onPress={closePicker}
-              accessibilityRole="button"
-              accessibilityLabel="Annuler">
-              <X size={17} color={colors.textSecondary} strokeWidth={LUCIDE_STROKE} />
-              <ThemedText style={[styles.sheetCancelTxt, { color: colors.textSecondary }]}>Annuler</ThemedText>
-            </Pressable>
-            <Pressable
-              style={[styles.sheetDone, { backgroundColor: colors.primary }]}
-              onPress={() => applyPicker()}
-              accessibilityRole="button"
-              accessibilityLabel="Valider l'heure">
-              <ThemedText style={styles.sheetDoneText}>Valider</ThemedText>
-            </Pressable>
+      {/* ── Android: native clock dialog (no Modal needed) ── */}
+      {IS_ANDROID && androidPicker ? (
+        <DateTimePicker
+          value={androidPicker.value}
+          mode="time"
+          is24Hour
+          display="default"
+          accentColor={colors.primary}
+          onChange={handleAndroidChange}
+        />
+      ) : null}
+
+      {/* ── iOS: spinner inside a bottom sheet Modal ── */}
+      {!IS_ANDROID && (
+        <Modal visible={iosPicker !== null} transparent animationType="fade" onRequestClose={closeIosPicker}>
+          <Pressable style={styles.modalBackdrop} onPress={closeIosPicker} />
+          <View
+            style={[
+              styles.sheet,
+              { backgroundColor: colors.surfaceElevated, borderTopColor: colors.border },
+            ]}>
+            <View style={[styles.sheetHandle, { backgroundColor: colors.borderStrong }]} />
+            <ThemedText style={[styles.sheetTitle, { color: colors.text }]}>
+              {iosPicker
+                ? `${DAY_NAMES[iosPicker.jour]} · ${iosPicker.field === 'ouverture' ? 'Ouverture' : 'Fermeture'}`
+                : ''}
+            </ThemedText>
+            {iosPicker ? (
+              <DateTimePicker
+                value={pendingTime ?? iosPicker.value}
+                mode="time"
+                is24Hour
+                display="spinner"
+                accentColor={colors.primary}
+                onChange={(_event, date) => {
+                  if (date) setPendingTime(date);
+                }}
+              />
+            ) : null}
+            <View style={styles.sheetActions}>
+              <Pressable
+                style={[styles.sheetCancel, { borderColor: colors.border }]}
+                onPress={closeIosPicker}
+                accessibilityRole="button"
+                accessibilityLabel="Annuler">
+                <X size={17} color={colors.textSecondary} strokeWidth={LUCIDE_STROKE} />
+                <ThemedText style={[styles.sheetCancelTxt, { color: colors.textSecondary }]}>Annuler</ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.sheetDone, { backgroundColor: colors.primary }]}
+                onPress={() => applyIosPicker()}
+                accessibilityRole="button"
+                accessibilityLabel="Valider l'heure">
+                <ThemedText style={styles.sheetDoneText}>Valider</ThemedText>
+              </Pressable>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
     </ThemedView>
   );
 }
@@ -636,7 +683,7 @@ const styles = StyleSheet.create({
   },
   saveText: { color: '#FFFFFF', fontWeight: '900', fontSize: 16 },
 
-  /* Bottom sheet */
+  /* Bottom sheet (iOS only) */
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
   sheet: {
     borderTopLeftRadius: 22,

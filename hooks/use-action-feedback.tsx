@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import type { LucideIcon } from 'lucide-react-native';
 
@@ -22,24 +22,21 @@ type FeedbackConfig = {
   icon?: LucideIcon;
 };
 
-const initial = {
-  visible: false,
-  variant: 'success' as ActionFeedbackVariant,
-  title: '',
-  message: undefined as string | undefined,
-  primaryLabel: 'OK',
-  secondaryLabel: undefined as string | undefined,
-  onPrimary: undefined as (() => void) | undefined,
-  onSecondary: undefined as (() => void) | undefined,
-  danger: false,
-  icon: undefined as LucideIcon | undefined,
-};
-
 export function useActionFeedback() {
-  const [state, setState] = useState(initial);
+  const [visible, setVisible] = useState(false);
+  const [variant, setVariant] = useState<ActionFeedbackVariant>('success');
+  const [title, setTitle] = useState('');
+  const [message, setMessage] = useState<string | undefined>(undefined);
+  const [primaryLabel, setPrimaryLabel] = useState<string>('OK');
+  const [secondaryLabel, setSecondaryLabel] = useState<string | undefined>(undefined);
+  const [danger, setDanger] = useState(false);
+  const [icon, setIcon] = useState<LucideIcon | undefined>(undefined);
+  // Store callbacks in refs so we never stale-close or cause re-renders
+  const onPrimaryRef = useRef<(() => void) | undefined>(undefined);
+  const onSecondaryRef = useRef<(() => void) | undefined>(undefined);
 
   const dismiss = useCallback(() => {
-    setState((s) => ({ ...s, visible: false }));
+    setVisible(false);
   }, []);
 
   const open = useCallback((config: FeedbackConfig) => {
@@ -52,18 +49,16 @@ export function useActionFeedback() {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
 
-    setState({
-      visible: true,
-      variant: config.variant,
-      title: config.title,
-      message: config.message,
-      primaryLabel: config.primaryLabel ?? 'OK',
-      secondaryLabel: config.secondaryLabel,
-      onPrimary: config.onPrimary,
-      onSecondary: config.onSecondary,
-      danger: config.danger ?? false,
-      icon: config.icon,
-    });
+    onPrimaryRef.current = config.onPrimary;
+    onSecondaryRef.current = config.onSecondary;
+    setVariant(config.variant);
+    setTitle(config.title);
+    setMessage(config.message);
+    setPrimaryLabel(config.primaryLabel ?? 'OK');
+    setSecondaryLabel(config.secondaryLabel);
+    setDanger(config.danger ?? false);
+    setIcon(config.icon);
+    setVisible(true);
   }, []);
 
   const showSuccess = useCallback(
@@ -124,23 +119,26 @@ export function useActionFeedback() {
     [open],
   );
 
+  // Stable component reference — only re-renders when `visible` or display props change.
+  // Callbacks are read from refs so they always run the latest version
+  // without causing unmount/remount of the Modal.
   const FeedbackOverlay = useCallback(
     () => (
       <ActionFeedbackOverlay
-        visible={state.visible}
-        variant={state.variant}
-        title={state.title}
-        message={state.message}
-        primaryLabel={state.primaryLabel}
-        secondaryLabel={state.secondaryLabel}
-        onPrimary={state.onPrimary}
-        onSecondary={state.onSecondary}
+        visible={visible}
+        variant={variant}
+        title={title}
+        message={message}
+        primaryLabel={primaryLabel}
+        secondaryLabel={secondaryLabel}
+        onPrimary={() => onPrimaryRef.current?.()}
+        onSecondary={() => onSecondaryRef.current?.()}
         onDismiss={dismiss}
-        danger={state.danger}
-        icon={state.icon}
+        danger={danger}
+        icon={icon}
       />
     ),
-    [state, dismiss],
+    [visible, variant, title, message, primaryLabel, secondaryLabel, dismiss, danger, icon],
   );
 
   return { showSuccess, showError, showInfo, showConfirm, dismiss, FeedbackOverlay };
