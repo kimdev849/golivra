@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAsyncStorage } from '@/lib/safe-async-storage';
 
 let secureStore: typeof import('expo-secure-store') | null = null;
 let nativeAvailable: boolean | null = null;
@@ -101,25 +101,33 @@ export async function secureDeleteItem(key: string): Promise<void> {
 // Préférences (onboarding, taille de texte), caches, panier local : un vol de
 // ces données n'équivaut pas à une prise de contrôle du compte.
 export async function safeGetItem(key: string): Promise<string | null> {
-  const ss = await getSecureStore();
-  if (ss) return ss.getItemAsync(key);
-  return AsyncStorage.getItem(key);
+  try {
+    const ss = await getSecureStore();
+    if (ss) return await ss.getItemAsync(key);
+    return await SafeAsyncStorage.getItem(key);
+  } catch {
+    return null;
+  }
 }
 
 export async function safeSetItem(key: string, value: string): Promise<void> {
-  const ss = await getSecureStore();
-  if (ss) {
-    await ss.setItemAsync(key, value);
-  } else {
-    await AsyncStorage.setItem(key, value);
-  }
+  try {
+    const ss = await getSecureStore();
+    if (ss) {
+      await ss.setItemAsync(key, value);
+    } else {
+      await SafeAsyncStorage.setItem(key, value);
+    }
+  } catch { /* ignore */ }
 }
 
 export async function safeDeleteItem(key: string): Promise<void> {
-  const ss = await getSecureStore();
-  if (ss) {
-    await ss.deleteItemAsync(key);
-  } else {
-    await AsyncStorage.removeItem(key);
-  }
+  try {
+    const ss = await getSecureStore();
+    if (ss) {
+      await ss.deleteItemAsync(key);
+    } else {
+      await SafeAsyncStorage.removeItem(key);
+    }
+  } catch { /* ignore */ }
 }
