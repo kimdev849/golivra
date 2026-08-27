@@ -1,4 +1,5 @@
 import { Link, useRouter } from 'expo-router';
+import { useSafeNavigation } from '@/hooks/use-safe-navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Keyboard,
@@ -42,6 +43,7 @@ const LOGO_ENTER = ZoomIn.springify().damping(14).mass(0.9).stiffness(120);
 
 export default function AuthScreen() {
   const router = useRouter();
+  const { safePush } = useSafeNavigation();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const colors = useAppColors();
@@ -326,7 +328,7 @@ export default function AuthScreen() {
 
                 <Pressable
                   style={({ pressed }) => [styles.forgotRow, pressed && styles.pressed]}
-                  onPress={() => router.push('/forgot-password')}
+                  onPress={() => safePush('/forgot-password')}
                   hitSlop={6}>
                   <ThemedText style={[styles.forgotText, { color: colors.primary }]}>
                     Mot de passe oublié ?

@@ -313,6 +313,7 @@ export function VendorProductFormWizard({
   };
 
   const submit = async () => {
+    if (saving) return;
     if (!validateAll()) return;
     setSaving(true);
     try {

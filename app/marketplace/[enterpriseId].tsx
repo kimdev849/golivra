@@ -182,8 +182,12 @@ export default function EnterpriseDetailScreen() {
     return { label: liveStatus.label, color: toneColor };
   })();
 
+  const lastAddRef = useRef<string>('');
   const addProduct = (p: ProductPublic) => {
     if (!enterprise) return;
+    if (lastAddRef.current === p.id) return;
+    lastAddRef.current = p.id;
+    setTimeout(() => { lastAddRef.current = ''; }, 800);
     const prix = getEffectiveUnitPrice(p);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     trackProductClick(enterprise.id, p.id);

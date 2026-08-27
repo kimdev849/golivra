@@ -213,8 +213,11 @@ export default function ProductDetailScreen() {
     }
   };
 
+  const addingRef = useRef(false);
   const onAddToCart = () => {
-    if (!product) return;
+    if (!product || addingRef.current) return;
+    addingRef.current = true;
+    setTimeout(() => { addingRef.current = false; }, 1000);
     // Chaque clic ajoute +1 unité. stockAvailable = plafond réel (stock dispo),
     // pas la quantité : sinon la ligne du panier resterait bloquée à 1.
     const stockCap = effectiveStockCap(product);
