@@ -1,13 +1,11 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowRight, User, X } from 'lucide-react';
+import { ArrowRight, User, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { useAppColors } from '@/hooks/use-app-colors';
 import { LUCIDE_STROKE } from '@/constants/icons';
-import { GOLIVRA_YELLOW } from '@/constants/app-palette';
 
 type Props = {
   visible: boolean;
