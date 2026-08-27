@@ -1,6 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { useSafeNavigation } from '@/hooks/use-safe-navigation';
 import {
   ActivityIndicator,
   Pressable,
@@ -154,7 +155,7 @@ function OrdersScreenInner({
   onOrderRated: (orderId: string, sousCommandeId?: string | null) => void;
   colors: ReturnType<typeof useAppColors>;
 }) {
-  const navigating = useRef(false);
+
   const visible = expanded ? ordersForTab : ordersForTab.slice(0, PREVIEW_LIMIT);
   const hasMore = ordersForTab.length > PREVIEW_LIMIT;
 
@@ -178,7 +179,7 @@ function OrdersScreenInner({
         <Pressable
           key={o.id}
           style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-          onPress={() => { if (navigating.current) return; navigating.current = true; router.push(`/order-tracking/${o.id}`); setTimeout(() => { navigating.current = false; }, 500); }}
+          onPress={() => safePush(`/order-tracking/${o.id}`)}
           android_ripple={{ color: colors.primarySoft }}>
           <View style={styles.cardHeader}>
             <View style={styles.cardHeaderLeft}>
@@ -218,7 +219,7 @@ function OrdersScreenInner({
         <Pressable
           key={o.id}
           style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-          onPress={() => router.push(`/order-tracking/${o.id}`)}
+          onPress={() => safePush(`/order-tracking/${o.id}`)}
           android_ripple={{ color: colors.primarySoft }}>
           <View style={styles.cardHeader}>
             <View style={styles.cardHeaderLeft}>
@@ -303,6 +304,7 @@ const ORDERS_CACHE_KEY = 'orders:client';
 export default function OrdersScreen() {
   const colors = useAppColors();
   const router = useRouter();
+  const { safePush, safeBack } = useSafeNavigation();
   const insets = useSafeAreaInsets();
   const [orders, setOrders] = useState<OrderRow[]>(() => peekCached<OrderRow[]>(ORDERS_CACHE_KEY, Number.POSITIVE_INFINITY) ?? []);
   const [enterprises, setEnterprises] = useState<Enterprise[]>(() => peekAllEnterprises() ?? []);

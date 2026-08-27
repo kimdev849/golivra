@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSafeNavigation } from '@/hooks/use-safe-navigation';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -80,7 +81,7 @@ export default function EnterpriseDetailScreen() {
   const [token, setToken] = useState<string | null>(null);
   const [galleryState, setGalleryState] = useState<{ images: string[]; index: number } | null>(null);
   const [etaDetailOpen, setEtaDetailOpen] = useState(false);
-  const navigatingRef = useRef(false);
+  const { safePush, safeBack } = useSafeNavigation();
 
   const { data: enterprise, isLoading: loadingEnt, error: entError } = useQuery<EnterprisePublic>({
     queryKey: ['enterprise', id],
@@ -297,7 +298,7 @@ export default function EnterpriseDetailScreen() {
             <PressableScale
               style={[styles.iconBtn, { backgroundColor: colors.surface }]}
               scaleTo={0.9}
-              onPress={() => router.back()}
+              onPress={() => safeBack()}
               hitSlop={8}
               accessibilityLabel="Retour">
               <ArrowLeft size={20} color={colors.text} strokeWidth={LUCIDE_STROKE} />
@@ -515,7 +516,7 @@ export default function EnterpriseDetailScreen() {
               <Pressable
                 key={p.id}
                 style={styles.productCard}
-                onPress={() => { if (navigatingRef.current) return; navigatingRef.current = true; router.push(productDetailHref(p) as never); setTimeout(() => { navigatingRef.current = false; }, 500); }}
+                onPress={() => safePush(productDetailHref(p))}
                 android_ripple={{ color: colors.primaryMuted }}>
                 <Pressable
                   style={styles.productThumb}

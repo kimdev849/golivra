@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { WatermarkedImage } from '@/components/watermarked-image';
 import { useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSafeNavigation } from '@/hooks/use-safe-navigation';
 import {
   ActivityIndicator,
   FlatList,
@@ -313,6 +314,7 @@ const EnterpriseCard = memo(function EnterpriseCard({
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { safePush, safeBack } = useSafeNavigation();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
@@ -337,7 +339,7 @@ export default function HomeScreen() {
   const flatListRef = useRef<FlatList>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const filterScrollRef = useRef<ScrollView>(null);
-  const navigatingRef = useRef(false);
+
   const desktopSearch = useDesktopSearch();
   const [localSearch, setLocalSearch] = useState('');
   // On desktop, the search is controlled by the WebNavbar context
@@ -637,7 +639,7 @@ export default function HomeScreen() {
       <View style={styles.gridCell}>
         <PremiumCard
           product={item}
-          onPress={() => { if (navigatingRef.current) return; navigatingRef.current = true; router.push(productDetailHref(item) as never); setTimeout(() => { navigatingRef.current = false; }, 500); }}
+          onPress={() => safePush(productDetailHref(item))}
           isFav={favProductKeys.has(`${item.kind === 'article' ? 'article' : 'plat'}:${item.id}`)}
           onToggleFav={() => void onToggleFav(item)}
           colors={colors}
@@ -843,7 +845,7 @@ export default function HomeScreen() {
               <EnterpriseCard
                 key={ent.id}
                 enterprise={ent}
-                onPress={() => router.push(`/marketplace/${ent.id}` as never)}
+                onPress={() => safePush(`/marketplace/${ent.id}`)}
                 colors={colors}
                 deliveryMinutes={deliveryMinutes}
                 isDesktop={isDesktop}
@@ -890,7 +892,7 @@ export default function HomeScreen() {
                     styles.entGridCard,
                     { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.93 : 1 },
                   ]}
-                  onPress={() => router.push(`/marketplace/${ent.id}` as never)}>
+                  onPress={() => safePush(`/marketplace/${ent.id}`)}>
                   <View style={[styles.entGridCardImg, { backgroundColor: colors.primarySoft }]}>
                     {resolveRemoteImageUrl(ent.image_url, ENT_IMG) ? (
                       <Image
@@ -927,7 +929,7 @@ export default function HomeScreen() {
                   styles.entRow,
                   { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.93 : 1 },
                 ]}
-                onPress={() => router.push(`/marketplace/${ent.id}` as never)}>
+                onPress={() => safePush(`/marketplace/${ent.id}`)}>
                 <View style={[styles.entRowImg, { backgroundColor: colors.primarySoft }]}>
                   {resolveRemoteImageUrl(ent.image_url, ENT_IMG) ? (
                     <Image

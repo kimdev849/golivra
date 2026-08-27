@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSafeNavigation } from '@/hooks/use-safe-navigation';
 import {
   Pressable,
   ScrollView,
@@ -118,7 +119,7 @@ export default function ProductDetailScreen() {
   const [selectedOptions, setSelectedOptions] = useState<SelectedOptionChoice[]>([]);
   const [note, setNote] = useState('');
   const [selectedGalleryIndex, setSelectedGalleryIndex] = useState(0);
-  const navigatingBack = useRef(false);
+  const { safePush, safeBack } = useSafeNavigation();
 
   const { data: product, isLoading, error } = useQuery({
     queryKey: ['product', productId, kind],
@@ -290,7 +291,7 @@ export default function ProductDetailScreen() {
         styles.vendorRow,
         { backgroundColor: colors.surface, borderColor: colors.border },
       ]}
-      onPress={() => router.push(`/marketplace/${product.entreprise_id}`)}
+      onPress={() => safePush(`/marketplace/${product.entreprise_id}`)}
       android_ripple={{ color: colors.primaryMuted }}>
       <View style={[styles.vendorIcon, { backgroundColor: colors.primarySoft }]}>
         {product.enterprise_image_url ? (
@@ -352,7 +353,7 @@ export default function ProductDetailScreen() {
             <PressableScale
               style={[styles.iconBtn, { backgroundColor: colors.surface }]}
               scaleTo={0.9}
-              onPress={() => { if (navigatingBack.current) return; navigatingBack.current = true; router.back(); setTimeout(() => { navigatingBack.current = false; }, 600); }}
+              onPress={() => safeBack()}
               hitSlop={8}
               accessibilityLabel="Retour">
               <ArrowLeft size={20} color={colors.text} strokeWidth={LUCIDE_STROKE} />

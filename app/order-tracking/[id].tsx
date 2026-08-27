@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { useSafeNavigation } from '@/hooks/use-safe-navigation';
 import {
   ActivityIndicator,
   Alert,
@@ -227,7 +228,7 @@ export default function OrderTrackingScreen() {
   const [payMethod, setPayMethod] = useState<'airtel' | 'mtn'>('airtel');
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
-  const navigatingBack = useRef(false);
+  const { safePush, safeReplace, safeBack } = useSafeNavigation();
 
   // Horloge locale : fait tourner les comptes à rebours (MM:SS) chaque seconde,
   // uniquement tant qu'une échéance est active (attente de confirmation ou
@@ -330,7 +331,7 @@ export default function OrderTrackingScreen() {
   };
 
   const goHome = () => {
-    router.replace('/(tabs)/explore');
+    safeReplace('/(tabs)/explore');
   };
 
   const callCourier = () => {
@@ -352,7 +353,7 @@ export default function OrderTrackingScreen() {
     return (
       <ThemedView style={styles.center} lightColor={colors.background} darkColor={colors.background}>
         <ThemedText>Commande introuvable.</ThemedText>
-        <Pressable style={{ marginTop: 20 }} onPress={() => router.back()}>
+        <Pressable style={{ marginTop: 20 }} onPress={() => safeBack()}>
           <ThemedText style={{ color: colors.primary }}>Retour</ThemedText>
         </Pressable>
       </ThemedView>
@@ -502,7 +503,7 @@ export default function OrderTrackingScreen() {
     <ThemedView style={styles.screen} lightColor={colors.backgroundAlt} darkColor={colors.backgroundAlt}>
       {/* ── Header ── */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 10), backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <Pressable onPress={() => { if (navigatingBack.current) return; navigatingBack.current = true; router.back(); setTimeout(() => { navigatingBack.current = false; }, 600); }} style={[styles.backBtn, { backgroundColor: colors.surfaceMuted }]} hitSlop={12}>
+        <Pressable onPress={() => safeBack()} style={[styles.backBtn, { backgroundColor: colors.surfaceMuted }]} hitSlop={12}>
           <ArrowLeft size={20} color={colors.text} strokeWidth={2.5} />
         </Pressable>
         <View style={styles.headerCenter}>
@@ -976,7 +977,7 @@ export default function OrderTrackingScreen() {
         {/* ── LIEN VERS LE DÉTAIL COMPLET DE LA LIVRAISON ── */}
         {primaryDeliveryId ? (
           <Pressable
-            onPress={() => router.push(`/delivery/${primaryDeliveryId}`)}
+            onPress={() => safePush(`/delivery/${primaryDeliveryId}`)}
             style={({ pressed }) => [
               styles.card,
               styles.linkCard,

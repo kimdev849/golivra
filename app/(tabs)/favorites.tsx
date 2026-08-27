@@ -1,6 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
+import { useSafeNavigation } from '@/hooks/use-safe-navigation';
 import {
   ActivityIndicator,
   FlatList,
@@ -44,6 +45,7 @@ type TabKey = 'commerces' | 'produits';
 
 export default function FavoritesScreen() {
   const router = useRouter();
+  const { safePush } = useSafeNavigation();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const [tab, setTab] = useState<TabKey>('commerces');
@@ -280,7 +282,7 @@ export default function FavoritesScreen() {
               return (
                 <Pressable
                   style={[styles.entGridCard, { borderColor: colors.border, backgroundColor: colors.surface }]}
-                  onPress={() => router.push(`/marketplace/${item.id}`)}>
+                  onPress={() => safePush(`/marketplace/${item.id}`)}>
                   <View style={[styles.entGridImg, { backgroundColor: colors.primarySoft }]}>
                     {img ? (
                       <Image source={{ uri: img }} style={{ width: '100%', height: '100%' }} contentFit="cover" transition={150} />
@@ -405,7 +407,7 @@ export default function FavoritesScreen() {
             <ListingCard
               product={item}
               variant={isDesktop ? 'grid' : 'feed'}
-              onPress={() => router.push(productDetailHref(item) as never)}
+              onPress={() => safePush(productDetailHref(item))}
               isFav
               onToggleFav={() => void onUnfavProduct(item)}
             />
