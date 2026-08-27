@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAsyncStorage as AsyncStorage } from '@/lib/safe-async-storage';
 import { SITE_URL } from '@/lib/config';
 import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';

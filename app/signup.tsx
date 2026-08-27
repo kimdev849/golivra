@@ -283,8 +283,12 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
       const reqId = (e as { requestId?: string })?.requestId;
       const rawMsg = e instanceof Error ? e.message : String(e);
       const lower = rawMsg.toLowerCase();
-      if (lower.includes('déjà enregistré') || lower.includes('deja enregistre')) {
-        setError('Ce numéro est déjà inscrit. Connectez-vous avec votre mot de passe.');
+      if (lower.includes('déjà enregistré') || lower.includes('deja enregistre') || lower.includes('déjà inscrit') || lower.includes('deja inscrit')) {
+        setError('Ce numéro est déjà inscrit.');
+        // Redirection automatique vers la connexion après 1.5s
+        setTimeout(() => {
+          router.replace('/auth');
+        }, 1500);
         return;
       }
       const msg = friendlyErrorMessage(e, 'La création du compte a échoué.');
