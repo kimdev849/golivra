@@ -193,7 +193,8 @@ export default function ProfileScreen() {
     setError(null);
     try {
       const token = await getSessionToken();
-      if (!token) throw new Error('Session expirée.');
+      // DA zéro blocage : pas de token → mode invité (pas d'erreur)
+      if (!token) { setIsLoading(false); return; }
 
       // Show cached profile immediately
       const cached = peekAuthMe(token);

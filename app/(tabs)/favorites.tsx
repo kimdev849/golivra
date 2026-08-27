@@ -77,6 +77,15 @@ export default function FavoritesScreen() {
   const loadEnterprises = useCallback(async (force = false) => {
     const gen = ++loadGen.current;
     setErrorEnt(null);
+    // DA zéro blocage : pas de token → on n'affiche rien (état vide)
+    const { getSessionToken } = await import('@/lib/auth');
+    const token = await getSessionToken();
+    if (!token) {
+      setEnterprises([]);
+      setFavoriteEntIds([]);
+      setLoadingEnt(false);
+      return;
+    }
     // 1) Affichage instantané : favoris locaux + catalogue en cache.
     const localIds = await getFavoriteEnterpriseIdsLocal();
     setFavoriteEntIds(localIds);
@@ -111,6 +120,15 @@ export default function FavoritesScreen() {
   const loadProducts = useCallback(async (force = false) => {
     const gen = ++loadGen.current;
     setErrorProd(null);
+    // DA zéro blocage : pas de token → on n'affiche rien
+    const { getSessionToken } = await import('@/lib/auth');
+    const token = await getSessionToken();
+    if (!token) {
+      setFavProducts([]);
+      setFavProductRefs([]);
+      setLoadingProd(false);
+      return;
+    }
     // 1) Affichage instantané : favoris produits locaux.
     const localRefs = await getFavoriteProductsLocal();
     setFavProductRefs(localRefs);

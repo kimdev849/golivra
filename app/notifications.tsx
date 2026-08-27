@@ -56,11 +56,22 @@ export default function NotificationsScreen() {
     setLoading(true); setError(null);
     try {
       const token = await getSessionToken();
-      if (!token) { setItems([]); setUnreadCount(0); return; }
+      if (!token) {
+        // DA zéro blocage : pas de token → état invité propre
+        setItems([]); setUnreadCount(0); setLoading(false);
+        return;
+      }
       const res = await fetchNotifications(token, { limit: 80 });
       setItems(res.items ?? []); setUnreadCount(res.unread_count ?? 0);
-    } catch (e) { setError(e instanceof Error ? e.message : 'Impossible de charger les notifications.'); }
-    finally { setLoading(false); }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '';
+      // Token expiré ou erreur auth → état invité, pas d'erreur agressive
+      if (/session|401|token|unauthorized/i.test(msg)) {
+        setItems([]); setUnreadCount(0);
+      } else {
+        setError(msg || 'Impossible de charger les notifications.');
+      }
+    } finally { setLoading(false); }
   }, []);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
