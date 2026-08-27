@@ -20,6 +20,7 @@ import { useIsWebDesktop } from '@/hooks/use-is-web-desktop';
 import { DESKTOP_MAX_WIDTH, DESKTOP_PADDING } from '@/components/desktop-layout';
 import { apiFetch } from '@/lib/api';
 import { getSessionToken } from '@/lib/auth';
+import { GuestLoginSheet } from '@/components/guest-login-sheet';
 import { fetchAllEnterprises, peekAllEnterprises } from '@/lib/client-data';
 import { fetchCached, invalidateCached, peekCached } from '@/lib/request-cache';
 import { formatDateTimeFr } from '@/lib/datetime';
@@ -317,6 +318,8 @@ export default function OrdersScreen() {
     annulees: false,
   });
   const [pendingReviews, setPendingReviews] = useState<{ id: string; sous_commande_id: string; enterprise_nom: string | null }[]>([]);
+  const [hasToken, setHasToken] = useState<boolean | null>(null);
+  const [showGuestSheet, setShowGuestSheet] = useState(false);
   const isDesktop = useIsWebDesktop();
 
   const bottomPad = isDesktop ? 24 : Math.max(insets.bottom, 12) + TAB_BAR_CONTENT_PADDING_BOTTOM;
@@ -333,7 +336,8 @@ export default function OrdersScreen() {
     }
     try {
       const token = await getSessionToken();
-      if (!token) { setOrders([]); setEnterprises([]); return; }
+      if (!token) { setHasToken(false); setOrders([]); setEnterprises([]); return; }
+      setHasToken(true);
       const [orderList, entList] = await Promise.all([
         fetchCached(ORDERS_CACHE_KEY, () => apiFetch<OrderRow[]>('/api/orders', { method: 'GET', token }), 60_000, force),
         fetchAllEnterprises(force),
@@ -457,8 +461,23 @@ export default function OrdersScreen() {
           })}
         </View>
 
-        {/* Content */}
-        {loading ? (
+        {/* Guest state */}
+        {hasToken === false ? (
+          <View style={styles.emptyState}>
+            <View style={[styles.emptyIconWrap, { backgroundColor: colors.primarySoft }]}>
+              <ScrollText size={32} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+            </View>
+            <ThemedText style={[styles.emptyTitle, { color: colors.text }]}>Connectez-vous</ThemedText>
+            <ThemedText style={[styles.emptyBody, { color: colors.textMuted }]}>
+              Connectez-vous pour suivre vos commandes et consulter votre historique.
+            </ThemedText>
+            <Pressable
+              style={[styles.emptyBtn, { backgroundColor: colors.primary }]}
+              onPress={() => setShowGuestSheet(true)}>
+              <ThemedText style={[styles.emptyBtnText, { color: colors.onPrimary }]}>Se connecter</ThemedText>
+            </Pressable>
+          </View>
+        ) : loading ? (
           <View style={styles.loader}>
             <ActivityIndicator size="large" color={colors.primary} />
           </View>
@@ -494,6 +513,7 @@ export default function OrdersScreen() {
           />
         )}
       </ScrollView>
+      <GuestLoginSheet visible={showGuestSheet} onClose={() => setShowGuestSheet(false)} />
     </ThemedView>
   );
 }
