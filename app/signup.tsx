@@ -331,7 +331,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
                   { backgroundColor: colors.surface, borderColor: colors.border },
                   pressed && styles.buttonPressed,
                 ]}
-                onPress={() => router.replace('/auth')}
+                onPress={() => { if (router.canGoBack()) router.back(); else router.replace('/(tabs)'); }}
                 hitSlop={6}>
                 <ChevronLeft size={22} color={colors.primary} strokeWidth={2.5} />
               </Pressable>
@@ -507,7 +507,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
                 </Pressable>
               )}
 
-              <Pressable style={({ pressed }) => [styles.secondaryButton, { backgroundColor: colors.primarySoft }, pressed ? styles.buttonPressed : undefined]} onPress={() => router.replace('/auth')}>
+              <Pressable style={({ pressed }) => [styles.secondaryButton, { backgroundColor: colors.primarySoft }, pressed ? styles.buttonPressed : undefined]} onPress={() => { if (router.canGoBack()) router.back(); else router.replace('/auth'); }}>
                 <ThemedText style={[styles.secondaryButtonText, { color: colors.primary }]}>{"J'ai déjà un compte"}</ThemedText>
               </Pressable>
 

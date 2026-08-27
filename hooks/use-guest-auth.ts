@@ -61,7 +61,7 @@ export function useGuestAuth() {
   const goToSignup = useCallback(() => {
     setShowLoginSheet(false);
     setPendingAction(null);
-    router.push('/signup/choose');
+    router.push('/signup');
   }, [router]);
 
   const dismissSheet = useCallback(() => {

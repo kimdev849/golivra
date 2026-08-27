@@ -90,7 +90,7 @@ export default function SignupChooseScreen() {
               { backgroundColor: colors.surface, borderColor: colors.border },
               pressed && styles.pressed,
             ]}
-            onPress={() => router.replace('/auth')}
+            onPress={() => { if (router.canGoBack()) router.back(); else router.replace('/(tabs)'); }}
             hitSlop={6}
           >
             <ChevronLeft size={22} color={colors.primary} strokeWidth={2.5} />
@@ -167,7 +167,7 @@ export default function SignupChooseScreen() {
                 { borderColor: colors.primary, width: cardWidth },
                 pressed ? styles.pressed : undefined,
               ]}
-              onPress={() => router.replace('/auth')}>
+              onPress={() => { if (router.canGoBack()) router.back(); else router.replace('/auth'); }}>
               <ThemedText style={[styles.loginButtonText, { color: colors.primary }]}>
                 Se connecter
               </ThemedText>

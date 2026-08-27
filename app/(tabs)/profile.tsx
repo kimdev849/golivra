@@ -392,25 +392,15 @@ export default function ProfileScreen() {
           /* ══════════════════════════════════════════════════
               MODE INVITÉ : pas de compte connecté
           ══════════════════════════════════════════════════ */
-          <>
-            <View style={styles.guestHeader}>
-              <View style={[styles.guestAvatar, { backgroundColor: colors.primarySoft }]}>
-                <User size={40} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-              </View>
-              <ThemedText style={[styles.guestTitle, { color: colors.text }]}>Bienvenue sur GoLivra</ThemedText>
-              <ThemedText style={[styles.guestSubtitle, { color: colors.textMuted }]}>Connectez-vous pour accéder à vos commandes, favoris et informations personnelles.</ThemedText>
+          <View style={styles.guestWrap}>
+            <View style={[styles.guestAvatar, { backgroundColor: colors.primarySoft }]}>
+              <User size={36} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
             </View>
-
-            {/* Espace client */}
-            <View style={[styles.guestCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={[styles.guestCardIcon, { backgroundColor: colors.primarySoft }]}>
-                <User size={22} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <ThemedText style={[styles.guestCardTitle, { color: colors.text }]}>👤 Espace client</ThemedText>
-                <ThemedText style={[styles.guestCardBody, { color: colors.textMuted }]}>Commandez dans vos restaurants et boutiques préférés.</ThemedText>
-              </View>
-            </View>
+            <ThemedText style={[styles.guestTitle, { color: colors.text }]}>Bienvenue sur GoLivra</ThemedText>
+            <ThemedText style={[styles.guestSubtitle, { color: colors.textMuted }]}>
+              Connectez-vous pour gérer vos commandes,
+              vos favoris et votre profil.
+            </ThemedText>
 
             <Pressable
               style={[styles.guestBtn, { backgroundColor: colors.primary }]}
@@ -420,29 +410,10 @@ export default function ProfileScreen() {
 
             <Pressable
               style={[styles.guestBtnOutline, { borderColor: colors.border }]}
-              onPress={() => router.push('/signup/choose')}>
-              <ThemedText style={[styles.guestBtnOutlineText, { color: colors.primary }]}>Créer un compte gratuit</ThemedText>
+              onPress={() => router.push('/signup')}>
+              <ThemedText style={[styles.guestBtnOutlineText, { color: colors.primary }]}>Créer un compte</ThemedText>
             </Pressable>
-
-            {/* Espace professionnel */}
-            <View style={[styles.guestDivider, { backgroundColor: colors.border }]} />
-
-            <View style={[styles.guestCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
-              <View style={[styles.guestCardIcon, { backgroundColor: colors.accentSoft }]}>
-                <Store size={22} color={colors.accent} strokeWidth={LUCIDE_STROKE} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <ThemedText style={[styles.guestCardTitle, { color: colors.text }]}>🏪 Vous êtes un professionnel ?</ThemedText>
-                <ThemedText style={[styles.guestCardBody, { color: colors.textMuted }]}>Gérez votre restaurant ou votre boutique sur GoLivra.</ThemedText>
-              </View>
-            </View>
-
-            <Pressable
-              style={[styles.guestBtnAccent, { backgroundColor: colors.accent }]}
-              onPress={() => router.push('/signup/choose')}>
-              <ThemedText style={[styles.guestBtnAccentText, { color: '#1A1A1A' }]}>Accéder à l'espace professionnel</ThemedText>
-            </Pressable>
-          </>
+          </View>
         ) : me ? (
           <>
             {/* ══════════════════════════════════════════════════
@@ -1001,17 +972,18 @@ const styles = StyleSheet.create({
   },
 
   // ── Mode invité ──────────────────────────────────────────
-  guestHeader: {
+  guestWrap: {
     alignItems: 'center',
-    paddingVertical: 24,
-    gap: 10,
+    paddingVertical: 32,
+    gap: 14,
   },
   guestAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 4,
   },
   guestTitle: {
     fontSize: 18,
@@ -1024,63 +996,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 16,
   },
-  guestCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 12,
-  },
-  guestCardIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  guestCardTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  guestCardBody: {
-    fontSize: 12.5,
-    lineHeight: 18,
-    marginTop: 2,
-  },
   guestBtn: {
+    width: '100%',
     borderRadius: 14,
     paddingVertical: 15,
     alignItems: 'center',
-    marginBottom: 10,
   },
   guestBtnText: {
     fontSize: 15,
     fontWeight: '800',
   },
   guestBtnOutline: {
+    width: '100%',
     borderRadius: 14,
     borderWidth: 1.5,
     paddingVertical: 14,
     alignItems: 'center',
-    marginBottom: 16,
   },
   guestBtnOutlineText: {
     fontSize: 14.5,
     fontWeight: '700',
-  },
-  guestDivider: {
-    height: 1,
-    marginBottom: 16,
-  },
-  guestBtnAccent: {
-    borderRadius: 14,
-    paddingVertical: 15,
-    alignItems: 'center',
-  },
-  guestBtnAccentText: {
-    fontSize: 14.5,
-    fontWeight: '800',
   },
 });

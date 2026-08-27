@@ -15,7 +15,7 @@ import {
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { ArrowRight, Eye, EyeOff, FlaskConical, Lock, Moon, Smartphone, Sun, UserPlus } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Eye, EyeOff, FlaskConical, Lock, Moon, Smartphone, Sun, UserPlus } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 
@@ -169,28 +169,39 @@ export default function AuthScreen() {
     <ThemedView style={styles.container}>
       <AuthBackdrop colors={colors} />
 
-      {/* Bascule rapide du thème clair/sombre */}
-      <Pressable
-        style={({ pressed }) => [
-          styles.themeToggle,
-          {
-            top: Math.max(insets.top + 10, 20),
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
-          },
-          pressed ? styles.pressed : undefined,
+      {/* Bouton retour + bascule thème */}
+      <View style={[styles.topBar, { top: Math.max(insets.top + 10, 20) }]}>
+        <Pressable
+          style={({ pressed }) => [
+            styles.iconBtn,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+            pressed ? styles.pressed : undefined,
         ]}
-        onPress={() => {
-          void Haptics.selectionAsync();
-          void setDarkMode(!isDark);
-        }}
-        hitSlop={8}>
-        {isDark ? (
-          <Sun size={20} color={colors.primary} strokeWidth={2.2} />
-        ) : (
-          <Moon size={20} color={colors.primary} strokeWidth={2.2} />
-        )}
-      </Pressable>
+          onPress={() => {
+            if (router.canGoBack()) router.back();
+            else router.replace('/(tabs)');
+          }}
+          hitSlop={8}>
+          <ArrowLeft size={20} color={colors.text} strokeWidth={2.2} />
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [
+            styles.iconBtn,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+            pressed ? styles.pressed : undefined,
+        ]}
+          onPress={() => {
+            void Haptics.selectionAsync();
+            void setDarkMode(!isDark);
+          }}
+          hitSlop={8}>
+          {isDark ? (
+            <Sun size={20} color={colors.primary} strokeWidth={2.2} />
+          ) : (
+            <Moon size={20} color={colors.primary} strokeWidth={2.2} />
+          )}
+        </Pressable>
+      </View>
 
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
@@ -222,11 +233,10 @@ export default function AuthScreen() {
               />
             </Animated.View>
             <ThemedText type="title" style={styles.title}>
-              Bon retour
+              Connexion
             </ThemedText>
             <ThemedText style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Vos favoris, vos commandes,
-              {'\n'}livrés en un clin d&apos;œil.
+              Connectez-vous pour finaliser votre commande
             </ThemedText>
           </Animated.View>
 
@@ -440,16 +450,21 @@ function makeAuthStyles(c: AppPalette) {
       fontWeight: '600',
       letterSpacing: 0.2,
     },
-    themeToggle: {
+    topBar: {
       position: 'absolute',
+      left: 20,
       right: 20,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      zIndex: 10,
+    },
+    iconBtn: {
       width: 42,
       height: 42,
       borderRadius: 21,
       borderWidth: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 10,
     },
     header: {
       alignItems: 'center',
