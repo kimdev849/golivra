@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { Tabs, useRouter } from 'expo-router';
-import { ClipboardList, Heart, Home, ShoppingBag, UserRound } from 'lucide-react-native';
+import { ClipboardList, Heart, Home, ShoppingCart, UserRound } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState, createContext, useContext } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 
@@ -114,7 +114,7 @@ export default function TabLayout() {
                 options={{
                   title: 'Panier',
                   tabBarIcon: ({ color, focused }) => (
-                    <ShoppingBag size={21} color={color} strokeWidth={focused ? 2.4 : LUCIDE_STROKE} />
+                    <ShoppingCart size={21} color={color} strokeWidth={focused ? 2.4 : LUCIDE_STROKE} />
                   ),
                 }}
               />
@@ -189,7 +189,7 @@ export default function TabLayout() {
           options={{
             title: 'Panier',
             tabBarIcon: ({ color, focused }) => (
-              <ShoppingBag size={21} color={color} strokeWidth={focused ? 2.4 : LUCIDE_STROKE} />
+              <ShoppingCart size={21} color={color} strokeWidth={focused ? 2.4 : LUCIDE_STROKE} />
             ),
           }}
         />
