@@ -122,6 +122,20 @@ export function sortEnterprisesByPopularity<
   });
 }
 
+/** Trie les commerces du mieux noté au moins bien noté. */
+export function sortEnterprisesByRating<
+  T extends { note_moyenne?: number | null; nb_avis?: number | null },
+>(list: T[]): T[] {
+  return [...list].sort((a, b) => {
+    const noteA = a.note_moyenne ?? 0;
+    const noteB = b.note_moyenne ?? 0;
+    // Priorité absolue à la note moyenne
+    if (noteB !== noteA) return noteB - noteA;
+    // En cas d'égalité, celui avec le plus d'avis passe en premier
+    return (b.nb_avis ?? 0) - (a.nb_avis ?? 0);
+  });
+}
+
 /** Trie les commerces du plus récent au plus ancien (date de création). */
 export function sortEnterprisesByRecency<
   T extends { cree_le?: string | null; created_at?: string | null },

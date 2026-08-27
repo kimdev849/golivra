@@ -55,6 +55,7 @@ import {
   fetchProductFeed,
   searchCatalog,
   sortEnterprisesByPopularity,
+  sortEnterprisesByRating,
   sortEnterprisesByRecency,
   type CatalogSearchType,
   type EnterprisePublic,
@@ -85,7 +86,7 @@ const ENT_IMG: ResizeOptions = { width: 120, format: 'webp', quality: 75 };
 // ─── Types ────────────────────────────────────────────────────────
 
 type FilterTab = 'all' | 'plat' | 'article' | 'restaurant' | 'boutique' | 'promo';
-type SortKey = 'recent' | 'popular' | 'price_low' | 'price_high';
+type SortKey = 'recent' | 'popular' | 'rated' | 'price_low' | 'price_high';
 
 // ─── Food category chips (visual) ─────────────────────────────────
 
@@ -450,6 +451,7 @@ export default function HomeScreen() {
   const sortOptions: { key: SortKey; label: string }[] = isEnterpriseView
     ? [
         { key: 'popular', label: 'Plus populaires' },
+        { key: 'rated', label: 'Mieux notés' },
         { key: 'recent', label: 'Plus récents' },
       ]
     : [
@@ -459,16 +461,14 @@ export default function HomeScreen() {
 
   const displayEnterprises = useMemo(() => {
     if (searchActive) return searchResult?.enterprises ?? [];
-    if (category === 'restaurant') {
-      if (sort === 'popular') return sortEnterprisesByPopularity(restaurants);
-      if (sort === 'recent') return sortEnterprisesByRecency(restaurants);
-      return restaurants;
-    }
-    if (category === 'boutique') {
-      if (sort === 'popular') return sortEnterprisesByPopularity(boutiques);
-      if (sort === 'recent') return sortEnterprisesByRecency(boutiques);
-      return boutiques;
-    }
+    const applySort = (list: EnterprisePublic[]) => {
+      if (sort === 'popular') return sortEnterprisesByPopularity(list);
+      if (sort === 'rated') return sortEnterprisesByRating(list);
+      if (sort === 'recent') return sortEnterprisesByRecency(list);
+      return list;
+    };
+    if (category === 'restaurant') return applySort(restaurants);
+    if (category === 'boutique') return applySort(boutiques);
     return [];
   }, [searchActive, searchResult, category, restaurants, boutiques, sort]);
 
@@ -537,7 +537,7 @@ export default function HomeScreen() {
   useEffect(() => {
     const enterprise = !searchActive && (category === 'restaurant' || category === 'boutique');
     if (enterprise) {
-      setSort((s) => (s === 'popular' || s === 'recent' ? s : 'popular'));
+      setSort((s) => (s === 'popular' || s === 'recent' || s === 'rated' ? s : 'popular'));
     } else {
       setSort((s) => (s === 'price_low' || s === 'price_high' || s === 'recent' ? s : 'recent'));
     }

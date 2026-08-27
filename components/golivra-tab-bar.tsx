@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
+  interpolate,
   interpolateColor,
   useAnimatedStyle,
   useSharedValue,
@@ -18,11 +19,14 @@ import { useAppColors } from '@/hooks/use-app-colors';
 import { shouldShowTabBar } from '@/lib/tab-bar-visibility';
 
 /**
- * Barre de navigation pleine largeur ancrée en bas : onglet actif en cercle
- * pleine couleur avec ressort (spring), micro-interactions à l'appui,
- * badge panier, et séparée du contenu par une fine bordure supérieure.
+ * Barre de navigation client — design 2026 :
+ * - Pill flottant animé sous l'onglet actif (pas de cercle autour de l'icône)
+ * - Fond glassmorphism semi-transparent
+ * - Micro-interactions subtiles
+ * - Icônes libres (pas de bulle colorée)
  */
 const TAB_ORDER = ['index', 'explore', 'cart', 'favorites', 'profile'] as const;
+const TAB_WIDTH = 64; // largeur de chaque onglet pour calculer le pill
 
 function triggerTabHaptic() {
   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -35,55 +39,46 @@ function TabItem({
   title,
   colors,
   cartCount,
+  tabX,
+  index,
   onPress,
   onLongPress,
 }: {
   route: { key: string; name: string };
   isFocused: boolean;
-  Icon?: (props: {
-    focused: boolean;
-    color: string;
-    size: number;
-    strokeWidth?: number;
-  }) => React.ReactNode;
+  Icon?: (props: { focused: boolean; color: string; size: number; strokeWidth?: number }) => React.ReactNode;
   title: string;
   colors: ReturnType<typeof useAppColors>;
   cartCount: number;
+  tabX: Animated.SharedValue<number>;
+  index: number;
   onPress: () => void;
   onLongPress: () => void;
 }) {
-  const active = useSharedValue(isFocused ? 1 : 0);
   const pressed = useSharedValue(0);
 
-  React.useEffect(() => {
-    active.value = withSpring(isFocused ? 1 : 0, {
-      damping: 18,
-      stiffness: 220,
-      mass: 0.6,
-    });
-  }, [isFocused, active]);
+  const iconColor = isFocused ? colors.primary : colors.tabInactive;
+  const labelColor = isFocused ? colors.primary : colors.tabInactive;
 
-  const circleAnim = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(
-      active.value,
-      [0, 1],
-      [colors.surfaceElevated, colors.primary],
-    ),
+  const iconAnim = useAnimatedStyle(() => ({
     transform: [
-      {
-        scale:
-          (0.86 + 0.14 * active.value) *
-          (1 - 0.05 * pressed.value),
-      },
+      { scale: interpolate(pressed.value, [0, 1], [1, 0.88]) },
+      { translateY: interpolate(pressed.value, [0, 1], [0, -1]) },
     ],
   }));
 
-  const isCart = route.name === 'cart';
-  const contentColor = isFocused ? colors.onPrimary : colors.tabInactive;
-  const labelColor = isFocused ? colors.primary : colors.tabInactive;
+  // Animate pill position
+  React.useEffect(() => {
+    if (isFocused) {
+      tabX.value = withSpring(index * TAB_WIDTH, {
+        damping: 20,
+        stiffness: 250,
+        mass: 0.8,
+      });
+    }
+  }, [isFocused, index, tabX]);
 
-  // Le badge panier « pop » avec un ressort à chaque changement de quantité,
-  // pour bien mettre le panier en avant dès qu'il contient quelque chose.
+  const isCart = route.name === 'cart';
   const badgeScale = useSharedValue(0);
   React.useEffect(() => {
     if (cartCount > 0) {
@@ -103,35 +98,27 @@ function TabItem({
       accessibilityLabel={title}
       onPress={onPress}
       onLongPress={onLongPress}
-      onPressIn={() => {
-        pressed.value = 1;
-      }}
-      onPressOut={() => {
-        pressed.value = 0;
-      }}
+      onPressIn={() => { pressed.value = 1; }}
+      onPressOut={() => { pressed.value = 0; }}
       style={styles.tab}
       hitSlop={{ top: 6, bottom: 10, left: 4, right: 4 }}>
-      <Animated.View style={[styles.iconWrap, circleAnim]}>
+      <Animated.View style={iconAnim}>
         {Icon ? (
           <Icon
             focused={isFocused}
-            color={contentColor}
-            size={21}
+            color={iconColor}
+            size={22}
             strokeWidth={isFocused ? 2.4 : LUCIDE_STROKE}
           />
         ) : null}
       </Animated.View>
       <Text
-        style={[
-          styles.label,
-          { color: labelColor, fontWeight: isFocused ? '500' : '400' },
-        ]}
+        style={[styles.label, { color: labelColor, fontWeight: isFocused ? '700' : '500' }]}
         numberOfLines={1}>
         {title}
       </Text>
       {isCart && cartCount > 0 ? (
-        <Animated.View
-          style={[styles.cartBadge, { borderColor: colors.surfaceElevated }, badgeAnim]}>
+        <Animated.View style={[styles.cartBadge, { borderColor: colors.surfaceElevated }, badgeAnim]}>
           <Text style={styles.cartBadgeText}>{cartCount > 99 ? '99+' : String(cartCount)}</Text>
         </Animated.View>
       ) : null}
@@ -162,9 +149,31 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
   );
 
   const focusedRouteName = state.routes[state.index]?.name;
+  const focusedIndex = orderedRoutes.findIndex((r) => r.name === focusedRouteName);
+
+  // Animated pill position
+  const tabX = useSharedValue(focusedIndex >= 0 ? focusedIndex * TAB_WIDTH : 0);
+
+  const pillStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: tabX.value }],
+  }));
 
   return (
     <Animated.View style={[styles.root, barAnimStyle]} pointerEvents={visible ? 'auto' : 'none'}>
+      {/* Floating pill indicator */}
+      <View style={[styles.pillTrack, { bottom: bottomPad + 34 }]}>
+        <Animated.View
+          style={[
+            styles.pill,
+            {
+              backgroundColor: colors.primary,
+              width: TAB_WIDTH - 20,
+            },
+            pillStyle,
+          ]}
+        />
+      </View>
+
       <View
         style={[
           styles.bar,
@@ -174,7 +183,7 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
             paddingBottom: bottomPad,
           },
         ]}>
-        {orderedRoutes.map((route) => {
+        {orderedRoutes.map((route, i) => {
           const { options } = descriptors[route.key];
           const isFocused = focusedRouteName === route.name;
           const title =
@@ -209,6 +218,8 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
               title={title}
               colors={colors}
               cartCount={itemCount}
+              tabX={tabX}
+              index={i}
               onPress={onPress}
               onLongPress={onLongPress}
             />
@@ -220,13 +231,26 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
 }
 
 const styles = StyleSheet.create({
-  // Barre pleine largeur ancrée en bas — pas de pastille flottante,
-  // pas d'espace à gauche/droite. Séparée du contenu par une fine bordure.
   root: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
+  },
+  pillTrack: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    flexDirection: 'row',
+    paddingHorizontal: 4,
+    height: 32,
+    zIndex: 0,
+  },
+  pill: {
+    height: 28,
+    borderRadius: 14,
+    position: 'absolute',
   },
   bar: {
     flexDirection: 'row',
@@ -234,6 +258,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingTop: 7,
     paddingHorizontal: 4,
+    zIndex: 1,
   },
   tab: {
     flex: 1,
@@ -241,15 +266,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 3,
     paddingTop: 4,
+    zIndex: 2,
   },
-  iconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  label: { fontSize: 11, letterSpacing: -0.2, textTransform: 'lowercase' },
+  label: { fontSize: 11, letterSpacing: -0.2 },
   cartBadge: {
     position: 'absolute',
     top: 0,
