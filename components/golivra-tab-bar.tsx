@@ -18,16 +18,14 @@ import { useAppColors } from '@/hooks/use-app-colors';
 import { shouldShowTabBar } from '@/lib/tab-bar-visibility';
 
 /**
- * Barre de navigation client — style pro, simple et épuré :
- * - Icônes grises en arc, pill vert derrière l'onglet actif
- * - L'icône active est blanche sur fond vert arrondi
+ * Barre de navigation client — style pro 2026 :
+ * - Pill vert derrière l'onglet actif
+ * - Icône active blanche sur fond vert arrondi
  * - Badge panier rouge
- * - Légende sous l'icône
  * - Fixe en bas, bordure fine supérieure
  */
 const TAB_ORDER = ['index', 'explore', 'cart', 'favorites', 'profile'] as const;
-const ICON_SIZE = 44; // taille du conteneur d'icône (pill vert inclus)
-const PILL_SIZE = 40; // taille du pill vert
+const TAB_COUNT = TAB_ORDER.length;
 
 function triggerTabHaptic() {
   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -40,8 +38,7 @@ function TabItem({
   title,
   colors,
   cartCount,
-  tabX,
-  index,
+  tabWidth,
   onPress,
   onLongPress,
 }: {
@@ -51,8 +48,7 @@ function TabItem({
   title: string;
   colors: ReturnType<typeof useAppColors>;
   cartCount: number;
-  tabX: Animated.SharedValue<number>;
-  index: number;
+  tabWidth: number;
   onPress: () => void;
   onLongPress: () => void;
 }) {
@@ -65,17 +61,6 @@ function TabItem({
       { scale: interpolate(pressed.value, [0, 1], [1, 0.85]) },
     ],
   }));
-
-  // Move pill to active tab
-  React.useEffect(() => {
-    if (isFocused) {
-      tabX.value = withSpring(index * ICON_SIZE, {
-        damping: 18,
-        stiffness: 220,
-        mass: 0.7,
-      });
-    }
-  }, [isFocused, index, tabX]);
 
   const isCart = route.name === 'cart';
 
@@ -101,7 +86,7 @@ function TabItem({
       onLongPress={onLongPress}
       onPressIn={() => { pressed.value = 1; }}
       onPressOut={() => { pressed.value = 0; }}
-      style={styles.tab}
+      style={[styles.tab, { width: tabWidth }]}
       hitSlop={{ top: 6, bottom: 10, left: 4, right: 4 }}>
       <Animated.View style={iconAnim}>
         {Icon ? (
@@ -152,11 +137,14 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
   const focusedRouteName = state.routes[state.index]?.name;
   const focusedIndex = orderedRoutes.findIndex((r) => r.name === focusedRouteName);
 
-  // Animated pill X position
-  const tabX = useSharedValue(focusedIndex >= 0 ? focusedIndex * ICON_SIZE : 0);
+  // Tab width is flexible (1 / TAB_COUNT of the bar)
+  const tabWidth = 100 / TAB_COUNT;
+
+  // Animated pill X position based on percentage
+  const tabX = useSharedValue(focusedIndex >= 0 ? focusedIndex * tabWidth : 0);
 
   const pillStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: tabX.value }],
+    left: `${tabX.value}%`,
   }));
 
   return (
@@ -171,11 +159,9 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
           },
         ]}>
         {/* Animated green pill */}
-        <View style={[styles.pillTrack, { paddingBottom: bottomPad }]}>
-          <Animated.View
-            style={[styles.pill, { backgroundColor: colors.primary }, pillStyle]}
-          />
-        </View>
+        <Animated.View
+          style={[styles.pill, { backgroundColor: colors.primary }, pillStyle]}
+        />
 
         {orderedRoutes.map((route, i) => {
           const { options } = descriptors[route.key];
@@ -197,6 +183,13 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
             });
             if (event.defaultPrevented) return;
             if (!isFocused) navigation.navigate(route.name as never);
+
+            // Move pill to pressed tab
+            tabX.value = withSpring(i * tabWidth, {
+              damping: 18,
+              stiffness: 220,
+              mass: 0.7,
+            });
           };
 
           const onLongPress = () => {
@@ -212,8 +205,7 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
               title={title}
               colors={colors}
               cartCount={itemCount}
-              tabX={tabX}
-              index={i}
+              tabWidth={`${tabWidth}%` as unknown as number}
               onPress={onPress}
               onLongPress={onLongPress}
             />
@@ -232,39 +224,33 @@ const styles = StyleSheet.create({
     right: 0,
   },
   bar: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 6,
-    paddingHorizontal: 8,
-  },
-  pillTrack: {
-    position: 'absolute',
-    top: 0,
-    left: 8,
-    right: 8,
-    height: 50,
     flexDirection: 'row',
     alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 8,
+    paddingHorizontal: 4,
   },
   pill: {
-    width: PILL_SIZE,
-    height: PILL_SIZE,
-    borderRadius: 20,
     position: 'absolute',
-    left: (ICON_SIZE - PILL_SIZE) / 2,
+    top: 4,
+    height: 36,
+    width: '18%',
+    borderRadius: 18,
+    zIndex: 0,
   },
   tab: {
-    width: ICON_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
-    paddingTop: 4,
+    paddingTop: 2,
     paddingBottom: 2,
+    zIndex: 1,
   },
   label: { fontSize: 10, letterSpacing: -0.2 },
   cartBadge: {
     position: 'absolute',
     top: -2,
-    right: 2,
+    right: 6,
     minWidth: 17,
     height: 17,
     borderRadius: 9,
