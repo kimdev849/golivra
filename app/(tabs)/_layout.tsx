@@ -37,8 +37,14 @@ export default function TabLayout() {
       } catch (e) {
         const msg = e instanceof Error ? e.message : '';
         if (isAuthErrorMessage(msg)) {
-          router.replace('/auth');
-          setSessionOk(false);
+          // ══════════════════════════════════════════════════════════
+          // DA « zéro blocage » : token expire → on reste en mode
+          // invité au lieu de rediriger vers /auth. L'utilisateur
+          // continue à naviguer et sera redirigé quand il essaiera
+          // une action personnelle.
+          // ══════════════════════════════════════════════════════════
+          console.log('[auth] Token expiré, mode invité activé');
+          setSessionOk(true);
         }
       }
     },
