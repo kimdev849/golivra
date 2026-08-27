@@ -10,6 +10,7 @@ import {
   MapPin,
   Package,
   Settings,
+  Share2,
   Truck,
   User,
   Wallet,
@@ -172,6 +173,13 @@ export default function VendorMoreTabScreen() {
             "Horaires d'ouverture",
             'Jours et heures de commande',
             () => router.push({ pathname: '/vendor/horaires', params: shop?.id ? { id: shop.id } : {} })
+          )}
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          {row(
+            <Share2 size={20} color={palette.primary} strokeWidth={LUCIDE_STROKE} />,
+            'Partager ma boutique',
+            'Lien, QR code et partage',
+            () => router.push(VENDOR_HREF.share)
           )}
         </View>
 

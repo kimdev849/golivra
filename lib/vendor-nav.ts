@@ -18,6 +18,7 @@ export const VENDOR_HREF = {
   shopAddresses: '/vendor/shop-addresses' as Href,
   shopPayments: '/vendor/shop-payments' as Href,
   shopSettings: '/vendor/shop-settings' as Href,
+  share: '/vendor/share' as Href,
   helpCenter: '/vendor/help-center' as Href,
 } as const;
 

@@ -34,6 +34,7 @@ export default function VendorRootLayout() {
         <Stack.Screen name="shop-addresses" />
         <Stack.Screen name="shop-payments" />
         <Stack.Screen name="shop-settings" />
+        <Stack.Screen name="share" />
         <Stack.Screen name="help-center" />
       </Stack>
     </VendorProvider>
