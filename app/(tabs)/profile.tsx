@@ -410,9 +410,18 @@ export default function ProfileScreen() {
 
             <Pressable
               style={[styles.guestBtnOutline, { borderColor: colors.border }]}
-              onPress={() => router.push('/signup')}>
+              onPress={() => router.push('/signup/choose')}>
               <ThemedText style={[styles.guestBtnOutlineText, { color: colors.primary }]}>Créer un compte</ThemedText>
             </Pressable>
+
+            {/* ── Éléments généraux (pas besoin de connexion) ── */}
+            <View style={{ width: '100%', marginTop: 24, gap: 10 }}>
+              <MenuRow Icon={Settings} title="Paramètres" onPress={() => router.push('/settings')} colors={colors} />
+              <MenuRow Icon={HelpCircle} title="Aide & support" onPress={() => router.push('/help-support')} colors={colors} />
+              <MenuRow Icon={Share2} title="Partager GoLivra" onPress={handleShare} colors={colors} />
+              <MenuRow Icon={Star} title="Noter l'application" onPress={handleRate} colors={colors} />
+              <MenuRow Icon={FileText} title="Informations légales" onPress={() => router.push('/legal-info')} colors={colors} />
+            </View>
           </View>
         ) : me ? (
           <>
