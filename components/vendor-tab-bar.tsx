@@ -8,21 +8,26 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useVendor } from '@/contexts/vendor-context';
+import { shouldShowTabBar } from '@/lib/tab-bar-visibility';
 
 /**
- * Barre de navigation vendeur — design 2026 :
- * - Pill flottant animé sous l'onglet actif
- * - Fond glassmorphism
- * - Icônes libres, pas de bulle colorée
+ * Barre de navigation vendeur — style pro 2026 :
+ * - Pill vert derrière l'onglet actif
+ * - Icône active blanche sur fond vert
+ * - Icônes grises inactives
+ * - Badge rouge commandes + notifs
+ * - Fixe en bas, bordure fine supérieure
  */
 const TAB_ORDER = ['index', 'orders', 'products', 'deliveries', 'more'] as const;
-const TAB_WIDTH = 64;
+const ICON_SIZE = 44;
+const PILL_SIZE = 40;
 
 function triggerTabHaptic() {
   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -53,25 +58,37 @@ function TabItem({
 }) {
   const pressed = useSharedValue(0);
 
-  const iconColor = isFocused ? colors.primary : colors.tabInactive;
   const labelColor = isFocused ? colors.primary : colors.tabInactive;
 
   const iconAnim = useAnimatedStyle(() => ({
     transform: [
-      { scale: interpolate(pressed.value, [0, 1], [1, 0.88]) },
-      { translateY: interpolate(pressed.value, [0, 1], [0, -1]) },
+      { scale: interpolate(pressed.value, [0, 1], [1, 0.85]) },
     ],
   }));
 
+  // Move pill to active tab
   React.useEffect(() => {
     if (isFocused) {
-      tabX.value = withSpring(index * TAB_WIDTH, {
-        damping: 20,
-        stiffness: 250,
-        mass: 0.8,
+      tabX.value = withSpring(index * ICON_SIZE, {
+        damping: 18,
+        stiffness: 220,
+        mass: 0.7,
       });
     }
   }, [isFocused, index, tabX]);
+
+  // Badge animation
+  const badgeScale = useSharedValue(0);
+  React.useEffect(() => {
+    if (badge && badge > 0) {
+      badgeScale.value = 0;
+      badgeScale.value = withSpring(1, { damping: 11, stiffness: 340, mass: 0.4 });
+    }
+  }, [badge, badgeScale]);
+  const badgeAnim = useAnimatedStyle(() => ({
+    opacity: badgeScale.value,
+    transform: [{ scale: 0.5 + 0.5 * badgeScale.value }],
+  }));
 
   return (
     <PlatformPressable
@@ -88,8 +105,8 @@ function TabItem({
         {Icon ? (
           <Icon
             focused={isFocused}
-            color={iconColor}
-            size={22}
+            color={isFocused ? '#FFFFFF' : colors.tabInactive}
+            size={21}
             strokeWidth={isFocused ? 2.4 : LUCIDE_STROKE}
           />
         ) : null}
@@ -100,9 +117,9 @@ function TabItem({
         {title}
       </Text>
       {badge != null && badge > 0 ? (
-        <View style={[styles.badge, { backgroundColor: colors.error, borderColor: colors.surfaceElevated }]}>
+        <Animated.View style={[styles.badge, { borderColor: colors.surface }, badgeAnim]}>
           <Text style={styles.badgeText}>{badge > 99 ? '99+' : String(badge)}</Text>
-        </View>
+        </Animated.View>
       ) : null}
     </PlatformPressable>
   );
@@ -113,6 +130,18 @@ export function VendorTabBar({ state, descriptors, navigation }: BottomTabBarPro
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 10);
   const { orders, unreadNotifCount } = useVendor();
+
+  const visible = shouldShowTabBar(state);
+  const visibility = useSharedValue(visible ? 1 : 0);
+
+  React.useEffect(() => {
+    visibility.value = withTiming(visible ? 1 : 0, { duration: 220 });
+  }, [visible, visibility]);
+
+  const barAnimStyle = useAnimatedStyle(() => ({
+    opacity: visibility.value,
+    transform: [{ translateY: (1 - visibility.value) * 90 }],
+  }));
 
   const pendingCount = React.useMemo(
     () => orders.filter((o) => o.statut === 'en_attente').length,
@@ -126,34 +155,31 @@ export function VendorTabBar({ state, descriptors, navigation }: BottomTabBarPro
   const focusedRouteName = state.routes[state.index]?.name;
   const focusedIndex = orderedRoutes.findIndex((r) => r.name === focusedRouteName);
 
-  const tabX = useSharedValue(focusedIndex >= 0 ? focusedIndex * TAB_WIDTH : 0);
+  // Animated pill X position
+  const tabX = useSharedValue(focusedIndex >= 0 ? focusedIndex * ICON_SIZE : 0);
 
   const pillStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: tabX.value }],
   }));
 
   return (
-    <View style={styles.root}>
-      {/* Floating pill indicator */}
-      <View style={[styles.pillTrack, { bottom: bottomPad + 34 }]}>
-        <Animated.View
-          style={[
-            styles.pill,
-            { backgroundColor: colors.primary, width: TAB_WIDTH - 20 },
-            pillStyle,
-          ]}
-        />
-      </View>
-
+    <Animated.View style={[styles.root, barAnimStyle]} pointerEvents={visible ? 'auto' : 'none'}>
       <View
         style={[
           styles.bar,
           {
-            backgroundColor: colors.surfaceElevated,
+            backgroundColor: colors.surface,
             borderTopColor: colors.borderStrong,
             paddingBottom: bottomPad,
           },
         ]}>
+        {/* Animated green pill */}
+        <View style={[styles.pillTrack, { paddingBottom: bottomPad }]}>
+          <Animated.View
+            style={[styles.pill, { backgroundColor: colors.primary }, pillStyle]}
+          />
+        </View>
+
         {orderedRoutes.map((route, i) => {
           const { options } = descriptors[route.key];
           const isFocused = focusedRouteName === route.name;
@@ -180,6 +206,13 @@ export function VendorTabBar({ state, descriptors, navigation }: BottomTabBarPro
             navigation.emit({ type: 'tabLongPress', target: route.key });
           };
 
+          const badge =
+            route.name === 'orders'
+              ? pendingCount
+              : route.name === 'more'
+                ? unreadNotifCount
+                : undefined;
+
           return (
             <TabItem
               key={route.key}
@@ -188,7 +221,7 @@ export function VendorTabBar({ state, descriptors, navigation }: BottomTabBarPro
               Icon={Icon}
               title={title}
               colors={colors}
-              badge={route.name === 'orders' ? pendingCount : route.name === 'more' ? unreadNotifCount : undefined}
+              badge={badge}
               tabX={tabX}
               index={i}
               onPress={onPress}
@@ -197,7 +230,7 @@ export function VendorTabBar({ state, descriptors, navigation }: BottomTabBarPro
           );
         })}
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -208,49 +241,53 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
   },
+  bar: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 6,
+    paddingHorizontal: 8,
+  },
   pillTrack: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
+    top: 0,
+    left: 8,
+    right: 8,
+    height: 50,
     flexDirection: 'row',
-    paddingHorizontal: 4,
-    height: 32,
-    zIndex: 0,
+    alignItems: 'center',
   },
   pill: {
-    height: 28,
-    borderRadius: 14,
+    width: PILL_SIZE,
+    height: PILL_SIZE,
+    borderRadius: 20,
     position: 'absolute',
-  },
-  bar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 7,
-    paddingHorizontal: 4,
-    zIndex: 1,
+    left: (ICON_SIZE - PILL_SIZE) / 2,
   },
   tab: {
-    flex: 1,
+    width: ICON_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
+    gap: 2,
     paddingTop: 4,
-    zIndex: 2,
+    paddingBottom: 2,
   },
-  label: { fontSize: 11, letterSpacing: -0.2 },
+  label: { fontSize: 10, letterSpacing: -0.2 },
   badge: {
     position: 'absolute',
     top: -2,
-    right: -4,
-    minWidth: 18,
-    height: 18,
+    right: 2,
+    minWidth: 17,
+    height: 17,
     borderRadius: 9,
-    paddingHorizontal: 4,
+    backgroundColor: '#E53935',
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    paddingHorizontal: 3,
   },
-  badgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '800',
+    lineHeight: 11,
+  },
 });

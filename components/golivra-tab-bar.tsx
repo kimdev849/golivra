@@ -5,7 +5,6 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   interpolate,
-  interpolateColor,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -19,14 +18,16 @@ import { useAppColors } from '@/hooks/use-app-colors';
 import { shouldShowTabBar } from '@/lib/tab-bar-visibility';
 
 /**
- * Barre de navigation client — design 2026 :
- * - Pill flottant animé sous l'onglet actif (pas de cercle autour de l'icône)
- * - Fond glassmorphism semi-transparent
- * - Micro-interactions subtiles
- * - Icônes libres (pas de bulle colorée)
+ * Barre de navigation client — style pro, simple et épuré :
+ * - Icônes grises en arc, pill vert derrière l'onglet actif
+ * - L'icône active est blanche sur fond vert arrondi
+ * - Badge panier rouge
+ * - Légende sous l'icône
+ * - Fixe en bas, bordure fine supérieure
  */
 const TAB_ORDER = ['index', 'explore', 'cart', 'favorites', 'profile'] as const;
-const TAB_WIDTH = 64; // largeur de chaque onglet pour calculer le pill
+const ICON_SIZE = 44; // taille du conteneur d'icône (pill vert inclus)
+const PILL_SIZE = 40; // taille du pill vert
 
 function triggerTabHaptic() {
   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -57,28 +58,28 @@ function TabItem({
 }) {
   const pressed = useSharedValue(0);
 
-  const iconColor = isFocused ? colors.primary : colors.tabInactive;
   const labelColor = isFocused ? colors.primary : colors.tabInactive;
 
   const iconAnim = useAnimatedStyle(() => ({
     transform: [
-      { scale: interpolate(pressed.value, [0, 1], [1, 0.88]) },
-      { translateY: interpolate(pressed.value, [0, 1], [0, -1]) },
+      { scale: interpolate(pressed.value, [0, 1], [1, 0.85]) },
     ],
   }));
 
-  // Animate pill position
+  // Move pill to active tab
   React.useEffect(() => {
     if (isFocused) {
-      tabX.value = withSpring(index * TAB_WIDTH, {
-        damping: 20,
-        stiffness: 250,
-        mass: 0.8,
+      tabX.value = withSpring(index * ICON_SIZE, {
+        damping: 18,
+        stiffness: 220,
+        mass: 0.7,
       });
     }
   }, [isFocused, index, tabX]);
 
   const isCart = route.name === 'cart';
+
+  // Badge animation
   const badgeScale = useSharedValue(0);
   React.useEffect(() => {
     if (cartCount > 0) {
@@ -106,8 +107,8 @@ function TabItem({
         {Icon ? (
           <Icon
             focused={isFocused}
-            color={iconColor}
-            size={22}
+            color={isFocused ? '#FFFFFF' : colors.tabInactive}
+            size={21}
             strokeWidth={isFocused ? 2.4 : LUCIDE_STROKE}
           />
         ) : null}
@@ -118,7 +119,7 @@ function TabItem({
         {title}
       </Text>
       {isCart && cartCount > 0 ? (
-        <Animated.View style={[styles.cartBadge, { borderColor: colors.surfaceElevated }, badgeAnim]}>
+        <Animated.View style={[styles.cartBadge, { borderColor: colors.surface }, badgeAnim]}>
           <Text style={styles.cartBadgeText}>{cartCount > 99 ? '99+' : String(cartCount)}</Text>
         </Animated.View>
       ) : null}
@@ -151,8 +152,8 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
   const focusedRouteName = state.routes[state.index]?.name;
   const focusedIndex = orderedRoutes.findIndex((r) => r.name === focusedRouteName);
 
-  // Animated pill position
-  const tabX = useSharedValue(focusedIndex >= 0 ? focusedIndex * TAB_WIDTH : 0);
+  // Animated pill X position
+  const tabX = useSharedValue(focusedIndex >= 0 ? focusedIndex * ICON_SIZE : 0);
 
   const pillStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: tabX.value }],
@@ -160,29 +161,22 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
 
   return (
     <Animated.View style={[styles.root, barAnimStyle]} pointerEvents={visible ? 'auto' : 'none'}>
-      {/* Floating pill indicator */}
-      <View style={[styles.pillTrack, { bottom: bottomPad + 34 }]}>
-        <Animated.View
-          style={[
-            styles.pill,
-            {
-              backgroundColor: colors.primary,
-              width: TAB_WIDTH - 20,
-            },
-            pillStyle,
-          ]}
-        />
-      </View>
-
       <View
         style={[
           styles.bar,
           {
-            backgroundColor: colors.surfaceElevated,
+            backgroundColor: colors.surface,
             borderTopColor: colors.borderStrong,
             paddingBottom: bottomPad,
           },
         ]}>
+        {/* Animated green pill */}
+        <View style={[styles.pillTrack, { paddingBottom: bottomPad }]}>
+          <Animated.View
+            style={[styles.pill, { backgroundColor: colors.primary }, pillStyle]}
+          />
+        </View>
+
         {orderedRoutes.map((route, i) => {
           const { options } = descriptors[route.key];
           const isFocused = focusedRouteName === route.name;
@@ -237,42 +231,40 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
   },
+  bar: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 6,
+    paddingHorizontal: 8,
+  },
   pillTrack: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
+    top: 0,
+    left: 8,
+    right: 8,
+    height: 50,
     flexDirection: 'row',
-    paddingHorizontal: 4,
-    height: 32,
-    zIndex: 0,
+    alignItems: 'center',
   },
   pill: {
-    height: 28,
-    borderRadius: 14,
+    width: PILL_SIZE,
+    height: PILL_SIZE,
+    borderRadius: 20,
     position: 'absolute',
-  },
-  bar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 7,
-    paddingHorizontal: 4,
-    zIndex: 1,
+    left: (ICON_SIZE - PILL_SIZE) / 2,
   },
   tab: {
-    flex: 1,
+    width: ICON_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
+    gap: 2,
     paddingTop: 4,
-    zIndex: 2,
+    paddingBottom: 2,
   },
-  label: { fontSize: 11, letterSpacing: -0.2 },
+  label: { fontSize: 10, letterSpacing: -0.2 },
   cartBadge: {
     position: 'absolute',
-    top: 0,
-    right: 8,
+    top: -2,
+    right: 2,
     minWidth: 17,
     height: 17,
     borderRadius: 9,
