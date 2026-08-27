@@ -38,14 +38,15 @@ function TabItem({
   onPress: () => void;
   onLongPress: () => void;
 }) {
-  const bgOpacity = useSharedValue(isFocused ? 1 : 0);
+  const dotScale = useSharedValue(isFocused ? 1 : 0);
 
   React.useEffect(() => {
-    bgOpacity.value = withTiming(isFocused ? 1 : 0, { duration: 200 });
-  }, [isFocused, bgOpacity]);
+    dotScale.value = withTiming(isFocused ? 1 : 0, { duration: 180 });
+  }, [isFocused, dotScale]);
 
-  const bgAnim = useAnimatedStyle(() => ({
-    opacity: bgOpacity.value,
+  const dotAnim = useAnimatedStyle(() => ({
+    transform: [{ scaleX: dotScale.value }],
+    opacity: dotScale.value,
   }));
 
   return (
@@ -57,19 +58,11 @@ function TabItem({
       onLongPress={onLongPress}
       style={styles.tab}
       hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-      {/* Green capsule behind icon — fades in/out */}
-      <Animated.View
-        style={[
-          styles.pill,
-          { backgroundColor: colors.primary },
-          bgAnim,
-        ]}
-      />
-      <View style={styles.iconWrap}>
+      <View style={styles.iconArea}>
         {Icon ? (
           <Icon
             focused={isFocused}
-            color={isFocused ? '#FFFFFF' : colors.tabInactive}
+            color={isFocused ? colors.primary : colors.tabInactive}
             size={22}
             strokeWidth={isFocused ? 2.5 : LUCIDE_STROKE}
           />
@@ -80,6 +73,8 @@ function TabItem({
           </View>
         ) : null}
       </View>
+      {/* Small green dot indicator under active icon */}
+      <Animated.View style={[styles.dot, { backgroundColor: colors.primary }, dotAnim]} />
       <Text
         style={[
           styles.label,
@@ -180,47 +175,44 @@ const styles = StyleSheet.create({
   },
   bar: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-around',
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingTop: 10,
     paddingBottom: 8,
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
-    paddingTop: 4,
-    paddingBottom: 4,
-    position: 'relative',
+    paddingTop: 2,
+    paddingBottom: 2,
   },
-  pill: {
-    position: 'absolute',
-    top: 0,
-    width: 52,
-    height: 32,
-    borderRadius: 16,
-  },
-  iconWrap: {
-    width: 24,
-    height: 24,
+  iconArea: {
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
-  label: { fontSize: 10, letterSpacing: -0.2, fontWeight: '500' },
+  dot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    marginTop: 4,
+  },
+  label: { fontSize: 10, letterSpacing: -0.2, fontWeight: '500', marginTop: 2 },
   badge: {
     position: 'absolute',
-    top: -6,
-    right: -10,
-    minWidth: 17,
-    height: 17,
-    borderRadius: 9,
+    top: -4,
+    right: -8,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
-    zIndex: 1,
   },
-  badgeText: { color: '#FFF', fontSize: 10, fontWeight: '800' },
+  badgeText: { color: '#FFF', fontSize: 9, fontWeight: '800' },
 });
