@@ -23,6 +23,7 @@ import {
   Store,
   UtensilsCrossed,
 } from 'lucide-react-native';
+import { Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 
@@ -303,12 +304,12 @@ export default function ProductDetailScreen() {
         )}
       </View>
       <View style={{ flex: 1 }}>
-        <ThemedText style={[styles.vendorName, { color: colors.text }]} numberOfLines={1}>
+        <Text style={[styles.vendorName, { color: '#11181C' }]} numberOfLines={1}>
           {enterpriseName || 'Vendeur'}
-        </ThemedText>
-        <ThemedText style={[styles.vendorMeta, { color: colors.textMuted }]} numberOfLines={1}>
+        </Text>
+        <Text style={[styles.vendorMeta, { color: '#6A8578' }]} numberOfLines={1}>
           {enterpriseType === 'restaurant' ? 'Restaurant' : 'Boutique'} · Voir la boutique
-        </ThemedText>
+        </Text>
       </View>
       <ChevronDown
         size={18}
@@ -416,29 +417,29 @@ export default function ProductDetailScreen() {
           </ScrollView>
         ) : null}
 
-        <View style={styles.body}>
+        <View style={[styles.body, { backgroundColor: colors.background }]}>
           {/* name + price */}
           <View style={styles.titleRow}>
             <View style={{ flex: 1 }}>
-              <ThemedText style={[styles.title, { color: colors.text }]} numberOfLines={3}>
+              <Text style={[styles.title, { color: '#11181C' }]} numberOfLines={3}>
                 {product.nom}
-              </ThemedText>
+              </Text>
               {product.prix_promo != null ? (
                 <View style={styles.priceRow}>
-                  <ThemedText style={[styles.price, { color: colors.primary }]}>
+                  <Text style={[styles.price, { color: colors.primary }]}>
                     {formatFcfa(Number(product.prix_promo))}
-                  </ThemedText>
-                  <ThemedText style={[styles.oldPrice, { color: colors.textMuted }]}>
+                  </Text>
+                  <Text style={[styles.oldPrice, { color: '#6A8578' }]}>
                     {formatFcfa(Number(product.prix))}
-                  </ThemedText>
+                  </Text>
                   <View style={[styles.promoChip, { backgroundColor: colors.error }]}>
-                    <ThemedText style={styles.promoChipTxt}>PROMO</ThemedText>
+                    <Text style={styles.promoChipTxt}>PROMO</Text>
                   </View>
                 </View>
               ) : (
-                <ThemedText style={[styles.price, { color: colors.text }]}>
+                <Text style={[styles.price, { color: '#11181C' }]}>
                   {formatFcfa(Number(product.prix))}
-                </ThemedText>
+                </Text>
               )}
               {condition ? (
                 <View
@@ -446,7 +447,7 @@ export default function ProductDetailScreen() {
                     styles.condBadge,
                     { backgroundColor: getProductConditionColor(condition.key, colors) },
                   ]}>
-                  <ThemedText style={styles.condBadgeTxt}>{condition.label}</ThemedText>
+                  <Text style={styles.condBadgeTxt}>{condition.label}</Text>
                 </View>
               ) : null}
             </View>
@@ -466,7 +467,7 @@ export default function ProductDetailScreen() {
                 },
               ]}>
               <Clock size={14} color={tropTard ? colors.warning : colors.error} strokeWidth={LUCIDE_STROKE} />
-              <ThemedText
+              <Text
                 style={[
                   styles.stockTxt,
                   { color: tropTard ? colors.warning : colors.error, flex: 1 },
@@ -475,19 +476,19 @@ export default function ProductDetailScreen() {
                   ? liveStatus.messageCommande ??
                     'Il est trop tard pour commander aujourd\'hui : la préparation ne peut pas finir avant la fermeture.'
                   : liveStatus.messageFermeture}
-              </ThemedText>
+              </Text>
             </View>
           ) : null}
 
           {/* description */}
           {product.description ? (
             <View style={styles.section}>
-              <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
+              <Text style={[styles.sectionTitle, { color: '#11181C' }]}>
                 Description
-              </ThemedText>
-              <ThemedText style={[styles.description, { color: colors.textSecondary }]}>
+              </Text>
+              <Text style={[styles.description, { color: '#355245' }]}>
                 {product.description}
-              </ThemedText>
+              </Text>
             </View>
           ) : null}
 
@@ -496,7 +497,7 @@ export default function ProductDetailScreen() {
             <View style={styles.tagsRow}>
               {product.tags.slice(0, 6).map((t) => (
                 <View key={t} style={[styles.tagChip, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
-                  <ThemedText style={[styles.tagTxt, { color: colors.textSecondary }]}>{t}</ThemedText>
+                  <Text style={[styles.tagTxt, { color: '#355245' }]}>{t}</Text>
                 </View>
               ))}
             </View>
@@ -505,15 +506,15 @@ export default function ProductDetailScreen() {
           {/* options (plats) */}
           {Array.isArray(product.options) && product.options.length > 0 ? (
             <View style={styles.section}>
-              <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
+              <Text style={[styles.sectionTitle, { color: '#11181C' }]}>
                 Personnalisation
-              </ThemedText>
+              </Text>
               {product.options.map((g, gi) => (
                 <View key={`g-${gi}`} style={[styles.optionGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <ThemedText style={[styles.optionGroupName, { color: colors.text }]}>
+                  <Text style={[styles.optionGroupName, { color: '#11181C' }]}>
                     {g.nom}
                     {g.requis ? ' *' : ''}
-                  </ThemedText>
+                  </Text>
                   {(g.choix || []).map((c, ci) => {
                     const sel = selectedOptions.some(
                       (s) => s.groupIndex === gi && s.choiceIndex === ci,
@@ -549,13 +550,13 @@ export default function ProductDetailScreen() {
                             <Check size={12} color={colors.primary} strokeWidth={3} />
                           ) : null}
                         </View>
-                        <ThemedText style={[styles.optionChoiceLabel, { color: colors.text }]}>
+                        <Text style={[styles.optionChoiceLabel, { color: '#11181C' }]}>
                           {c.label}
-                        </ThemedText>
+                        </Text>
                         {typeof c.prix_sup === 'number' && c.prix_sup > 0 ? (
-                          <ThemedText style={[styles.optionChoiceSup, { color: colors.textMuted }]}>
+                          <Text style={[styles.optionChoiceSup, { color: '#6A8578' }]}>
                             +{formatFcfa(c.prix_sup)}
-                          </ThemedText>
+                          </Text>
                         ) : null}
                       </Pressable>
                     );
@@ -569,17 +570,17 @@ export default function ProductDetailScreen() {
           {stockLabel ? (
             <View style={[styles.stockBadge, { borderColor: orderable ? colors.success : colors.border, backgroundColor: orderable ? colors.surface : colors.surfaceMuted }]}>
               <View style={[styles.stockDot, { backgroundColor: orderable ? colors.success : colors.error }]} />
-              <ThemedText style={[styles.stockTxt, { color: orderable ? colors.text : colors.textMuted }]}>
+              <Text style={[styles.stockTxt, { color: orderable ? '#11181C' : '#6A8578' }]}>
                 {stockLabel}
-              </ThemedText>
+              </Text>
             </View>
           ) : null}
 
           {/* note */}
           <View style={styles.section}>
-            <ThemedText style={[styles.sectionTitle, { color: colors.text }]}>
+            <Text style={[styles.sectionTitle, { color: '#11181C' }]}>
               Note pour le vendeur (optionnel)
-            </ThemedText>
+            </Text>
             <TextInput
               style={[
                 styles.noteInput,
