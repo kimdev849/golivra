@@ -6,7 +6,6 @@ import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,7 +41,7 @@ function TabItem({
   const pressed = useSharedValue(0);
 
   const iconAnim = useAnimatedStyle(() => ({
-    transform: [{ scale: useSharedValue(1).value * (pressed.value > 0 ? 0.88 : 1) }],
+    transform: [{ scale: pressed.value > 0 ? 0.88 : 1 }],
   }));
 
   return (
