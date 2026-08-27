@@ -3,6 +3,8 @@ import type { Href } from 'expo-router';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useGuestAuth } from '@/hooks/use-guest-auth';
+import { GuestLoginSheet } from '@/components/guest-login-sheet';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -101,6 +103,7 @@ export default function CartScreen() {
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const { showSuccess, showError, showConfirm, FeedbackOverlay } = useActionFeedback();
+  const { requireAuth, showLoginSheet, goToAuth, goToSignup, dismissSheet } = useGuestAuth();
   const { cart, hydrated, hydrate, syncFromMemory } = useCart();
   const [address, setAddress] = useState<DeliveryAddressFields>(emptyAddressForm);
   const [savedAddressId, setSavedAddressId] = useState<string | null>(null);
@@ -385,6 +388,9 @@ export default function CartScreen() {
   const submitOrder = async () => {
     if (!cart || cart.segments.length === 0) return;
     if (orderInFlight.current || submitting) return;
+    // Vérifier l'auth avant de continuer (DA zéro blocage)
+    const ok = await requireAuth();
+    if (!ok) return;
     const addrErr = deliveryAddressError(address);
     if (addrErr) {
       showError('Adresse invalide', addrErr);
@@ -513,6 +519,12 @@ export default function CartScreen() {
   return (
     <ThemedView style={styles.screen}>
       <FeedbackOverlay />
+      <GuestLoginSheet
+        visible={showLoginSheet}
+        onLogin={goToAuth}
+        onSignup={goToSignup}
+        onDismiss={dismissSheet}
+      />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

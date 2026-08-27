@@ -1,6 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeNavigation } from '@/hooks/use-safe-navigation';
+import { useGuestAuth } from '@/hooks/use-guest-auth';
+import { GuestLoginSheet } from '@/components/guest-login-sheet';
 import {
   Pressable,
   ScrollView,
@@ -103,6 +105,7 @@ export default function ProductDetailScreen() {
   const isDesktop = useIsWebDesktop();
   const contentWidth = isDesktop ? DESKTOP_MAX_WIDTH : mobileContentWidth;
   const { showError, FeedbackOverlay } = useActionFeedback();
+  const { requireAuth, showLoginSheet, goToAuth, goToSignup, dismissSheet } = useGuestAuth();
   const params = useLocalSearchParams<{ id: string; kind?: string }>();
   const cart = useCart((s) => s.cart);
 
@@ -201,6 +204,9 @@ export default function ProductDetailScreen() {
 
   const onToggleFav = async () => {
     if (!product) return;
+    // Vérifier l'auth avant d'ajouter aux favoris (DA zéro blocage)
+    const ok = await requireAuth();
+    if (!ok) return;
     void Haptics.selectionAsync();
     const wasFav = isFav;
     setIsFav(!wasFav);
@@ -326,6 +332,12 @@ export default function ProductDetailScreen() {
 
   return (
     <ThemedView style={[styles.screen, { backgroundColor: colors.background }]}>
+      <GuestLoginSheet
+        visible={showLoginSheet}
+        onLogin={goToAuth}
+        onSignup={goToSignup}
+        onDismiss={dismissSheet}
+      />
       <ScrollView
         style={{ flex: 1, maxWidth: contentWidth, alignSelf: 'center', width: '100%' }}
         contentContainerStyle={{ paddingBottom: DETAIL_SCREEN_PADDING_BOTTOM + insets.bottom + 96 }}

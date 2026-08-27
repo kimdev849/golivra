@@ -43,23 +43,23 @@ const ROLES: Role[] = [
   {
     href: '/signup/client',
     icon: User,
-    title: 'Client',
-    subtitle: 'Je commande, on me livre partout.',
+    title: 'Commander sur GoLivra',
+    subtitle: 'Commandez dans vos restaurants et boutiques préférés.',
     iconBg: ICON_BG_POPULAR,
     popular: true,
   },
   {
-    href: '/signup/boutique',
-    icon: Store,
-    title: 'Boutique',
-    subtitle: 'Je vends mes produits en ligne.',
+    href: '/signup/restaurant',
+    icon: UtensilsCrossed,
+    title: 'Inscrire mon restaurant',
+    subtitle: 'Recevez et gérez vos commandes sur GoLivra.',
     iconBg: ICON_BG_GREEN,
   },
   {
-    href: '/signup/restaurant',
-    icon: UtensilsCrossed,
-    title: 'Restaurant',
-    subtitle: 'Je sers mes plats, GoLivra les livre.',
+    href: '/signup/boutique',
+    icon: Store,
+    title: 'Inscrire ma boutique',
+    subtitle: 'Vendez vos produits et gérez vos commandes.',
     iconBg: ICON_BG_GREEN,
   },
 ];
@@ -107,10 +107,10 @@ export default function SignupChooseScreen() {
         <View style={styles.centerBlock}>
           <Animated.View entering={HEADER_ENTER} style={styles.header}>
             <ThemedText type="title" style={styles.title}>
-              Créer un compte
+              Que souhaitez-vous faire ?
             </ThemedText>
             <ThemedText style={[styles.description, { color: colors.textSecondary }]}>
-              Comment souhaitez-vous utiliser GoLivra ?
+              Choisissez ce qui vous correspond.
             </ThemedText>
           </Animated.View>
 
