@@ -64,6 +64,14 @@ export async function resolveBootstrapTarget(): Promise<BootstrapTarget> {
   const snapshot = await hydrateSessionSnapshot();
 
   // ═══════════════════════════════════════════════════════════════════
+  // PREMIER LANCEMENT : on affiche le splash (image + slogan + Commencer)
+  // ═══════════════════════════════════════════════════════════════════
+  const seen = await isOnboardingComplete();
+  if (!seen) {
+    return { kind: 'onboarding' };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
   // DA « zéro blocage » : tout le monde accède directement à l'accueil.
   // L'inscription / connexion n'est demandée QUE quand l'utilisateur
   // veut effectuer une action personnelle (favoris, profil, commande…).

@@ -72,6 +72,7 @@ export default function SettingsScreen() {
   const appVersion = Constants.expoConfig?.version ?? '1.0.0';
 
   const [loading, setLoading] = useState(true);
+  const [hasToken, setHasToken] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
   const [notifPush, setNotifPush] = useState(true);
   const [notifEmail, setNotifEmail] = useState(true);
@@ -81,7 +82,8 @@ export default function SettingsScreen() {
     setLoading(true);
     try {
       const token = await getSessionToken();
-      if (!token) return;
+      if (!token) { setHasToken(false); setLoading(false); return; }
+      setHasToken(true);
       const prefs = await fetchPreferences(token);
       setNotifPush(prefs.notif_push_enabled);
       setNotifEmail(prefs.notif_email_enabled);
@@ -149,8 +151,9 @@ export default function SettingsScreen() {
         ) : null}
 
         {/* ══════════════════════════════════════════════════
-            MON COMPTE
+            MON COMPTE (connecté uniquement)
         ══════════════════════════════════════════════════ */}
+        {hasToken && <>
         {renderSectionLabel('Mon compte')}
         <View style={localStyles.menuCard}>
           <Pressable
@@ -201,6 +204,7 @@ export default function SettingsScreen() {
             <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
           </Pressable>
         </View>
+        </>}
 
         {/* ══════════════════════════════════════════════════
             APPARENCE
@@ -279,8 +283,9 @@ export default function SettingsScreen() {
         </View>
 
         {/* ══════════════════════════════════════════════════
-            NOTIFICATIONS
+            NOTIFICATIONS (connecté uniquement)
         ══════════════════════════════════════════════════ */}
+        {hasToken && <>
         {renderSectionLabel('Notifications')}
         <View style={localStyles.menuCard}>
           <Pressable
@@ -350,15 +355,18 @@ export default function SettingsScreen() {
             />
           </View>
         </View>
+        </>}
 
         {/* ══════════════════════════════════════════════════
-            SÉCURITÉ
+            SÉCURITÉ (connecté uniquement)
         ══════════════════════════════════════════════════ */}
+        {hasToken && <>
         {renderSectionLabel('Sécurité')}
         <BiometricLockToggle
           colors={colors}
           hint="Verrouillage biométrique au retour sur l'app"
         />
+        </>}
 
         {/* ══════════════════════════════════════════════════
             PARAMÈTRES AVANCÉS
