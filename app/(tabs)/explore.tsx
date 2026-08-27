@@ -8,7 +8,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { Bike, ScrollText } from 'lucide-react-native';
+import { Bike, Clock, CheckCircle2, XCircle, Package, ScrollText } from 'lucide-react-native';
 
 import { OrderRatingCard } from '@/components/order-rating-card';
 import { ThemedText } from '@/components/themed-text';
@@ -21,11 +21,8 @@ import { apiFetch } from '@/lib/api';
 import { getSessionToken } from '@/lib/auth';
 import { fetchAllEnterprises, peekAllEnterprises } from '@/lib/client-data';
 import { fetchCached, invalidateCached, peekCached } from '@/lib/request-cache';
-import { EventTimeline } from '@/components/event-timeline';
 import { formatDateTimeFr } from '@/lib/datetime';
 import { formatFcfa } from '@/lib/format';
-import type { TimelineStep } from '@/lib/datetime';
-import { fetchPendingReviews, type PendingReview } from '@/lib/reviews';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { orderCancelledChip, orderStatusLabel as statutLabel } from '@/lib/ux-copy';
@@ -45,8 +42,8 @@ type OrderRow = {
   livree_at_label?: string | null;
   livraison_livree_at_label?: string | null;
   timeline?: {
-    commande?: TimelineStep[];
-    livraisons?: { timeline?: TimelineStep[] }[];
+    commande?: { titre: string; date: string | null; type: string }[];
+    livraisons?: { timeline?: { titre: string; date: string | null; type: string }[] }[];
   };
   peut_noter?: boolean;
   sous_commande_id?: string | null;
@@ -67,7 +64,6 @@ function normStatut(s: string | null | undefined): string {
   return (s ?? '').trim().toLowerCase().replace(/\s+/g, '_');
 }
 
-/** Référence type maquette #GLV-7845 */
 function glvOrderRef(id: string): string {
   const clean = id.replace(/-/g, '');
   let n = 0;
@@ -85,7 +81,6 @@ function orderBucket(statut: string | null): FilterTab {
   return 'encours';
 }
 
-/** Nombre de pastilles « complètes » sur le stepper (1–4) pour les commandes actives hors livraison */
 function stepperFilledCount(statut: string | null): number {
   const k = normStatut(statut);
   if (k === 'en_preparation' || k === 'prete') return 3;
@@ -105,23 +100,33 @@ function orderCreatedLabel(o: OrderRow): string {
   return o.created_at_label || formatDateTimeFr(o.cree_le);
 }
 
+/** Status color config */
+function statusConfig(statut: string | null): { label: string; color: string; bg: string; icon: typeof Clock } {
+  const k = normStatut(statut);
+  if (k === 'livree') return { label: 'Livrée', color: '#16A34A', bg: '#DCFCE7', icon: CheckCircle2 };
+  if (k === 'en_livraison') return { label: 'En livraison', color: '#2563EB', bg: '#DBEAFE', icon: Bike };
+  if (k === 'en_preparation' || k === 'a_preparer') return { label: 'En préparation', color: '#EA580C', bg: '#FFF7ED', icon: Package };
+  if (k === 'prete' || k === 'collectee') return { label: 'Prête', color: '#7C3AED', bg: '#F5F3FF', icon: Package };
+  if (k === 'acceptee' || k === 'partiellement_acceptee') return { label: 'Acceptée', color: '#0891B2', bg: '#ECFEFF', icon: CheckCircle2 };
+  if (k === 'annulee' || k === 'remboursee') return { label: 'Annulée', color: '#DC2626', bg: '#FEF2F2', icon: XCircle };
+  return { label: statutLabel(statut), color: '#6B7280', bg: '#F3F4F6', icon: Clock };
+}
+
 const PREVIEW_LIMIT = 4;
 
-function StepperRow({ filled, colors }: { filled: number; colors: ReturnType<typeof useAppColors> }) {
+/** Small stepper dots */
+function StepperDots({ filled, colors }: { filled: number; colors: ReturnType<typeof useAppColors> }) {
   const total = 4;
   const safe = Math.min(Math.max(filled, 1), total);
   return (
     <View style={stepStyles.row}>
       {Array.from({ length: total }, (_, i) => {
         const isFilled = i < safe;
-        const lineGreen = i < safe - 1;
         return (
           <View key={i} style={stepStyles.stepSlot}>
-            <View style={[stepStyles.dotOuter, isFilled ? { backgroundColor: colors.primaryMuted } : { backgroundColor: colors.surfaceMuted, borderWidth: 1, borderColor: colors.border }]}>
-              <View style={[stepStyles.dotInner, isFilled ? { backgroundColor: colors.primary } : { backgroundColor: 'transparent' }]} />
-            </View>
+            <View style={[stepStyles.dot, isFilled ? { backgroundColor: colors.primary } : { backgroundColor: colors.surfaceMuted }]} />
             {i < total - 1 ? (
-              <View style={[stepStyles.line, lineGreen ? { backgroundColor: colors.primary } : { backgroundColor: colors.border }]} />
+              <View style={[stepStyles.line, i < safe - 1 ? { backgroundColor: colors.primary } : { backgroundColor: colors.border }]} />
             ) : null}
           </View>
         );
@@ -162,37 +167,37 @@ function OrdersScreenInner({
       ?? (o as any).total != null ? Number((o as any).total) : null;
     const priceOk = prixNum !== null && Number.isFinite(prixNum);
 
+    const status = statusConfig(o.statut);
+    const StatusIcon = status.icon;
+
     if (filter === 'livrees') {
       const dateStr = formatLivreeLe(o.livree_le ?? o.cree_le);
       const canRate = Boolean(o.peut_noter && o.sous_commande_id);
       return (
-        <View key={o.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Pressable
-            style={({ pressed }) => [pressed && styles.cardPressed]}
-            onPress={() => router.push(`/order-tracking/${o.id}`)}
-            android_ripple={{ color: colors.primarySoft }}>
-            <View style={styles.cardTop}>
-              <ThemedText type="defaultSemiBold" style={[styles.orderId, { color: colors.text }]}>
-                #{refStr}
-              </ThemedText>
+        <Pressable
+          key={o.id}
+          style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+          onPress={() => router.push(`/order-tracking/${o.id}`)}
+          android_ripple={{ color: colors.primarySoft }}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardHeaderLeft}>
+              <View style={[styles.statusDot, { backgroundColor: status.color }]} />
+              <ThemedText style={[styles.refText, { color: colors.text }]}>{refStr}</ThemedText>
             </View>
-            <ThemedText type="defaultSemiBold" style={[styles.merchantTitle, { color: colors.text }]}>
-              {merchant}
+            {priceOk ? (
+              <ThemedText style={[styles.priceText, { color: colors.primaryDeep }]}>{formatFcfa(prixNum)}</ThemedText>
+            ) : null}
+          </View>
+          <ThemedText style={[styles.merchantText, { color: colors.text }]} numberOfLines={1}>{merchant}</ThemedText>
+          <View style={styles.cardFooter}>
+            <View style={[styles.statusChip, { backgroundColor: status.bg }]}>
+              <StatusIcon size={12} color={status.color} strokeWidth={2.5} />
+              <ThemedText style={[styles.statusChipText, { color: status.color }]}>{status.label}</ThemedText>
+            </View>
+            <ThemedText style={[styles.dateText, { color: colors.textMuted }]}>
+              {dateStr ? `Le ${dateStr}` : orderCreatedLabel(o)}
             </ThemedText>
-            <ThemedText style={[styles.statusDark, { color: colors.text }]}>Livrée</ThemedText>
-            <View style={styles.cardFooterRow}>
-              <ThemedText style={[styles.dateMuted, { color: colors.textMuted }]}>
-                {dateStr ? `Livrée le ${dateStr}` : orderCreatedLabel(o) ? `Commandée le ${orderCreatedLabel(o)}` : ' '}
-              </ThemedText>
-              {priceOk ? (
-                <ThemedText type="defaultSemiBold" style={[styles.priceStrong, { color: colors.text }]}>
-                  {formatFcfa(prixNum)}
-                </ThemedText>
-              ) : (
-                <View />
-              )}
-            </View>
-          </Pressable>
+          </View>
           {canRate ? (
             <OrderRatingCard
               sousCommandeId={o.sous_commande_id!}
@@ -200,125 +205,76 @@ function OrdersScreenInner({
               onRated={() => onOrderRated(o.id, o.sous_commande_id)}
             />
           ) : null}
-        </View>
+        </Pressable>
       );
     }
 
     if (filter === 'annulees') {
-      // Chaque commande annulée explique SA raison, en mots simples.
       const chip = orderCancelledChip(o.statut, o.annulation_motif, o.commerce_type, o.sous_statuts);
-      const chipColor =
-        chip.tone === 'warn' ? colors.warning : chip.tone === 'error' ? colors.error : colors.textMuted;
-      const chipBg =
-        chip.tone === 'warn' ? colors.warningSoft : chip.tone === 'error' ? colors.errorSoft : colors.surfaceMuted;
+      const chipColor = chip.tone === 'warn' ? '#D97706' : chip.tone === 'error' ? '#DC2626' : '#6B7280';
+      const chipBg = chip.tone === 'warn' ? '#FEF3C7' : chip.tone === 'error' ? '#FEE2E2' : '#F3F4F6';
       return (
         <Pressable
           key={o.id}
-          style={({ pressed }) => [
-            styles.card,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-            pressed && styles.cardPressed,
-          ]}
+          style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
           onPress={() => router.push(`/order-tracking/${o.id}`)}
           android_ripple={{ color: colors.primarySoft }}>
-          <View style={styles.cardTop}>
-            <ThemedText type="defaultSemiBold" style={[styles.orderId, { color: colors.text }]}>
-              #{refStr}
-            </ThemedText>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardHeaderLeft}>
+              <View style={[styles.statusDot, { backgroundColor: chipColor }]} />
+              <ThemedText style={[styles.refText, { color: colors.text }]}>{refStr}</ThemedText>
+            </View>
             {priceOk ? (
-              <ThemedText type="defaultSemiBold" style={[styles.priceStrong, { color: colors.text }]}>
-                {formatFcfa(prixNum)}
-              </ThemedText>
+              <ThemedText style={[styles.priceText, { color: colors.primaryDeep }]}>{formatFcfa(prixNum)}</ThemedText>
             ) : null}
           </View>
-          <ThemedText type="defaultSemiBold" style={[styles.merchantTitle, { color: colors.text }]}>
-            {merchant}
-          </ThemedText>
+          <ThemedText style={[styles.merchantText, { color: colors.text }]} numberOfLines={1}>{merchant}</ThemedText>
           <View style={[styles.cancelChip, { backgroundColor: chipBg }]}>
+            <XCircle size={12} color={chipColor} strokeWidth={2.5} />
             <ThemedText style={[styles.cancelChipText, { color: chipColor }]}>{chip.label}</ThemedText>
           </View>
-          <ThemedText style={[styles.cancelDetail, { color: colors.textMuted }]}>{chip.detail}</ThemedText>
+          {chip.detail ? (
+            <ThemedText style={[styles.cancelDetail, { color: colors.textMuted }]} numberOfLines={2}>{chip.detail}</ThemedText>
+          ) : null}
           {orderCreatedLabel(o) ? (
-            <ThemedText style={[styles.dateMuted, { color: colors.textMuted }]}>
-              Commandée le {orderCreatedLabel(o)}
-            </ThemedText>
+            <ThemedText style={[styles.dateText, { color: colors.textMuted, marginTop: 6 }]}>{orderCreatedLabel(o)}</ThemedText>
           ) : null}
         </Pressable>
       );
     }
 
     // En cours
-    if (k === 'en livraison') {
-      return (
-        <Pressable
-          key={o.id}
-          style={({ pressed }) => [styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && styles.cardPressed]}
-          onPress={() => router.push(`/order-tracking/${o.id}`)}
-          android_ripple={{ color: colors.primarySoft }}>
-          <View style={styles.cardTop}>
-            <ThemedText type="defaultSemiBold" style={[styles.orderId, { color: colors.text }]}>
-              #{refStr}
-            </ThemedText>
-            {priceOk ? (
-              <ThemedText type="defaultSemiBold" style={[styles.priceStrong, { color: colors.text }]}>
-                {formatFcfa(prixNum)}
-              </ThemedText>
-            ) : null}
-          </View>
-          <ThemedText type="defaultSemiBold" style={[styles.merchantTitle, { color: colors.text }]}>
-            {merchant}
-          </ThemedText>
-          <ThemedText style={[styles.statusDark, { color: colors.text }]}>En livraison</ThemedText>
-          {orderCreatedLabel(o) ? (
-            <ThemedText style={[styles.dateMuted, { color: colors.textMuted }]}>
-              Commandée le {orderCreatedLabel(o)}
-            </ThemedText>
-          ) : null}
-          <View style={styles.deliveryRow}>
-            <View style={[styles.deliveryIconWrap, { backgroundColor: colors.primary }]}>
-              <Bike size={18} color={colors.onPrimary} strokeWidth={LUCIDE_STROKE} />
-            </View>
-            <ThemedText style={[styles.deliveryText, { color: colors.text }]}>Livreur en route</ThemedText>
-            <View style={[styles.dottedLine, { borderColor: colors.border }]} />
-          </View>
-        </Pressable>
-      );
-    }
-
-    const prepOrange = k === 'en preparation';
     const steps = stepperFilledCount(o.statut);
+    const isInDelivery = k === 'en livraison';
 
     return (
       <Pressable
         key={o.id}
-        style={({ pressed }) => [styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && styles.cardPressed]}
+        style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
         onPress={() => router.push(`/order-tracking/${o.id}`)}
         android_ripple={{ color: colors.primarySoft }}>
-        <View style={styles.cardTop}>
-          <ThemedText type="defaultSemiBold" style={[styles.orderId, { color: colors.text }]}>
-            #{refStr}
-          </ThemedText>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardHeaderLeft}>
+            <View style={[styles.statusDot, { backgroundColor: status.color }]} />
+            <ThemedText style={[styles.refText, { color: colors.text }]}>{refStr}</ThemedText>
+          </View>
           {priceOk ? (
-            <ThemedText type="defaultSemiBold" style={[styles.priceStrong, { color: colors.text }]}>
-              {formatFcfa(prixNum)}
-            </ThemedText>
+            <ThemedText style={[styles.priceText, { color: colors.primaryDeep }]}>{formatFcfa(prixNum)}</ThemedText>
           ) : null}
         </View>
-        <ThemedText type="defaultSemiBold" style={[styles.merchantTitle, { color: colors.text }]}>
-          {merchant}
-        </ThemedText>
-        <ThemedText style={prepOrange ? [styles.statusOrange, { color: colors.warning }] : [styles.statusDark, { color: colors.text }]}>
-          {statutLabel(o.statut)}
-        </ThemedText>
+        <ThemedText style={[styles.merchantText, { color: colors.text }]} numberOfLines={1}>{merchant}</ThemedText>
+        <View style={[styles.statusChip, { backgroundColor: status.bg }]}>
+          <StatusIcon size={12} color={status.color} strokeWidth={2.5} />
+          <ThemedText style={[styles.statusChipText, { color: status.color }]}>{status.label}</ThemedText>
+        </View>
         {orderCreatedLabel(o) ? (
-          <ThemedText style={[styles.dateMuted, { color: colors.textMuted, marginBottom: 8 }]}>
-            Commandée le {orderCreatedLabel(o)}
-          </ThemedText>
+          <ThemedText style={[styles.dateText, { color: colors.textMuted, marginTop: 8 }]}>{orderCreatedLabel(o)}</ThemedText>
         ) : null}
-        <StepperRow filled={steps} colors={colors} />
-        {o.timeline?.livraisons?.[0]?.timeline?.length ? (
-          <View style={{ marginTop: 12 }}>
-            <EventTimeline steps={o.timeline.livraisons[0].timeline!} title="Suivi livraison" />
+        <StepperDots filled={steps} colors={colors} />
+        {isInDelivery ? (
+          <View style={[styles.deliveryBanner, { backgroundColor: colors.primarySoft }]}>
+            <Bike size={16} color={colors.primary} strokeWidth={2.4} />
+            <ThemedText style={[styles.deliveryBannerText, { color: colors.primary }]}>Livreur en route</ThemedText>
           </View>
         ) : null}
       </Pressable>
@@ -330,9 +286,11 @@ function OrdersScreenInner({
       <View style={styles.listGap}>{visible.map(renderCard)}</View>
       {hasMore && !expanded ? (
         <Pressable
-          style={({ pressed }) => [styles.seeAllBtn, { borderColor: colors.primary, backgroundColor: colors.primarySoft }, pressed && styles.seeAllBtnPressed]}
+          style={({ pressed }) => [styles.seeAllBtn, pressed && styles.seeAllBtnPressed]}
           onPress={() => setExpanded(true)}>
-          <ThemedText style={[styles.seeAllText, { color: colors.primary }]}>Voir toutes les commandes</ThemedText>
+          <ThemedText style={[styles.seeAllText, { color: colors.primary }]}>
+            Voir les {ordersForTab.length} commandes
+          </ThemedText>
         </Pressable>
       ) : null}
     </>
@@ -355,7 +313,7 @@ export default function OrdersScreen() {
     livrees: false,
     annulees: false,
   });
-  const [pendingReviews, setPendingReviews] = useState<PendingReview[]>([]);
+  const [pendingReviews, setPendingReviews] = useState<{ id: string; sous_commande_id: string; enterprise_nom: string | null }[]>([]);
   const isDesktop = useIsWebDesktop();
 
   const bottomPad = isDesktop ? 24 : Math.max(insets.bottom, 12) + TAB_BAR_CONTENT_PADDING_BOTTOM;
@@ -363,36 +321,22 @@ export default function OrdersScreen() {
   const load = useCallback(async (force = false) => {
     setError(null);
     const cachedEnt = peekAllEnterprises();
-    const hasCachedOrders = Boolean(
-      peekCached<OrderRow[]>(ORDERS_CACHE_KEY, Number.POSITIVE_INFINITY)?.length,
-    );
+    const hasCachedOrders = Boolean(peekCached<OrderRow[]>(ORDERS_CACHE_KEY, Number.POSITIVE_INFINITY)?.length);
     if (cachedEnt?.length) {
       setEnterprises(cachedEnt as Enterprise[]);
       setLoading(false);
     } else if (!hasCachedOrders) {
       setLoading(true);
     }
-
     try {
       const token = await getSessionToken();
-      if (!token) {
-        setOrders([]);
-        setEnterprises([]);
-        return;
-      }
-      const [orderList, entList, pending] = await Promise.all([
-        fetchCached(
-          ORDERS_CACHE_KEY,
-          () => apiFetch<OrderRow[]>('/api/orders', { method: 'GET', token }),
-          60_000,
-          force,
-        ),
+      if (!token) { setOrders([]); setEnterprises([]); return; }
+      const [orderList, entList] = await Promise.all([
+        fetchCached(ORDERS_CACHE_KEY, () => apiFetch<OrderRow[]>('/api/orders', { method: 'GET', token }), 60_000, force),
         fetchAllEnterprises(force),
-        fetchPendingReviews(token).catch(() => [] as PendingReview[]),
       ]);
       setOrders(Array.isArray(orderList) ? orderList : []);
       setEnterprises(entList as Enterprise[]);
-      setPendingReviews(Array.isArray(pending) ? pending : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Impossible de charger les commandes.');
     } finally {
@@ -401,40 +345,30 @@ export default function OrdersScreen() {
   }, []);
 
   const handleOrderRated = useCallback((orderId: string, sousCommandeId?: string | null) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, peut_noter: false, sous_commande_id: null } : o))
-    );
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, peut_noter: false, sous_commande_id: null } : o)));
     if (sousCommandeId) {
       setPendingReviews((prev) => prev.filter((p) => p.sous_commande_id !== sousCommandeId));
     }
-    // Sans ça, le cache 60 s des commandes renvoyait l'ancienne liste
-    // (peut_noter: true) au focus suivant : la carte de notation réapparaissait
-    // alors que la note était déjà envoyée. On invalide pour que le backend
-    // recalcule peut_noter / pending à la prochaine visite.
     invalidateCached('orders:client');
   }, []);
 
-  const onRefresh = useCallback(() => {
-    void load();
-  }, [load]);
-
-  useFocusEffect(onRefresh);
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const enterpriseById = useMemo(() => new Map(enterprises.map((e) => [e.id, e])), [enterprises]);
 
   const sortedOrders = useMemo(
-    () =>
-      [...orders].sort((a, b) => {
-        const da = a.cree_le ? new Date(a.cree_le).getTime() : 0;
-        const db = b.cree_le ? new Date(b.cree_le).getTime() : 0;
-        return db - da;
-      }),
-    [orders]
+    () => [...orders].sort((a, b) => {
+      const da = a.cree_le ? new Date(a.cree_le).getTime() : 0;
+      const db = b.cree_le ? new Date(b.cree_le).getTime() : 0;
+      return db - da;
+    }),
+    [orders],
   );
 
-  const ordersForTab = useMemo(() => {
-    return sortedOrders.filter((o) => orderBucket(o.statut) === filter);
-  }, [sortedOrders, filter]);
+  const ordersForTab = useMemo(
+    () => sortedOrders.filter((o) => orderBucket(o.statut) === filter),
+    [sortedOrders, filter],
+  );
 
   const setExpanded = useCallback((v: boolean) => {
     setExpandedByTab((prev) => ({ ...prev, [filter]: v }));
@@ -442,25 +376,16 @@ export default function OrdersScreen() {
 
   const expanded = expandedByTab[filter];
 
-  const emptyCopy: Record<FilterTab, { title: string; body: string }> = {
-    encours: {
-      title: 'Aucune commande en cours',
-      body: 'Vos commandes actives apparaîtront ici avec suivi en temps réel.',
-    },
-    livrees: {
-      title: 'Aucune livraison terminée',
-      body: 'Les commandes livrées seront listées dans cet onglet.',
-    },
-    annulees: {
-      title: 'Aucune commande annulée',
-      body: "Les annulations éventuelles s'afficheront ici.",
-    },
+  const emptyCopy: Record<FilterTab, { icon: typeof ScrollText; title: string; body: string }> = {
+    encours: { icon: Package, title: 'Aucune commande en cours', body: 'Vos commandes actives apparaîtront ici.' },
+    livrees: { icon: CheckCircle2, title: 'Aucune livraison terminée', body: 'Les commandes livrées seront listées ici.' },
+    annulees: { icon: XCircle, title: 'Aucune commande annulée', body: 'Les annulations s\'afficheront ici.' },
   };
 
-  const filterLabels: { key: FilterTab; label: string }[] = [
-    { key: 'encours', label: 'En cours' },
-    { key: 'livrees', label: 'Livrées' },
-    { key: 'annulees', label: 'Annulées' },
+  const filterLabels: { key: FilterTab; label: string; icon: typeof Clock }[] = [
+    { key: 'encours', label: 'En cours', icon: Clock },
+    { key: 'livrees', label: 'Livrées', icon: CheckCircle2 },
+    { key: 'annulees', label: 'Annulées', icon: XCircle },
   ];
 
   return (
@@ -478,71 +403,79 @@ export default function OrdersScreen() {
             width: isDesktop ? '100%' : undefined,
           },
         ]}>
-        <ThemedText type="title" style={[styles.pageTitle, { color: colors.primaryDeep }]}>
-          Commandes
-        </ThemedText>
+        {/* Header */}
+        <View style={styles.pageHeader}>
+          <ThemedText style={[styles.pageTitle, { color: colors.text }]}>Commandes</ThemedText>
+          {sortedOrders.length > 0 ? (
+            <View style={[styles.countBadge, { backgroundColor: colors.surfaceMuted }]}>
+              <ThemedText style={[styles.countText, { color: colors.textSecondary }]}>{sortedOrders.length}</ThemedText>
+            </View>
+          ) : null}
+        </View>
 
+        {/* Pending reviews */}
         {pendingReviews.length > 0 ? (
-          <View style={[styles.pendingReviewsBanner, { backgroundColor: colors.primarySoft, borderColor: colors.border }]}>
-            <ThemedText type="defaultSemiBold" style={[styles.pendingReviewsTitle, { color: colors.primaryDeep }]}>
-              {pendingReviews.length} avis en attente
-            </ThemedText>
-            <ThemedText style={[styles.pendingReviewsBody, { color: colors.textSecondary }]}>
-              Notez {pendingReviews[0]?.enterprise_nom ?? 'votre dernier commerce'} pour aider la communauté.
-            </ThemedText>
-            <Pressable
-              style={[styles.pendingReviewsBtn, { backgroundColor: colors.primary }]}
-              onPress={() => setFilter('livrees')}>
-              <ThemedText style={[styles.pendingReviewsBtnText, { color: colors.onPrimary }]}>Noter maintenant</ThemedText>
+          <View style={[styles.reviewBanner, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}>
+            <View style={styles.reviewBannerContent}>
+              <ThemedText style={[styles.reviewTitle, { color: '#92400E' }]}>
+                ⭐ {pendingReviews.length} avis en attente
+              </ThemedText>
+              <ThemedText style={[styles.reviewBody, { color: '#A16207' }]}>
+                Notez {pendingReviews[0]?.enterprise_nom ?? 'votre dernier commerce'}
+              </ThemedText>
+            </View>
+            <Pressable style={[styles.reviewBtn, { backgroundColor: '#F59E0B' }]} onPress={() => setFilter('livrees')}>
+              <ThemedText style={styles.reviewBtnText}>Noter</ThemedText>
             </Pressable>
           </View>
         ) : null}
 
-        <View style={styles.filterRow}>
-          {filterLabels.map(({ key, label }) => {
+        {/* Filter tabs */}
+        <View style={[styles.filterRow, { backgroundColor: colors.surfaceMuted }]}>
+          {filterLabels.map(({ key, label, icon: Icon }) => {
             const active = filter === key;
+            const count = sortedOrders.filter((o) => orderBucket(o.statut) === key).length;
             return (
               <Pressable
                 key={key}
-                style={[styles.filterPill, active ? { backgroundColor: colors.primary } : { backgroundColor: colors.surfaceMuted }]}
+                style={[styles.filterTab, active && { backgroundColor: colors.surface }]}
                 onPress={() => setFilter(key)}>
-                <ThemedText style={[styles.filterPillText, active ? { color: colors.onPrimary } : { color: colors.textSecondary }]}>
+                <Icon size={14} color={active ? colors.primary : colors.textMuted} strokeWidth={active ? 2.5 : LUCIDE_STROKE} />
+                <ThemedText style={[styles.filterLabel, { color: active ? colors.primary : colors.textMuted }]}>
                   {label}
                 </ThemedText>
+                {count > 0 ? (
+                  <View style={[styles.filterCount, { backgroundColor: active ? colors.primarySoft : colors.border }]}>
+                    <ThemedText style={[styles.filterCountText, { color: active ? colors.primary : colors.textMuted }]}>{count}</ThemedText>
+                  </View>
+                ) : null}
               </Pressable>
             );
           })}
         </View>
 
+        {/* Content */}
         {loading ? (
           <View style={styles.loader}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <ThemedText style={[styles.muted, { color: colors.textMuted }]}>Chargement…</ThemedText>
-          </View>
-        ) : error && sortedOrders.length === 0 ? (
-          <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', gap: 12, padding: 20 }]}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <ThemedText style={[styles.muted, { color: colors.textMuted }]}>Chargement des commandes…</ThemedText>
-            <Pressable style={[styles.retrySolid, { backgroundColor: colors.primary }]} onPress={() => void load()}>
-              <ThemedText style={[styles.retrySolidText, { color: colors.onPrimary }]}>Actualiser</ThemedText>
-            </Pressable>
           </View>
         ) : sortedOrders.length === 0 ? (
-          <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={[styles.emptyIcon, { backgroundColor: colors.primarySoft, borderColor: colors.borderStrong }]}>
-              <ScrollText size={28} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
+          <View style={styles.emptyState}>
+            <View style={[styles.emptyIconWrap, { backgroundColor: colors.primarySoft }]}>
+              <ScrollText size={32} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
             </View>
-            <ThemedText style={[styles.emptyTitle, { color: colors.primaryDeep }]}>Aucune commande</ThemedText>
+            <ThemedText style={[styles.emptyTitle, { color: colors.text }]}>Aucune commande</ThemedText>
             <ThemedText style={[styles.emptyBody, { color: colors.textMuted }]}>
-              Passez une commande depuis le panier pour la voir apparaître ici.
+              Passez une commande depuis le marketplace pour la voir apparaître ici.
             </ThemedText>
-            <Pressable style={[styles.retrySolid, { backgroundColor: colors.primary }]} onPress={() => router.navigate('/(tabs)')}>
-              <ThemedText style={[styles.retrySolidText, { color: colors.onPrimary }]}>Ouvrir le marketplace</ThemedText>
+            <Pressable style={[styles.emptyBtn, { backgroundColor: colors.primary }]} onPress={() => router.navigate('/(tabs)')}>
+              <ThemedText style={[styles.emptyBtnText, { color: colors.onPrimary }]}>Ouvrir le marketplace</ThemedText>
             </Pressable>
           </View>
         ) : ordersForTab.length === 0 ? (
-          <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <ThemedText style={[styles.emptyTitle, { color: colors.primaryDeep }]}>{emptyCopy[filter].title}</ThemedText>
+          <View style={styles.emptyState}>
+            {(() => { const E = emptyCopy[filter].icon; return <E size={28} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />; })()}
+            <ThemedText style={[styles.emptyTitle, { color: colors.text }]}>{emptyCopy[filter].title}</ThemedText>
             <ThemedText style={[styles.emptyBody, { color: colors.textMuted }]}>{emptyCopy[filter].body}</ThemedText>
           </View>
         ) : (
@@ -563,184 +496,142 @@ export default function OrdersScreen() {
 }
 
 const stepStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 14,
-    paddingRight: 4,
-  },
-  stepSlot: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    minWidth: 0,
-  },
-  dotOuter: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dotInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  line: {
-    flex: 1,
-    height: 3,
-    marginHorizontal: 2,
-    borderRadius: 2,
-  },
+  row: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
+  stepSlot: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  line: { flex: 1, height: 2, marginHorizontal: 2, borderRadius: 1 },
 });
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   scroll: { paddingHorizontal: 16 },
-  pendingReviewsBanner: {
-    borderRadius: 16,
+  pageHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  pageTitle: { fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
+  countBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  countText: { fontSize: 13, fontWeight: '700' },
+
+  // Review banner
+  reviewBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14,
     borderWidth: 1,
     padding: 14,
-    gap: 8,
-    marginBottom: 14,
+    marginBottom: 16,
+    gap: 12,
   },
-  pendingReviewsTitle: { fontSize: 13 },
-  pendingReviewsBody: { fontSize: 13, lineHeight: 19 },
-  pendingReviewsBtn: {
-    alignSelf: 'flex-start',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginTop: 4,
-  },
-  pendingReviewsBtnText: { fontWeight: '800', fontSize: 14 },
-  pageTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    marginBottom: 18,
-  },
+  reviewBannerContent: { flex: 1, gap: 2 },
+  reviewTitle: { fontSize: 14, fontWeight: '800' },
+  reviewBody: { fontSize: 12, fontWeight: '600' },
+  reviewBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
+  reviewBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+
+  // Filter tabs
   filterRow: {
     flexDirection: 'row',
-    gap: 10,
+    borderRadius: 14,
+    padding: 4,
     marginBottom: 20,
+    gap: 4,
   },
-  filterPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 999,
+  filterTab: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 10,
   },
-  filterPillText: {
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  loader: { marginTop: 48, alignItems: 'center', gap: 12 },
-  muted: { fontSize: 14 },
-  listGap: { gap: 14 },
+  filterLabel: { fontSize: 13, fontWeight: '700' },
+  filterCount: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, minWidth: 20, alignItems: 'center' },
+  filterCountText: { fontSize: 11, fontWeight: '800' },
+
+  // Cards
+  listGap: { gap: 12 },
   card: {
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    shadowColor: '#0C3020',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  cardPressed: { opacity: 0.97 },
-  cardTop: {
+  cardPressed: { opacity: 0.97, transform: [{ scale: 0.99 }] },
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 8,
   },
-  orderId: { fontSize: 13, letterSpacing: -0.2 },
-  eta: { fontSize: 13, fontWeight: '600' },
-  merchantTitle: { fontSize: 15, marginBottom: 6 },
-  statusOrange: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  statusDark: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  cancelChip: {
+  cardHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  refText: { fontSize: 13, fontWeight: '700', letterSpacing: -0.2 },
+  priceText: { fontSize: 14, fontWeight: '800' },
+  merchantText: { fontSize: 15, fontWeight: '700', marginBottom: 8 },
+
+  // Status chip
+  statusChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     alignSelf: 'flex-start',
-    borderRadius: 8,
+    gap: 5,
     paddingHorizontal: 10,
     paddingVertical: 5,
+    borderRadius: 8,
+  },
+  statusChipText: { fontSize: 12, fontWeight: '700' },
+
+  // Cancel
+  cancelChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
     marginBottom: 4,
   },
-  cancelChipText: { fontSize: 13, fontWeight: '800' },
-  cancelDetail: { fontSize: 13, marginBottom: 8, lineHeight: 18 },
-  deliveryRow: {
+  cancelChipText: { fontSize: 12, fontWeight: '700' },
+  cancelDetail: { fontSize: 13, lineHeight: 18 },
+
+  // Delivery banner
+  deliveryBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
-    gap: 10,
+    gap: 8,
+    padding: 10,
+    borderRadius: 10,
+    marginTop: 10,
   },
-  deliveryIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deliveryText: { fontSize: 13, fontWeight: '700' },
-  dottedLine: {
-    flex: 1,
-    height: 1,
-    borderStyle: 'dotted',
-    borderWidth: 1,
-    opacity: 0.85,
-  },
-  cardFooterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 14,
-  },
-  dateMuted: { fontSize: 12 },
-  priceStrong: { fontSize: 14 },
+  deliveryBannerText: { fontSize: 13, fontWeight: '700' },
+
+  // Date
+  dateText: { fontSize: 12, fontWeight: '500' },
+
+  // See all
   seeAllBtn: {
-    marginTop: 18,
+    marginTop: 14,
     paddingVertical: 14,
     borderRadius: 14,
     borderWidth: 1.5,
+    borderColor: '#E5E7EB',
     alignItems: 'center',
   },
   seeAllBtnPressed: { opacity: 0.92 },
-  seeAllText: { fontSize: 13, fontWeight: '800' },
-  emptyCard: {
-    marginTop: 24,
-    borderRadius: 18,
-    padding: 22,
-    borderWidth: 1,
-    alignItems: 'center',
-    gap: 10,
-  },
-  emptyIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  emptyTitle: { fontSize: 15, fontWeight: '800' },
-  emptyBody: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
-  cardError: { alignItems: 'center', gap: 12 },
-  errText: { fontWeight: '700', textAlign: 'center' },
-  retrySolid: {
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    borderRadius: 14,
-  },
-  retrySolidText: { fontWeight: '800' },
+  seeAllText: { fontSize: 14, fontWeight: '700' },
+
+  // Empty
+  loader: { marginTop: 48, alignItems: 'center' },
+  emptyState: { marginTop: 40, alignItems: 'center', gap: 12, paddingHorizontal: 20 },
+  emptyIconWrap: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
+  emptyTitle: { fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  emptyBody: { fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  emptyBtn: { marginTop: 8, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
+  emptyBtnText: { fontSize: 14, fontWeight: '800' },
 });

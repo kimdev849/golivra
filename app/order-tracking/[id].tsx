@@ -501,13 +501,19 @@ export default function OrderTrackingScreen() {
     <ThemedView style={styles.screen} lightColor={colors.backgroundAlt} darkColor={colors.backgroundAlt}>
       {/* ── Header ── */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 10), backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
-          <ArrowLeft size={24} color={colors.text} strokeWidth={LUCIDE_STROKE} />
+        <Pressable onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: colors.surfaceMuted }]} hitSlop={12}>
+          <ArrowLeft size={20} color={colors.text} strokeWidth={2.5} />
         </Pressable>
-        <ThemedText style={[styles.headerTitle, { color: colors.text }]}>
-          {isDelivered ? 'Détails de commande' : 'Suivi de commande'}
-        </ThemedText>
+        <View style={styles.headerCenter}>
+          <ThemedText style={[styles.headerTitle, { color: colors.text }]}>
+            {isDelivered ? 'Détails' : 'Suivi'}
+          </ThemedText>
+          <ThemedText style={[styles.headerRef, { color: colors.textMuted }]}>
+            #{order?.numero || id?.slice(0, 8).toUpperCase()}
+          </ThemedText>
+        </View>
         <View style={[styles.headerPill, { backgroundColor: headerPill.bg }]}>
+          <View style={[styles.headerPillDot, { backgroundColor: headerPill.txt }]} />
           <ThemedText style={[styles.headerPillText, { color: headerPill.txt }]}>{headerPill.label}</ThemedText>
         </View>
       </View>
@@ -1006,43 +1012,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: '800' },
-  headerPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
+  backBtn: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  headerCenter: { flex: 1, alignItems: 'center' },
+  headerTitle: { fontSize: 17, fontWeight: '800' },
+  headerRef: { fontSize: 11, fontWeight: '600', marginTop: 1 },
+  headerPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
+  headerPillDot: { width: 6, height: 6, borderRadius: 3 },
   headerPillText: { fontSize: 12, fontWeight: '800' },
   scroll: { padding: 16, gap: 14 },
 
   // ── Cartes unifiées ──
   card: {
-    borderRadius: 20,
+    borderRadius: 18,
     padding: 16,
     borderWidth: 1,
+    borderColor: '#E5E7EB',
     width: '100%',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
     elevation: 2,
   },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
   cardIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cardTitle: { fontSize: 16, fontWeight: '800' },
-  cardSub: { fontSize: 13, marginTop: 2, fontWeight: '500' },
+  cardTitle: { fontSize: 15, fontWeight: '800' },
+  cardSub: { fontSize: 13, marginTop: 2, fontWeight: '500', lineHeight: 18 },
 
   // ── Hero statut (dégradé) ──
   heroCard: {
-    borderRadius: 24,
+    borderRadius: 20,
     padding: 20,
     width: '100%',
-    gap: 18,
+    gap: 16,
     overflow: 'hidden',
   },
   heroTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -1143,13 +1154,13 @@ const styles = StyleSheet.create({
   // ── Boutons ──
   primaryCta: {
     borderRadius: 14,
-    paddingVertical: 14,
+    paddingVertical: 15,
     paddingHorizontal: 28,
     alignItems: 'center',
     alignSelf: 'stretch',
     marginTop: 4,
   },
-  primaryCtaText: { fontWeight: '800', fontSize: 15 },
+  primaryCtaText: { fontWeight: '800', fontSize: 15, letterSpacing: -0.2 },
 
   // ── Paiement ──
   payDeadlineBanner: {
