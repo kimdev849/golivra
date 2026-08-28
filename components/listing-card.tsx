@@ -84,7 +84,7 @@ export function ListingCard({ product, onPress, isFav = false, onToggleFav, vari
         ]}>
         {image ? (
           <>
-            <WatermarkedImage source={{ uri: image }} style={styles.image} recyclingKey={image} />
+            <Image source={{ uri: image }} style={styles.image} recyclingKey={image} contentFit="cover" transition={200} />
             <Pressable
               style={[styles.zoomBtn, isGrid && styles.zoomBtnGrid, isFeed && styles.zoomBtnFeed]}
               onPress={(e) => {

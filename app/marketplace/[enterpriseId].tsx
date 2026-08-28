@@ -532,11 +532,13 @@ export default function EnterpriseDetailScreen() {
                   }}
                   disabled={!img}>
                   {img ? (
-                    <WatermarkedImage
+                    <Image
                       source={{ uri: img }}
                       style={styles.productImg}
                       recyclingKey={img}
                       cachePolicy="memory-disk"
+                      contentFit="cover"
+                      transition={200}
                     />
                   ) : (
                     <View style={[styles.productImg, styles.productImgPh]}>

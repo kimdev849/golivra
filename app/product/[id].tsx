@@ -350,11 +350,13 @@ export default function ProductDetailScreen() {
                 setGalleryIndex(selectedGalleryIndex);
                 setGalleryOpen(true);
               }}>
-              <WatermarkedImage
+              <Image
                 key={`${productId}-${selectedGalleryIndex}`}
                 source={{ uri: galleryImages[selectedGalleryIndex] }}
                 style={styles.heroImg}
                 recyclingKey={galleryImages[selectedGalleryIndex]}
+                contentFit="cover"
+                transition={200}
               />
             </Pressable>
           ) : (

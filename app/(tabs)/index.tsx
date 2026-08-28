@@ -179,10 +179,12 @@ const PremiumCard = memo(function PremiumCard({
       {/* Image */}
       <View style={[styles.premiumCardImg, isDesktop && styles.premiumCardImgDesktop, { backgroundColor: colors.primarySoft }]}>
         {imageUrl ? (
-          <WatermarkedImage
+          <Image
             source={{ uri: imageUrl }}
             recyclingKey={imageUrl}
             cachePolicy="memory-disk"
+            contentFit="cover"
+            transition={200}
             style={{ width: '100%', height: '100%' }}
           />
         ) : (
