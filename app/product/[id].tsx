@@ -314,10 +314,10 @@ export default function ProductDetailScreen() {
         )}
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.vendorName, { color: '#11181C' }]} numberOfLines={1}>
+        <Text style={[styles.vendorName, { color: colors.text }]} numberOfLines={1}>
           {enterpriseName || 'Vendeur'}
         </Text>
-        <Text style={[styles.vendorMeta, { color: '#6A8578' }]} numberOfLines={1}>
+        <Text style={[styles.vendorMeta, { color: colors.textMuted }]} numberOfLines={1}>
           {enterpriseType === 'restaurant' ? 'Restaurant' : 'Boutique'} · Voir la boutique
         </Text>
       </View>
@@ -437,7 +437,7 @@ export default function ProductDetailScreen() {
           {/* name + price */}
           <View style={styles.titleRow}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.title, { color: '#11181C' }]} numberOfLines={3}>
+              <Text style={[styles.title, { color: colors.text }]} numberOfLines={3}>
                 {product.nom}
               </Text>
               {product.prix_promo != null ? (
@@ -445,7 +445,7 @@ export default function ProductDetailScreen() {
                   <Text style={[styles.price, { color: colors.primary }]}>
                     {formatFcfa(Number(product.prix_promo))}
                   </Text>
-                  <Text style={[styles.oldPrice, { color: '#6A8578' }]}>
+                  <Text style={[styles.oldPrice, { color: colors.textMuted }]}>
                     {formatFcfa(Number(product.prix))}
                   </Text>
                   <View style={[styles.promoChip, { backgroundColor: colors.error }]}>
@@ -453,7 +453,7 @@ export default function ProductDetailScreen() {
                   </View>
                 </View>
               ) : (
-                <Text style={[styles.price, { color: '#11181C' }]}>
+                <Text style={[styles.price, { color: colors.text }]}>
                   {formatFcfa(Number(product.prix))}
                 </Text>
               )}
@@ -499,10 +499,10 @@ export default function ProductDetailScreen() {
           {/* description */}
           {product.description ? (
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: '#11181C' }]}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 Description
               </Text>
-              <Text style={[styles.description, { color: '#355245' }]}>
+              <Text style={[styles.description, { color: colors.textSecondary }]}>
                 {product.description}
               </Text>
             </View>
@@ -513,7 +513,7 @@ export default function ProductDetailScreen() {
             <View style={styles.tagsRow}>
               {product.tags.slice(0, 6).map((t) => (
                 <View key={t} style={[styles.tagChip, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}>
-                  <Text style={[styles.tagTxt, { color: '#355245' }]}>{t}</Text>
+                  <Text style={[styles.tagTxt, { color: colors.textSecondary }]}>{t}</Text>
                 </View>
               ))}
             </View>
@@ -522,12 +522,12 @@ export default function ProductDetailScreen() {
           {/* options (plats) */}
           {Array.isArray(product.options) && product.options.length > 0 ? (
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: '#11181C' }]}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
                 Personnalisation
               </Text>
               {product.options.map((g, gi) => (
                 <View key={`g-${gi}`} style={[styles.optionGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <Text style={[styles.optionGroupName, { color: '#11181C' }]}>
+                  <Text style={[styles.optionGroupName, { color: colors.text }]}>
                     {g.nom}
                     {g.requis ? ' *' : ''}
                   </Text>
@@ -566,11 +566,11 @@ export default function ProductDetailScreen() {
                             <Check size={12} color={colors.primary} strokeWidth={3} />
                           ) : null}
                         </View>
-                        <Text style={[styles.optionChoiceLabel, { color: '#11181C' }]}>
+                        <Text style={[styles.optionChoiceLabel, { color: colors.text }]}>
                           {c.label}
                         </Text>
                         {typeof c.prix_sup === 'number' && c.prix_sup > 0 ? (
-                          <Text style={[styles.optionChoiceSup, { color: '#6A8578' }]}>
+                          <Text style={[styles.optionChoiceSup, { color: colors.textMuted }]}>
                             +{formatFcfa(c.prix_sup)}
                           </Text>
                         ) : null}
@@ -586,7 +586,7 @@ export default function ProductDetailScreen() {
           {stockLabel ? (
             <View style={[styles.stockBadge, { borderColor: orderable ? colors.success : colors.border, backgroundColor: orderable ? colors.surface : colors.surfaceMuted }]}>
               <View style={[styles.stockDot, { backgroundColor: orderable ? colors.success : colors.error }]} />
-              <Text style={[styles.stockTxt, { color: orderable ? '#11181C' : '#6A8578' }]}>
+              <Text style={[styles.stockTxt, { color: orderable ? colors.text : colors.textMuted }]}>
                 {stockLabel}
               </Text>
             </View>
@@ -594,7 +594,7 @@ export default function ProductDetailScreen() {
 
           {/* note */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: '#11181C' }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
               Note pour le vendeur (optionnel)
             </Text>
             <TextInput
