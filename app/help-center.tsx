@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import {
   ChevronDown,
   ChevronLeft,

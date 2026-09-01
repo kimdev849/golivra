@@ -20,6 +20,7 @@ import { ThemedView } from '@/components/themed-view';
 import { VendorScreenHeader } from '@/components/vendor-screen-header';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 import { getSessionToken } from '@/lib/auth';
 import { showToast } from '@/lib/app-toast';
 import {
@@ -102,6 +103,7 @@ const IS_ANDROID = Platform.OS === 'android';
 
 export default function VendorHorairesScreen() {
   const insets = useSafeAreaInsets();
+  const guarded = useGuardedCallback();
   const colors = useAppColors();
   const { shop } = useVendor();
   const params = useLocalSearchParams<{ id?: string }>();
@@ -289,11 +291,11 @@ export default function VendorHorairesScreen() {
         ) : null}
 
         <View style={styles.quickRow}>
-          <Pressable style={({ pressed }) => [styles.quickBtn, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && styles.pressedDim]} onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); allOpen(); }} accessibilityRole="button">
+          <Pressable style={({ pressed }) => [styles.quickBtn, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && styles.pressedDim]} onPress={() => guarded(() => { void Haptics.impactAsync; allOpen(); })} accessibilityRole="button">
             <Sunrise size={16} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
             <ThemedText style={[styles.quickTxt, { color: colors.primary }]}>Tout ouvrir</ThemedText>
           </Pressable>
-          <Pressable style={({ pressed }) => [styles.quickBtn, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && styles.pressedDim]} onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); allClosed(); }} accessibilityRole="button">
+          <Pressable style={({ pressed }) => [styles.quickBtn, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && styles.pressedDim]} onPress={() => guarded(() => { void Haptics.impactAsync; allClosed(); })} accessibilityRole="button">
             <Power size={16} color={colors.error} strokeWidth={LUCIDE_STROKE} />
             <ThemedText style={[styles.quickTxt, { color: colors.error }]}>Tout fermer</ThemedText>
           </Pressable>
@@ -358,7 +360,7 @@ export default function VendorHorairesScreen() {
             <ThemedText style={[styles.errorText, { color: colors.error }]}>{error}</ThemedText>
           </View>
         ) : null}
-        <Pressable style={({ pressed }) => [styles.saveBtn, { backgroundColor: saving || loading ? colors.borderStrong : colors.primary }, pressed && styles.pressedDim]} disabled={saving || loading} onPress={() => void save()}>
+        <Pressable style={({ pressed }) => [styles.saveBtn, { backgroundColor: saving || loading ? colors.borderStrong : colors.primary }, pressed && styles.pressedDim]} disabled={saving || loading} onPress={() => guarded(() => void save())}>
           {saving ? <ActivityIndicator color="#FFFFFF" size="small" /> : (
             <>
               <CheckCircle2 size={20} color="#FFFFFF" strokeWidth={LUCIDE_STROKE} />

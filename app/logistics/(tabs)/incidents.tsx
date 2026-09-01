@@ -1,4 +1,5 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router'
+import { useRouter } from '@/hooks/use-safe-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,

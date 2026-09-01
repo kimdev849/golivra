@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import { Image } from 'expo-image';
 import { useCallback, useState } from 'react';
 import {
@@ -31,6 +31,7 @@ import { uploadImageBase64 } from '@/lib/uploads';
 import { validatePersonName, validatePhone } from '@/lib/form-validation';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 
 type Me = {
   id: string;
@@ -42,6 +43,7 @@ type Me = {
 
 export default function ProfileEditScreen() {
   const router = useRouter();
+  const guarded = useGuardedCallback();
   const colors = useAppColors();
   const isDark = useColorScheme() === 'dark';
   const insets = useSafeAreaInsets();
@@ -64,7 +66,12 @@ export default function ProfileEditScreen() {
     setLoading(true);
     try {
       const token = await getSessionToken();
-      if (!token) throw new Error('Session expirée.');
+      if (!token) {
+        // Invité : rediriger vers la connexion au lieu du faux
+        // message « Session expirée » (F-AUTH-01).
+        router.replace('/auth');
+        return;
+      }
       const data = await apiFetch<Me>('/api/auth/me', { method: 'GET', token });
       setNom(data.nom?.trim() ?? '');
       setPhoneDisplay(formatPhone(data.telephone ?? ''));
@@ -75,7 +82,7 @@ export default function ProfileEditScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [router]);
 
   useFocusEffect(
     useCallback(() => {
@@ -208,7 +215,7 @@ export default function ProfileEditScreen() {
               {/* ── Photo de profil ── */}
               <ThemedText style={[styles.sectionHeader, { color: colors.textMuted }]}>Photo de profil</ThemedText>
               <View style={styles.avatarBlock}>
-                <Pressable style={[styles.avatarCircle, { backgroundColor: colors.primarySoft, borderColor: avatarDataUrl ? colors.primary : colors.borderStrong }]} onPress={() => void pickPhoto()}>
+                <Pressable style={[styles.avatarCircle, { backgroundColor: colors.primarySoft, borderColor: avatarDataUrl ? colors.primary : colors.borderStrong }]} onPress={() => guarded(() => void pickPhoto())}>
                   {avatarUri ? (
                     <Image source={{ uri: avatarUri }} style={styles.avatarImg} contentFit="cover" />
                   ) : (
@@ -229,7 +236,7 @@ export default function ProfileEditScreen() {
                       </Pressable>
                       <Pressable
                         style={[styles.photoSaveBtn, { backgroundColor: colors.primary }, savingPhoto && styles.btnDisabled]}
-                        onPress={() => void savePhoto()}
+                        onPress={() => guarded(() => void savePhoto())}
                         disabled={savingPhoto}>
                         {savingPhoto ? (
                           <ActivityIndicator color="#FFF" size="small" />
@@ -288,7 +295,7 @@ export default function ProfileEditScreen() {
 
               <Pressable
                 style={[styles.primaryBtn, { backgroundColor: colors.primary }, savingProfile && styles.btnDisabled]}
-                onPress={() => void saveProfile()}
+                onPress={() => guarded(() => void saveProfile())}
                 disabled={savingProfile}>
                 {savingProfile ? (
                   <ActivityIndicator color="#FFFFFF" />

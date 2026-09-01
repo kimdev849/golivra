@@ -13,7 +13,7 @@
 
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import { router } from 'expo-router';
+import { safeRouter as router } from '@/lib/safe-router';
 
 import { loadExpoNotifications } from '@/lib/expo-notifications-module';
 import { registerPushToken } from '@/lib/push-token-api';

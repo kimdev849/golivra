@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import { useMemo, useState } from 'react';
 import {
   AlertCircle,

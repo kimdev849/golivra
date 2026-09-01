@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import { Copy, Share2, ExternalLink, CheckCircle2 } from 'lucide-react-native';
 import { useState } from 'react';
 import {
@@ -19,6 +19,7 @@ import { VendorScreenHeader } from '@/components/vendor-screen-header';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 import { useVendor } from '@/contexts/vendor-context';
 import { showToast } from '@/lib/app-toast';
 
@@ -41,6 +42,7 @@ function qrCodeUrl(data: string, size = 280): string {
 
 export default function VendorShareScreen() {
   const insets = useSafeAreaInsets();
+  const guarded = useGuardedCallback();
   const colors = useAppColors();
   const router = useRouter();
   const { shop } = useVendor();
@@ -141,7 +143,7 @@ export default function VendorShareScreen() {
         <View style={styles.actions}>
           <Pressable
             style={({ pressed }) => [styles.shareBtn, { backgroundColor: palette.primary }, pressed && styles.pressedDim]}
-            onPress={() => void handleShare()}
+            onPress={() => guarded(() => void handleShare())}
             accessibilityRole="button">
             <Share2 size={20} color="#FFFFFF" strokeWidth={LUCIDE_STROKE} />
             <ThemedText style={styles.shareBtnText}>Partager</ThemedText>
@@ -149,7 +151,7 @@ export default function VendorShareScreen() {
 
           <Pressable
             style={({ pressed }) => [styles.secondaryBtn, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }, pressed && styles.pressedDim]}
-            onPress={() => void handleCopyLink()}
+            onPress={() => guarded(() => void handleCopyLink())}
             accessibilityRole="button">
             {copied ? (
               <CheckCircle2 size={18} color={colors.success} strokeWidth={LUCIDE_STROKE} />

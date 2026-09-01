@@ -23,6 +23,7 @@ import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 import { getSessionToken } from '@/lib/auth';
 import { formatFcfa } from '@/lib/format';
 import {
@@ -45,6 +46,7 @@ const DONE_STATUTS = ['livree', 'annulee'];
 export default function VendorDeliveryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
+  const guarded = useGuardedCallback();
   const colors = useAppColors();
   const { palette } = useVendorTheme();
   const [detail, setDetail] = useState<VendorDeliveryDetail | null>(null);
@@ -282,7 +284,7 @@ export default function VendorDeliveryDetailScreen() {
                 {livreur.telephone ? (
                   <Pressable
                     hitSlop={8}
-                    onPress={() => void Linking.openURL(`tel:${livreur.telephone}`)}
+                    onPress={() => guarded(() => void Linking.openURL(`tel:${livreur.telephone}`))}
                     style={[styles.callBtn, { backgroundColor: colors.primarySoft }]}>
                     <Phone size={18} color={palette.primary} strokeWidth={LUCIDE_STROKE} />
                   </Pressable>
@@ -334,7 +336,7 @@ export default function VendorDeliveryDetailScreen() {
             ) : null}
             {liv.client_telephone ? (
               <Pressable
-                onPress={() => void Linking.openURL(`tel:${liv.client_telephone}`)}
+                onPress={() => guarded(() => void Linking.openURL(`tel:${liv.client_telephone}`))}
                 style={styles.infoRow}
                 hitSlop={8}>
                 <Phone size={15} color={palette.primary} strokeWidth={LUCIDE_STROKE} />

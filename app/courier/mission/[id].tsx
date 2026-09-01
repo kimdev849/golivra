@@ -1,4 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router'
+import { useRouter } from '@/hooks/use-safe-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -31,6 +32,7 @@ import {
 import { getSessionToken } from '@/lib/auth';
 import { AlertTriangle } from 'lucide-react-native';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 import { useCourierPalette } from '@/lib/courier-theme';
 
 type StepKey = 'assigned' | 'pickup' | 'picked_up' | 'delivering' | 'done';
@@ -124,6 +126,7 @@ function StepProgress({ currentStep }: { currentStep: StepKey }) {
 export default function CourierMissionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const guarded = useGuardedCallback();
   const insets = useSafeAreaInsets();
   const palette = useCourierPalette();
   const { missions, refreshMissions } = useCourier();
@@ -333,7 +336,7 @@ export default function CourierMissionDetailScreen() {
               <Pressable
                 style={[styles.btnPrimary, { backgroundColor: palette.primary }, acting !== null && styles.disabled]}
                 disabled={acting !== null}
-                onPress={() => void accept()}>
+                onPress={() => guarded(() => void accept())}>
                 {acting === 'accept' ? (
                   <ActivityIndicator color="#FFF" size="small" />
                 ) : (
@@ -349,7 +352,7 @@ export default function CourierMissionDetailScreen() {
               <Pressable
                 style={[styles.btnSecondary, { borderColor: palette.primary }, acting !== null && styles.disabled]}
                 disabled={acting !== null}
-                onPress={() => void advance()}>
+                onPress={() => guarded(() => void advance())}>
                 {acting === 'advance' ? (
                   <ActivityIndicator color={palette.primary} size="small" />
                 ) : (

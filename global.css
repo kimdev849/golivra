@@ -1,3 +1,80 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════════════
+   Web-specific resets — nettoie les styles moches des navigateurs
+   sur les inputs, boutons, et focuses.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Supprime les styles par défaut des inputs sur web (sans toucher au border-radius géré par React Native) */
+input,
+textarea,
+select,
+button {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  outline: none;
+  box-sizing: border-box;
+}
+
+/* Supprime l'outline bleu/contour au focus partout */
+*:focus {
+  outline: none;
+}
+
+/* Supprime le fond jaune/orange de l'autofill Chrome/Safari */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px transparent inset;
+  -webkit-text-fill-color: inherit;
+  transition: background-color 5000s ease-in-out 0s;
+  background-color: transparent !important;
+}
+
+/* Supprime les scrollbars moches sur webkit */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* Empêche le surlignage bleu au double-clic sur les textes */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Supprime les bordures internes des boutons sur web */
+button::-webkit-focus-inner {
+  border: 0;
+}
+
+/* Placeholder plus discret */
+::placeholder {
+  opacity: 0.5;
+}
+
+/* Sélection de texte plus propre */
+::selection {
+  background-color: rgba(14, 134, 212, 0.2);
+}

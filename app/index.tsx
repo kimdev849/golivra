@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { FlaskConical } from 'lucide-react-native';
 import { Image } from 'expo-image';

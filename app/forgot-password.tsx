@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,

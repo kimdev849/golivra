@@ -1,5 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs } from 'expo-router'
+import { useRouter } from '@/hooks/use-safe-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Bike, ClipboardList, User } from 'lucide-react-native';

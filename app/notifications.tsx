@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { BadgePercent, Bell, ChevronLeft, Package, ShoppingBag, Truck, Wallet, type LucideIcon } from 'lucide-react-native';
@@ -9,6 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 import { getSessionToken } from '@/lib/auth';
 import {
   fetchNotifications,
@@ -43,6 +44,7 @@ function moneyType(type: string): boolean {
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const guarded = useGuardedCallback();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const [items, setItems] = useState<AppNotification[]>([]);
@@ -107,7 +109,7 @@ export default function NotificationsScreen() {
         </Pressable>
         <ThemedText type="subtitle" style={[styles.headerTitle, { color: colors.primaryDeep }]}>Notifications</ThemedText>
         {unreadCount > 0 ? (
-          <Pressable style={styles.markAllBtn} onPress={() => void handleMarkAllRead()}>
+          <Pressable style={styles.markAllBtn} onPress={() => guarded(() => void handleMarkAllRead())}>
             <ThemedText style={[styles.markAllText, { color: colors.primary }]}>Tout lire</ThemedText>
           </Pressable>
         ) : <View style={styles.headerSpacer} />}
@@ -130,7 +132,7 @@ export default function NotificationsScreen() {
           ) : error ? (
             <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.errorSoft }]}>
               <ThemedText style={[styles.errText, { color: colors.error }]}>{error}</ThemedText>
-              <Pressable style={[styles.retry, { backgroundColor: colors.primary }]} onPress={() => void load()}>
+              <Pressable style={[styles.retry, { backgroundColor: colors.primary }]} onPress={() => guarded(() => void load())}>
                 <ThemedText style={styles.retryText}>Réessayer</ThemedText>
               </Pressable>
             </View>
@@ -160,7 +162,7 @@ export default function NotificationsScreen() {
                 },
                 pressed && styles.rowPressed,
               ]}
-              onPress={() => void handleOpen(n)}
+              onPress={() => guarded(() => void handleOpen(n))}
               android_ripple={{ color: colors.primaryMuted }}>
               <View
                 style={[

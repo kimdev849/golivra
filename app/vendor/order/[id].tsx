@@ -1,4 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router'
+import { useRouter } from '@/hooks/use-safe-router';
 import { MapPin, Phone, Truck } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, View } from 'react-native';
@@ -14,6 +15,7 @@ import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useThemedStyles } from '@/hooks/use-themed-styles';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 import {
   createVendorOrderDetailStyles,
   vendorStatusBadge,
@@ -32,6 +34,7 @@ import { vendorOrderStatusLabel as statusLabel } from '@/lib/ux-copy';
 export default function VendorOrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const guarded = useGuardedCallback();
   const insets = useSafeAreaInsets();
   const { orders, refreshOrders, setOrders } = useVendor();
   const [actingAction, setActingAction] = useState<string | null>(null);
@@ -267,7 +270,7 @@ export default function VendorOrderDetailScreen() {
             <Pressable
               style={[styles.primaryBtn, { flex: 1, backgroundColor: palette.primary }]}
               disabled={actingAction !== null}
-              onPress={() => void runStatus('acceptee', 'Commande acceptée.', 'accept')}>
+              onPress={() => guarded(() => void runStatus('acceptee', 'Commande acceptée.', 'accept'))}>
               {actingAction === 'accept' ? (
                 <ActivityIndicator color={colors.onPrimary} size="small" />
               ) : (

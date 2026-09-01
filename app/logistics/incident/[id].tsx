@@ -1,4 +1,6 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router'
+import { useRouter } from '@/hooks/use-safe-router';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -44,6 +46,7 @@ import {
 export default function IncidentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const guarded = useGuardedCallback();
   const insets = useSafeAreaInsets();
   const [token, setToken] = useState<string | null>(null);
   const [incident, setIncident] = useState<IncidentDelivery | null>(null);
@@ -397,21 +400,21 @@ export default function IncidentDetailScreen() {
           )}
           <Pressable
             style={[styles.actionBtnOutline, { borderColor: '#F59E0B' }]}
-            onPress={() => void handleEscalate()}
+            onPress={() => guarded(() => void handleEscalate())}
             disabled={acting !== null}>
             <TrendingUp size={18} color="#F59E0B" strokeWidth={LUCIDE_STROKE} />
             <ThemedText style={[styles.actionBtnOutlineText, { color: '#F59E0B' }]}>Escalader</ThemedText>
           </Pressable>
           <Pressable
             style={[styles.actionBtnOutline, { borderColor: '#6B7280' }]}
-            onPress={() => void handleAddNote()}
+            onPress={() => guarded(() => void handleAddNote())}
             disabled={acting !== null}>
             <MessageSquare size={18} color="#6B7280" strokeWidth={LUCIDE_STROKE} />
             <ThemedText style={[styles.actionBtnOutlineText, { color: '#6B7280' }]}>Ajouter note</ThemedText>
           </Pressable>
           <Pressable
             style={[styles.actionBtnDanger, { borderColor: '#EF4444' }]}
-            onPress={() => void handleCancel()}
+            onPress={() => guarded(() => void handleCancel())}
             disabled={acting !== null}>
             <XCircle size={18} color="#EF4444" strokeWidth={LUCIDE_STROKE} />
             <ThemedText style={[styles.actionBtnDangerText, { color: '#EF4444' }]}>Annuler la livraison</ThemedText>

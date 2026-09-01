@@ -1,4 +1,5 @@
-import { useRouter, usePathname } from 'expo-router';
+import { usePathname } from 'expo-router'
+import { useRouter } from '@/hooks/use-safe-router';
 import { memo, useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
@@ -234,7 +235,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 13,
     paddingVertical: 0,
   },
   navLinks: {
@@ -276,9 +277,9 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   profileBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,

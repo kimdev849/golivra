@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { Bell, AlertTriangle, Truck, Users, BellOff, CheckCheck } from 'lucide-react-native';
@@ -9,6 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 import { getSessionToken } from '@/lib/auth';
 import {
   fetchNotifications,
@@ -40,6 +41,7 @@ function iconColor(type: string) {
 
 export default function LogisticsNotificationsScreen() {
   const router = useRouter();
+  const guarded = useGuardedCallback();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const [items, setItems] = useState<AppNotification[]>([]);
@@ -91,7 +93,7 @@ export default function LogisticsNotificationsScreen() {
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 12), borderBottomColor: colors.border, backgroundColor: colors.surface }]}>
         <ThemedText type="subtitle" style={[styles.headerTitle, { color: colors.primaryDeep }]}>Notifications</ThemedText>
         {unreadCount > 0 ? (
-          <Pressable style={styles.markAllBtn} onPress={() => void handleMarkAllRead()}>
+          <Pressable style={styles.markAllBtn} onPress={() => guarded(() => void handleMarkAllRead())}>
             <CheckCheck size={14} color={colors.primary} strokeWidth={2.4} />
             <ThemedText style={[styles.markAllText, { color: colors.primary }]}>Tout lire</ThemedText>
           </Pressable>
@@ -132,7 +134,7 @@ export default function LogisticsNotificationsScreen() {
                 },
                 pressed && { opacity: 0.96 },
               ]}
-              onPress={() => void handleOpen(n)}>
+              onPress={() => guarded(() => void handleOpen(n))}>
               <View style={[styles.rowIcon, { backgroundColor: col + '15', borderColor: colors.border }]}>
                 <Icon size={18} color={col} strokeWidth={LUCIDE_STROKE} />
               </View>

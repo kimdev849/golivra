@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import { ActivityIndicator, View } from 'react-native';
 
 import { VendorMenuItemFormWizard } from '@/components/vendor-menu-item-form-wizard';

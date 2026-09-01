@@ -72,4 +72,28 @@ export const SafeAsyncStorage = {
       memoryStore = {};
     }
   },
+
+  async getAllKeys(): Promise<readonly string[]> {
+    if (blocked) return Object.keys(memoryStore);
+    try {
+      const store = await getReal();
+      const keys = await store.getAllKeys();
+      return keys;
+    } catch {
+      return Object.keys(memoryStore);
+    }
+  },
+
+  async multiRemove(keys: string[]): Promise<void> {
+    if (blocked) {
+      for (const k of keys) delete memoryStore[k];
+      return;
+    }
+    try {
+      const store = await getReal();
+      await store.multiRemove(keys);
+    } catch {
+      for (const k of keys) delete memoryStore[k];
+    }
+  },
 };

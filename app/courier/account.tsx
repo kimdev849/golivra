@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 import { FormErrorBanner } from '@/components/form-error-banner';
 import { InlineFormError } from '@/components/inline-form-error';
 import { LUCIDE_STROKE } from '@/constants/icons';
@@ -29,6 +30,7 @@ type Me = { nom: string | null; telephone: string };
 
 export default function CourierAccountScreen() {
   const router = useRouter();
+  const guarded = useGuardedCallback();
   const insets = useSafeAreaInsets();
   const palette = useCourierPalette();
   const { showSuccess, showError, FeedbackOverlay } = useActionFeedback();
@@ -191,7 +193,7 @@ export default function CourierAccountScreen() {
           </View>
           <InlineFormError message={fieldErrors.nom} colors={{ error: palette.danger, errorSoft: palette.dangerBg }} />
           <InlineFormError message={fieldErrors.phone} colors={{ error: palette.danger, errorSoft: palette.dangerBg }} />
-          <Pressable style={[styles.primaryBtn, { backgroundColor: palette.primary }]} onPress={() => void saveProfile()} disabled={savingProfile}>
+          <Pressable style={[styles.primaryBtn, { backgroundColor: palette.primary }]} onPress={() => guarded(() => void saveProfile())} disabled={savingProfile}>
             {savingProfile ? (
               <ActivityIndicator color="#FFF" />
             ) : (
@@ -238,7 +240,7 @@ export default function CourierAccountScreen() {
           <InlineFormError message={fieldErrors.currentPassword} colors={{ error: palette.danger, errorSoft: palette.dangerBg }} />
           <InlineFormError message={fieldErrors.newPassword} colors={{ error: palette.danger, errorSoft: palette.dangerBg }} />
           <InlineFormError message={fieldErrors.confirmPassword} colors={{ error: palette.danger, errorSoft: palette.dangerBg }} />
-          <Pressable style={[styles.secondaryBtn, { borderColor: palette.primary }]} onPress={() => void savePassword()} disabled={savingPassword}>
+          <Pressable style={[styles.secondaryBtn, { borderColor: palette.primary }]} onPress={() => guarded(() => void savePassword())} disabled={savingPassword}>
             {savingPassword ? (
               <ActivityIndicator color={palette.primary} />
             ) : (

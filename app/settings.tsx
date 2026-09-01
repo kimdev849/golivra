@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import {
   Bell,
   ChevronLeft,
@@ -44,6 +44,7 @@ import {
   type TextScaleKey,
 } from '@/contexts/text-scale-context';
 import { useUnreadNotifications } from '@/hooks/use-unread-notifications';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 import { getSessionToken } from '@/lib/auth';
 import { fetchPreferences, updatePreferences } from '@/lib/preferences-api';
 import type { ThemePreference } from '@/contexts/app-theme-context';
@@ -62,6 +63,7 @@ const THEME_OPTIONS: ThemeOption[] = [
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const guarded = useGuardedCallback();
   const insets = useSafeAreaInsets();
   const { colors, preference, setPreference, setDarkMode, isDark } = useAppTheme();
   const { key: textScaleKey, setKey: setTextScaleKey } = useTextScale();
@@ -117,7 +119,24 @@ export default function SettingsScreen() {
 
   const handleClearCache = async () => {
     try {
-      await AsyncStorage.clear();
+      // Clés à conserver : panier, onboarding, thème, taille de texte,
+      // biométrie et session — ne pas les supprimer lors du « vider le cache »
+      // (F-SET-01).
+      const PRESERVE_KEYS = new Set([
+        'golivra_cart_v1',
+        'golivra_onboarding_v2',
+        'golivra_theme_preference_v1',
+        'golivra_theme_migration_v1',
+        'golivra_text_scale',
+        'golivra_biometric_lock',
+        'golivra-session-token',
+        'golivra-auth',
+      ]);
+      const keys = await AsyncStorage.getAllKeys();
+      const toRemove = keys.filter((k) => !PRESERVE_KEYS.has(k));
+      if (toRemove.length > 0) {
+        await AsyncStorage.multiRemove(toRemove);
+      }
       setCacheCleared(true);
       setTimeout(() => setCacheCleared(false), 3000);
     } catch {
@@ -218,7 +237,7 @@ export default function SettingsScreen() {
               <View key={opt.id}>
                 <Pressable
                   style={[localStyles.row, active && localStyles.rowActive]}
-                  onPress={() => void setPreference(opt.id)}>
+                  onPress={() => guarded(() => void setPreference(opt.id))}>
                   <View style={[localStyles.rowIcon, { backgroundColor: active ? colors.primarySoft : colors.surfaceMuted }]}>
                     <Icon size={20} color={active ? colors.primary : colors.textMuted} strokeWidth={LUCIDE_STROKE} />
                   </View>

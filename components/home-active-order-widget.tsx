@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
-import { useRouter, type Href } from 'expo-router';
+import { type Href } from 'expo-router'
+import { useRouter } from '@/hooks/use-safe-router';
 import { ChevronRight, MapPin, UtensilsCrossed } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 

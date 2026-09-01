@@ -1,5 +1,5 @@
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
-import { router } from 'expo-router';
+import { safeRouter as router } from '@/lib/safe-router';
 import { Platform } from 'react-native';
 
 import type { AppPalette } from '@/constants/app-palette';

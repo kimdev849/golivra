@@ -8,6 +8,11 @@ const cartListeners = new Set<CartListener>();
 /** Panier en mémoire — source de vérité instantanée pour l'UI. */
 let memoryCart: CartState | null = null;
 let memoryHydrated = false;
+/** Gate qui se résout dès que hydrateCart() a terminé. Les mutations
+ * arrivant avant l'hydratation attendent ce promesse pour ne pas
+ * écraser le panier persistant avec un objet vide. */
+let hydrationGate: Promise<void> | null = null;
+let resolveHydrationGate: (() => void) | null = null;
 
 export let currentCartCount = 0;
 
@@ -156,12 +161,27 @@ async function readCartFromStorage(): Promise<CartState | null> {
 /** Charge SecureStore une fois au démarrage. */
 export async function hydrateCart(): Promise<CartState | null> {
   if (memoryHydrated) return memoryCart;
-  const loaded = normalizeCart(await readCartFromStorage());
-  memoryCart = loaded;
-  memoryHydrated = true;
-  currentCartCount = getCartItemCount(loaded);
-  notifyCartChanged();
-  return loaded;
+  // Si une hydratation est déjà en cours (autre appel concurrent), on attend
+  // qu'elle se termine plutôt que de relire le stockage deux fois.
+  if (hydrationGate) {
+    await hydrationGate;
+    return memoryCart;
+  }
+  hydrationGate = new Promise<void>((resolve) => {
+    resolveHydrationGate = resolve;
+  });
+  try {
+    const loaded = normalizeCart(await readCartFromStorage());
+    memoryCart = loaded;
+    memoryHydrated = true;
+    currentCartCount = getCartItemCount(loaded);
+    notifyCartChanged();
+    return loaded;
+  } finally {
+    resolveHydrationGate?.();
+    hydrationGate = null;
+    resolveHydrationGate = null;
+  }
 }
 
 export async function loadCart(): Promise<CartState | null> {
@@ -211,11 +231,34 @@ function persistCartAsync(state: CartState | null): void {
   })();
 }
 
-export function applyCartMutation(updater: (prev: CartState | null) => CartState | null): CartState | null {
-  const next = normalizeCart(updater(memoryCart));
-  setMemoryCart(next);
-  persistCartAsync(next);
-  return next;
+/** Applique une mutation au panier. Attend l'hydratation si nécessaire
+ * pour ne pas écraser le panier persistant avec un objet vide (F-CART-01).
+ * Retourne immédiatement le résultat optimiste si l'hydratation est faite ;
+ * sinon retourne null (la mutation sera appliquée en arrière-plan). */
+export function applyCartMutation(
+  updater: (prev: CartState | null) => CartState | null
+): CartState | null {
+  // Hydratation terminée → appliquer immédiatement (chemin synchronisé).
+  if (memoryHydrated) {
+    const next = normalizeCart(updater(memoryCart));
+    setMemoryCart(next);
+    persistCartAsync(next);
+    return next;
+  }
+  // Hydratation en cours ou pas encore lancée → lancer la mutation en
+  // arrière-plan une fois le panier chargé, pour ne pas écraser les
+  // données persistées avec un panier vide.
+  void (async () => {
+    try {
+      await hydrateCart();
+      const next = normalizeCart(updater(memoryCart));
+      setMemoryCart(next);
+      persistCartAsync(next);
+    } catch {
+      /* mémoire reste source de vérité */
+    }
+  })();
+  return null;
 }
 
 export async function saveCart(state: CartState | null): Promise<void> {

@@ -1,5 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs } from 'expo-router'
+import { useRouter } from '@/hooks/use-safe-router';
 import { ClipboardList, Heart, Home, ShoppingCart, UserRound } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState, createContext, useContext } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';

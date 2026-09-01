@@ -1,6 +1,6 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router'
+import { useRouter } from '@/hooks/use-safe-router';
 import { useEffect, useRef, useState } from 'react';
-import { useSafeNavigation } from '@/hooks/use-safe-navigation';
 import {
   ActivityIndicator,
   Alert,
@@ -38,6 +38,7 @@ import { GOLIVRA_BRAND_SHADOW } from '@/constants/app-palette';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useFeatureEnabled } from '@/hooks/use-feature-enabled';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 import { apiFetch } from '@/lib/api';
 import { getSessionToken } from '@/lib/auth';
 import type { TimelineStep as _TimelineStep } from '@/lib/datetime';
@@ -219,6 +220,7 @@ function FadeCard({
 export default function OrderTrackingScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const guarded = useGuardedCallback();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const paymentsEnabled = useFeatureEnabled('payments');
@@ -228,7 +230,6 @@ export default function OrderTrackingScreen() {
   const [payMethod, setPayMethod] = useState<'airtel' | 'mtn'>('airtel');
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
-  const { safePush, safeReplace, safeBack } = useSafeNavigation();
 
   // Horloge locale : fait tourner les comptes à rebours (MM:SS) chaque seconde,
   // uniquement tant qu'une échéance est active (attente de confirmation ou
@@ -331,7 +332,7 @@ export default function OrderTrackingScreen() {
   };
 
   const goHome = () => {
-    safeReplace('/(tabs)/explore');
+    router.replace('/(tabs)/explore');
   };
 
   const callCourier = () => {
@@ -353,7 +354,7 @@ export default function OrderTrackingScreen() {
     return (
       <ThemedView style={styles.center} lightColor={colors.background} darkColor={colors.background}>
         <ThemedText>Commande introuvable.</ThemedText>
-        <Pressable style={{ marginTop: 20 }} onPress={() => safeBack()}>
+        <Pressable style={{ marginTop: 20 }} onPress={() => router.back()}>
           <ThemedText style={{ color: colors.primary }}>Retour</ThemedText>
         </Pressable>
       </ThemedView>
@@ -503,7 +504,7 @@ export default function OrderTrackingScreen() {
     <ThemedView style={styles.screen} lightColor={colors.backgroundAlt} darkColor={colors.backgroundAlt}>
       {/* ── Header ── */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 10), backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <Pressable onPress={() => safeBack()} style={[styles.backBtn, { backgroundColor: colors.surfaceMuted }]} hitSlop={12}>
+        <Pressable onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: colors.surfaceMuted }]} hitSlop={12}>
           <ArrowLeft size={20} color={colors.text} strokeWidth={2.5} />
         </Pressable>
         <View style={styles.headerCenter}>
@@ -738,7 +739,7 @@ export default function OrderTrackingScreen() {
             ) : (
               <Pressable
                 style={[styles.primaryCta, { backgroundColor: colors.primary }]}
-                onPress={() => void payNow()}
+                onPress={() => guarded(() => void payNow())}
                 disabled={paying || paymentDeadlineExpired}
                 android_ripple={{ color: colors.primaryMuted }}>
                 {paying ? (
@@ -977,7 +978,7 @@ export default function OrderTrackingScreen() {
         {/* ── LIEN VERS LE DÉTAIL COMPLET DE LA LIVRAISON ── */}
         {primaryDeliveryId ? (
           <Pressable
-            onPress={() => safePush(`/delivery/${primaryDeliveryId}`)}
+            onPress={() => router.push(`/delivery/${primaryDeliveryId}`)}
             style={({ pressed }) => [
               styles.card,
               styles.linkCard,

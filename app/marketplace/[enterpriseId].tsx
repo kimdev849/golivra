@@ -1,6 +1,6 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router'
+import { useRouter } from '@/hooks/use-safe-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSafeNavigation } from '@/hooks/use-safe-navigation';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -81,7 +81,6 @@ export default function EnterpriseDetailScreen() {
   const [token, setToken] = useState<string | null>(null);
   const [galleryState, setGalleryState] = useState<{ images: string[]; index: number } | null>(null);
   const [etaDetailOpen, setEtaDetailOpen] = useState(false);
-  const { safePush, safeBack } = useSafeNavigation();
 
   const { data: enterprise, isLoading: loadingEnt, error: entError } = useQuery<EnterprisePublic>({
     queryKey: ['enterprise', id],
@@ -302,7 +301,7 @@ export default function EnterpriseDetailScreen() {
             <PressableScale
               style={[styles.iconBtn, { backgroundColor: colors.surface }]}
               scaleTo={0.9}
-              onPress={() => safeBack()}
+              onPress={() => router.back()}
               hitSlop={8}
               accessibilityLabel="Retour">
               <ArrowLeft size={20} color={colors.text} strokeWidth={LUCIDE_STROKE} />
@@ -385,7 +384,7 @@ export default function EnterpriseDetailScreen() {
                 <View style={styles.etaHeadRow}>
                   <Truck size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
                   <ThemedText type="defaultSemiBold" style={styles.etaHeadline}>
-                    Estimation : livraison dans environ {formatHumanMinutes(prepMin + deliveryMin)}
+                    Votre commande devrait être prête dans environ {formatHumanMinutes(prepMin)}. Ensuite, un livreur viendra vous la remettre directement à l'adresse indiquée.
                   </ThemedText>
                 </View>
                 <ThemedText style={styles.etaBody}>
@@ -431,7 +430,7 @@ export default function EnterpriseDetailScreen() {
                 <View style={styles.etaHeadRow}>
                   <Clock size={20} color={colors.primary} strokeWidth={LUCIDE_STROKE} />
                   <ThemedText type="defaultSemiBold" style={styles.etaHeadline}>
-                    Estimation : préparation en environ {prepMin} min
+                    Votre commande devrait être prête dans environ {prepMin} min. Ensuite, un livreur viendra vous la remettre directement à l'adresse indiquée.
                   </ThemedText>
                 </View>
                 <ThemedText style={styles.etaBody}>
@@ -520,7 +519,7 @@ export default function EnterpriseDetailScreen() {
               <Pressable
                 key={p.id}
                 style={styles.productCard}
-                onPress={() => safePush(productDetailHref(p))}
+                onPress={() => router.push(productDetailHref(p))}
                 android_ripple={{ color: colors.primaryMuted }}>
                 <Pressable
                   style={styles.productThumb}

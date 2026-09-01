@@ -1,7 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import { useCallback, useRef, useState } from 'react';
-import { useSafeNavigation } from '@/hooks/use-safe-navigation';
 import { useGuestAuth } from '@/hooks/use-guest-auth';
 import { GuestLoginSheet } from '@/components/guest-login-sheet';
 import {
@@ -47,7 +46,6 @@ type TabKey = 'commerces' | 'produits';
 
 export default function FavoritesScreen() {
   const router = useRouter();
-  const { safePush } = useSafeNavigation();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const { requireAuth, showLoginSheet, goToAuth, goToSignup, dismissSheet } = useGuestAuth();
@@ -309,7 +307,7 @@ export default function FavoritesScreen() {
               return (
                 <Pressable
                   style={[styles.entGridCard, { borderColor: colors.border, backgroundColor: colors.surface }]}
-                  onPress={() => safePush(`/marketplace/${item.id}`)}>
+                  onPress={() => router.push(`/marketplace/${item.id}`)}>
                   <View style={[styles.entGridImg, { backgroundColor: colors.primarySoft }]}>
                     {img ? (
                       <Image source={{ uri: img }} style={{ width: '100%', height: '100%' }} contentFit="cover" transition={150} />
@@ -434,7 +432,7 @@ export default function FavoritesScreen() {
             <ListingCard
               product={item}
               variant={isDesktop ? 'grid' : 'feed'}
-              onPress={() => safePush(productDetailHref(item))}
+              onPress={() => router.push(productDetailHref(item))}
               isFav
               onToggleFav={() => void onUnfavProduct(item)}
             />
@@ -601,9 +599,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },

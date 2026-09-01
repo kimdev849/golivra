@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { Camera, ChevronRight, Clock } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
@@ -27,6 +27,7 @@ import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useVendorHoraires } from '@/hooks/use-vendor-horaires';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 import { getSessionToken } from '@/lib/auth';
 import { invalidateEnterprisesCache } from '@/lib/client-data';
 import { patchEnterprise } from '@/lib/enterprise';
@@ -48,6 +49,7 @@ const emptyAddr = (): DeliveryAddressFormValue => ({
 
 export default function VendorShopInfoScreen() {
   const router = useRouter();
+  const guarded = useGuardedCallback();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const { showSuccess, showError, FeedbackOverlay } = useActionFeedback();
@@ -253,7 +255,7 @@ export default function VendorShopInfoScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           contentContainerStyle={{ padding: 18, paddingBottom: insets.bottom + 24 }}>
-        <Pressable style={[styles.photoZone, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]} onPress={() => void pickLogo()}>
+        <Pressable style={[styles.photoZone, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]} onPress={() => guarded(() => void pickLogo())}>
           {displayLogo ? (
             <Image source={{ uri: displayLogo }} style={styles.photoImg} contentFit="cover" />
           ) : (
@@ -379,7 +381,7 @@ export default function VendorShopInfoScreen() {
                       backgroundColor: on ? palette.primary : colors.surface,
                     },
                   ]}
-                  onPress={() => void savePrepMinutes(m)}
+                  onPress={() => guarded(() => void savePrepMinutes(m))}
                   disabled={prepSaving}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: on, disabled: prepSaving }}
@@ -414,7 +416,7 @@ export default function VendorShopInfoScreen() {
 
         <Pressable
           style={[styles.save, { backgroundColor: palette.primaryDeep }, saving && styles.saveDisabled]}
-          onPress={() => void save()}
+          onPress={() => guarded(() => void save())}
           disabled={saving}>
           {saving ? (
             <ActivityIndicator color={colors.onPrimary} />

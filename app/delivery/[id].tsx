@@ -1,4 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router'
+import { useRouter } from '@/hooks/use-safe-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ArrowLeft, Bike, CheckCircle2, Clock, CreditCard, MapPin, Navigation, PhoneCall, Star, Store, Wallet } from 'lucide-react-native';

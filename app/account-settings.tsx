@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import { Image } from 'expo-image';
 import { useCallback, useState } from 'react';
 import {
@@ -35,6 +35,7 @@ import { uploadImageBase64 } from '@/lib/uploads';
 import { validatePassword, validatePasswordConfirmation, validatePersonName, validatePhone } from '@/lib/form-validation';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 
 type Me = {
   id: string;
@@ -48,6 +49,7 @@ type Me = {
 
 export default function AccountSettingsScreen() {
   const router = useRouter();
+  const guarded = useGuardedCallback();
   const colors = useAppColors();
   const isDark = useColorScheme() === 'dark';
   const insets = useSafeAreaInsets();
@@ -276,7 +278,7 @@ export default function AccountSettingsScreen() {
                 <>
                   <ThemedText style={[styles.sectionHeader, { color: colors.textMuted }]}>Photo de profil</ThemedText>
                   <View style={styles.avatarBlock}>
-                    <Pressable style={[styles.avatarCircle, { backgroundColor: colors.primarySoft, borderColor: avatarDataUrl ? colors.primary : colors.borderStrong }]} onPress={() => void pickPhoto()}>
+                    <Pressable style={[styles.avatarCircle, { backgroundColor: colors.primarySoft, borderColor: avatarDataUrl ? colors.primary : colors.borderStrong }]} onPress={() => guarded(() => void pickPhoto())}>
                       {avatarUri ? (
                         <Image source={{ uri: avatarUri }} style={styles.avatarImg} contentFit="cover" />
                       ) : (
@@ -297,7 +299,7 @@ export default function AccountSettingsScreen() {
                           </Pressable>
                           <Pressable
                             style={[styles.photoSaveBtn, { backgroundColor: colors.primary }, savingPhoto && styles.btnDisabled]}
-                            onPress={() => void savePhoto()}
+                            onPress={() => guarded(() => void savePhoto())}
                             disabled={savingPhoto}>
                             {savingPhoto ? (
                               <ActivityIndicator color="#FFF" size="small" />
@@ -353,7 +355,7 @@ export default function AccountSettingsScreen() {
 
                   <Pressable
                     style={[styles.primaryBtn, { backgroundColor: colors.primary }, savingProfile && styles.btnDisabled]}
-                    onPress={() => void saveProfile()}
+                    onPress={() => guarded(() => void saveProfile())}
                     disabled={savingProfile}>
                     {savingProfile ? (
                       <ActivityIndicator color="#FFFFFF" />
@@ -458,7 +460,7 @@ export default function AccountSettingsScreen() {
 
               <Pressable
                 style={[styles.secondaryBtn, { borderColor: colors.primary, backgroundColor: colors.surface }, savingPassword && styles.btnDisabled]}
-                onPress={() => void savePassword()}
+                onPress={() => guarded(() => void savePassword())}
                 disabled={savingPassword}>
                 {savingPassword ? (
                   <ActivityIndicator color={colors.primary} />
@@ -604,7 +606,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   inputFlex: { flex: 1 },
-  eyeBtn: { padding: 4 },
+  eyeBtn: { padding: 10 },
   primaryBtn: {
     borderRadius: 14,
     paddingVertical: 15,

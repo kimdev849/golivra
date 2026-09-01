@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import { ChevronLeft, Home, MapPin, Pencil, Trash2 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -11,6 +11,7 @@ import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 import { createUserAddress, deleteUserAddress, fetchUserAddresses, setPrincipalAddress, updateUserAddress, type UserAddress } from '@/lib/addresses';
 import { getSessionToken } from '@/lib/auth';
 import { addressLabel, deliveryAddressError, formatDeliveryAddressText } from '@/lib/format-address';
@@ -20,6 +21,7 @@ const emptyForm = (): DeliveryAddressFormValue => ({ libelle: '', quartier: '', 
 
 export default function MyAddressesScreen() {
   const router = useRouter();
+  const guarded = useGuardedCallback();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const { showError, showConfirm, FeedbackOverlay } = useActionFeedback();
@@ -36,13 +38,18 @@ export default function MyAddressesScreen() {
     setLoading(true);
     try {
       const token = await getSessionToken();
-      if (!token) throw new Error('Session expirée.');
+      if (!token) {
+        // Invité : rediriger vers la connexion au lieu du faux
+        // message « Session expirée » (F-AUTH-01).
+        router.replace('/auth');
+        return;
+      }
       setRows(await fetchUserAddresses(token));
     } catch (e) {
       showError('Chargement impossible', e instanceof Error ? e.message : undefined);
     }
     finally { setLoading(false); }
-  }, [showError]);
+  }, [showError, router]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
@@ -174,7 +181,7 @@ export default function MyAddressesScreen() {
                   {creating ? "Nouvelle adresse" : "Modifier l'adresse"}
                 </ThemedText>
                 <DeliveryAddressForm value={form} onChange={setForm} />
-                <Pressable style={[styles.saveBtn, { backgroundColor: colors.primary }, saving && styles.saveDisabled]} onPress={() => void save()} disabled={saving}>
+                <Pressable style={[styles.saveBtn, { backgroundColor: colors.primary }, saving && styles.saveDisabled]} onPress={() => guarded(() => void save())} disabled={saving}>
                   {saving ? <ActivityIndicator color="#FFF" /> : <ThemedText style={styles.saveTxt}>{creating ? "Enregistrer l'adresse" : 'Enregistrer les modifications'}</ThemedText>}
                 </Pressable>
                 <Pressable onPress={closeForm}>

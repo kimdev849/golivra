@@ -1,6 +1,6 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router'
+import { useRouter } from '@/hooks/use-safe-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSafeNavigation } from '@/hooks/use-safe-navigation';
 import { useGuestAuth } from '@/hooks/use-guest-auth';
 import { GuestLoginSheet } from '@/components/guest-login-sheet';
 import {
@@ -43,6 +43,7 @@ import { useAppColors } from '@/hooks/use-app-colors';
 import { useCurrentTime } from '@/hooks/use-current-time';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { useIsWebDesktop } from '@/hooks/use-is-web-desktop';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 import { DESKTOP_MAX_WIDTH, DESKTOP_PADDING } from '@/components/desktop-layout';
 import { computeLiveStatus } from '@/lib/horaires-status';
 import {
@@ -99,6 +100,7 @@ function computeOptionSupplement(
 
 export default function ProductDetailScreen() {
   const router = useRouter();
+  const guarded = useGuardedCallback();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const { contentWidth: mobileContentWidth } = useResponsiveLayout();
@@ -122,7 +124,6 @@ export default function ProductDetailScreen() {
   const [selectedOptions, setSelectedOptions] = useState<SelectedOptionChoice[]>([]);
   const [note, setNote] = useState('');
   const [selectedGalleryIndex, setSelectedGalleryIndex] = useState(0);
-  const { safePush, safeBack } = useSafeNavigation();
 
   const { data: product, isLoading, error } = useQuery({
     queryKey: ['product', productId, kind],
@@ -300,7 +301,7 @@ export default function ProductDetailScreen() {
         styles.vendorRow,
         { backgroundColor: colors.surface, borderColor: colors.border },
       ]}
-      onPress={() => safePush(`/marketplace/${product.entreprise_id}`)}
+      onPress={() => router.push(`/marketplace/${product.entreprise_id}`)}
       android_ripple={{ color: colors.primaryMuted }}>
       <View style={[styles.vendorIcon, { backgroundColor: colors.primarySoft }]}>
         {product.enterprise_image_url ? (
@@ -370,7 +371,7 @@ export default function ProductDetailScreen() {
             <PressableScale
               style={[styles.iconBtn, { backgroundColor: colors.surface }]}
               scaleTo={0.9}
-              onPress={() => safeBack()}
+              onPress={() => router.back()}
               hitSlop={8}
               accessibilityLabel="Retour">
               <ArrowLeft size={20} color={colors.text} strokeWidth={LUCIDE_STROKE} />
@@ -378,7 +379,7 @@ export default function ProductDetailScreen() {
             <PressableScale
               style={[styles.iconBtn, { backgroundColor: colors.surface }]}
               scaleTo={0.9}
-              onPress={() => void onToggleFav()}
+              onPress={() => guarded(() => void onToggleFav())}
               hitSlop={8}
               accessibilityLabel={isFav ? 'Retirer des favoris' : 'Ajouter aux favoris'}>
               <Heart

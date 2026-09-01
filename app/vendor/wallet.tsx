@@ -17,6 +17,7 @@ import { ThemedView } from '@/components/themed-view';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 import { getSessionToken } from '@/lib/auth';
 import { formatFcfa } from '@/lib/format';
 import { fetchMyWallet, requestWithdrawal, type WalletDashboard } from '@/lib/wallet-api';
@@ -24,6 +25,7 @@ import { validatePhone } from '@/lib/form-validation';
 
 export default function VendorWalletScreen() {
   const insets = useSafeAreaInsets();
+  const guarded = useGuardedCallback();
   const colors = useAppColors();
   const { showSuccess, showError, FeedbackOverlay } = useActionFeedback();
   const { palette } = useVendorTheme();
@@ -120,7 +122,7 @@ export default function VendorWalletScreen() {
         />
         <Pressable
           style={[styles.btn, { backgroundColor: palette.primary }]}
-          onPress={() => void onRetrait()}
+          onPress={() => guarded(() => void onRetrait())}
           disabled={submitting}>
           {submitting ? (
             <ActivityIndicator color={colors.onPrimary} />

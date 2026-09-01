@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Banknote, BellOff, CheckCheck, ShoppingBag, Star, Truck } from 'lucide-react-native';
 import { ActivityIndicator, AppState, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -11,6 +11,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { useAppColors } from '@/hooks/use-app-colors';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 import { formatDateTimeFr } from '@/lib/datetime';
 import { getSessionToken } from '@/lib/auth';
 import { fetchNotifications, markAllNotificationsRead, markNotificationRead, type AppNotification } from '@/lib/notifications-api';
@@ -62,6 +63,7 @@ type FilterKey = 'all' | 'unread';
 
 export default function VendorNotificationsScreen() {
   const router = useRouter();
+  const guarded = useGuardedCallback();
   const colors = useAppColors();
   const insets = useSafeAreaInsets();
   const [items, setItems] = useState<AppNotification[]>([]);
@@ -174,7 +176,7 @@ export default function VendorNotificationsScreen() {
         right={
           unreadCount > 0 ? (
             <Pressable
-              onPress={() => void handleMarkAllRead()}
+              onPress={() => guarded(() => void handleMarkAllRead())}
               hitSlop={8}
               style={[styles.markAllBtn, { borderColor: colors.primary }]}>
               <CheckCheck size={14} color={colors.primary} strokeWidth={2.4} />
@@ -233,7 +235,7 @@ export default function VendorNotificationsScreen() {
               return (
                 <Pressable
                   key={n.id}
-                  onPress={() => void handleOpen(n)}
+                  onPress={() => guarded(() => void handleOpen(n))}
                   style={[
                     styles.row,
                     {

@@ -1,4 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router'
+import { useRouter } from '@/hooks/use-safe-router';
 import { useEffect, useMemo } from 'react';
 import { Check, Package, Store, UtensilsCrossed } from 'lucide-react-native';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';

@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ChevronLeft, Type } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

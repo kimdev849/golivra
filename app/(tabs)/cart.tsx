@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import type { Href } from 'expo-router';
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGuestAuth } from '@/hooks/use-guest-auth';
@@ -66,6 +66,7 @@ import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useCurrentTime } from '@/hooks/use-current-time';
 import { useFeatureEnabled } from '@/hooks/use-feature-enabled';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 import { computeLiveStatus } from '@/lib/horaires-status';
 
 /** Valeur d'adresse vierge (aucune adresse sélectionnée). */
@@ -99,6 +100,7 @@ function segmentLabel(seg: CartSegment, ent: EnterprisePublic | null | undefined
 
 export default function CartScreen() {
   const router = useRouter();
+  const guarded = useGuardedCallback();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
@@ -297,7 +299,7 @@ export default function CartScreen() {
   const grandTotal = Math.max(0, subtotal + deliveryFeeTotal - promoRemise);
 
   const applyPromo = async () => {
-    const code = promoInput.trim();
+    const code = promoInput.trim().toUpperCase();
     if (!code || !cart) return;
     const token = await getSessionToken();
     if (!token) {
@@ -668,8 +670,8 @@ export default function CartScreen() {
                     ) : (
                       <ThemedText style={[styles.segEta, { color: colors.textSecondary }]}>
                         {eta.deliveryMinutes != null
-                          ? `Estimation livraison : environ ${formatHumanMinutes(eta.totalMinutes)}`
-                          : `Estimation : préparation en environ ${eta.prepMinutes} min`}
+                          ? `Votre commande devrait être prête dans environ ${formatHumanMinutes(eta.prepMinutes)}. Ensuite, un livreur viendra vous la remettre directement à l'adresse indiquée.`
+                          : `Votre commande devrait être prête dans environ ${eta.prepMinutes} min.`}
                       </ThemedText>
                     )}
 
@@ -881,7 +883,7 @@ export default function CartScreen() {
                       <Pressable
                         style={[styles.promoBtn, { backgroundColor: colors.primary }, promoLoading && styles.submitBtnDisabled]}
                         disabled={promoLoading || !promoInput.trim()}
-                        onPress={() => void applyPromo()}>
+                        onPress={() => guarded(() => void applyPromo())}>
                         {promoLoading ? (
                           <ActivityIndicator color={colors.onPrimary} size="small" />
                         ) : (
@@ -932,7 +934,7 @@ export default function CartScreen() {
                   style={[styles.submitBtn, { backgroundColor: colors.primaryDeep }, (submitting || !addressOk || anySegmentBlocked) && styles.submitBtnDisabled]}
                   scaleTo={0.98}
                   disabled={submitting || !addressOk || anySegmentBlocked}
-                  onPress={() => void submitOrder()}>
+                  onPress={() => guarded(() => void submitOrder())}>
                   {submitting ? (
                     <ActivityIndicator color={colors.onPrimary} />
                   ) : (
@@ -1014,7 +1016,7 @@ export default function CartScreen() {
               </PressableScale>
               <PressableScale
                 style={[styles.confirmBtn, styles.confirmBtnPrimary, { backgroundColor: colors.primaryDeep }]}
-                onPress={() => void confirmAndSendOrder()}
+                onPress={() => guarded(() => void confirmAndSendOrder())}
                 scaleTo={0.97}>
                 <ThemedText style={{ color: colors.onPrimary, fontWeight: '800' }}>Envoyer la commande</ThemedText>
               </PressableScale>
@@ -1245,14 +1247,14 @@ const styles = StyleSheet.create({
   },
   qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   qtyCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  qtyVal: { fontSize: 15, fontWeight: '800', minWidth: 28, textAlign: 'center' },
+  qtyVal: { fontSize: 15, fontWeight: '800', minWidth: 28, textAlign: 'center', lineHeight: 20 },
   linePriceCol: { alignItems: 'flex-end', gap: 2 },
   linePriceRight: { fontSize: 14 },
   summary: {

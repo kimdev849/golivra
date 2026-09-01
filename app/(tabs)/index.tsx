@@ -2,9 +2,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { WatermarkedImage } from '@/components/watermarked-image';
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSafeNavigation } from '@/hooks/use-safe-navigation';
 import {
   ActivityIndicator,
   FlatList,
@@ -52,6 +51,7 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useUnreadNotifications } from '@/hooks/use-unread-notifications';
 import { useEnterprises } from '@/hooks/useMarketplace';
 import { useDeliveryEstimate } from '@/hooks/use-delivery-estimate';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 import {
   fetchProductFeed,
   searchCatalog,
@@ -82,7 +82,7 @@ const DESKTOP_GRID_COLUMNS = 4;
 const FEED_PAGE_SIZE = 24;
 // Vignettes commerces (rangée / liste) : version webp redimensionnée pour
 // éviter de télécharger l'original pleine taille dans une case de 52px.
-const ENT_IMG: ResizeOptions = { width: 120, format: 'webp', quality: 75 };
+const ENT_IMG: ResizeOptions = { width: 400, format: 'webp', quality: 85 };
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -316,7 +316,7 @@ const EnterpriseCard = memo(function EnterpriseCard({
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { safePush, safeBack } = useSafeNavigation();
+  const guarded = useGuardedCallback();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
@@ -645,7 +645,7 @@ export default function HomeScreen() {
       <View style={styles.gridCell}>
         <PremiumCard
           product={item}
-          onPress={() => safePush(productDetailHref(item))}
+          onPress={() => router.push(productDetailHref(item))}
           isFav={favProductKeys.has(`${item.kind === 'article' ? 'article' : 'plat'}:${item.id}`)}
           onToggleFav={() => void onToggleFav(item)}
           colors={colors}
@@ -851,7 +851,7 @@ export default function HomeScreen() {
               <EnterpriseCard
                 key={ent.id}
                 enterprise={ent}
-                onPress={() => safePush(`/marketplace/${ent.id}`)}
+                onPress={() => router.push(`/marketplace/${ent.id}`)}
                 colors={colors}
                 deliveryMinutes={deliveryMinutes}
                 isDesktop={isDesktop}
@@ -898,7 +898,7 @@ export default function HomeScreen() {
                     styles.entGridCard,
                     { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.93 : 1 },
                   ]}
-                  onPress={() => safePush(`/marketplace/${ent.id}`)}>
+                  onPress={() => router.push(`/marketplace/${ent.id}`)}>
                   <View style={[styles.entGridCardImg, { backgroundColor: colors.primarySoft }]}>
                     {resolveRemoteImageUrl(ent.image_url, ENT_IMG) ? (
                       <Image
@@ -935,7 +935,7 @@ export default function HomeScreen() {
                   styles.entRow,
                   { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.93 : 1 },
                 ]}
-                onPress={() => safePush(`/marketplace/${ent.id}`)}>
+                onPress={() => router.push(`/marketplace/${ent.id}`)}>
                 <View style={[styles.entRowImg, { backgroundColor: colors.primarySoft }]}>
                   {resolveRemoteImageUrl(ent.image_url, ENT_IMG) ? (
                     <Image
@@ -967,39 +967,95 @@ export default function HomeScreen() {
         </View>
       ) : null}
 
-      {/* Search results: enterprises */}
+      {/* Search results: enterprises — card layout with cover image */}
       {searchActive && displayEnterprises.length > 0 ? (
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Commerces</Text>
-          {displayEnterprises.map((ent) => (
-            <Pressable
-              key={ent.id}
-              style={({ pressed }) => [
-                styles.entRow,
-                { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.93 : 1 },
-              ]}
-              onPress={() => router.push(`/marketplace/${ent.id}` as never)}>
-              <View style={[styles.entRowImg, { backgroundColor: colors.primarySoft }]}>
-                {resolveRemoteImageUrl(ent.image_url, ENT_IMG) ? (
-                  <Image
-                    source={{ uri: resolveRemoteImageUrl(ent.image_url, ENT_IMG)! }}
-                    style={{ width: '100%', height: '100%' }}
-                    contentFit="cover"
-                    transition={150}
-                  />
-                ) : (
-                  <Store size={20} color={colors.primary} strokeWidth={1.5} />
-                )}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.entRowName, { color: colors.text }]} numberOfLines={1}>{ent.nom}</Text>
-                {ent.adresse ? (
-                  <Text style={[styles.entRowMeta, { color: colors.textMuted }]} numberOfLines={1}>{ent.adresse}</Text>
-                ) : null}
-              </View>
-              <ChevronRight size={16} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-            </Pressable>
-          ))}
+          {isDesktop ? (
+            <View style={styles.entGrid}>
+              {displayEnterprises.map((ent) => (
+                <Pressable
+                  key={ent.id}
+                  style={({ pressed }) => [
+                    styles.entGridCard,
+                    { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.93 : 1 },
+                  ]}
+                  onPress={() => router.push(`/marketplace/${ent.id}` as never)}>
+                  <View style={[styles.entGridCardImg, { backgroundColor: colors.primarySoft }]}>
+                    {resolveRemoteImageUrl(ent.image_url, ENT_IMG) ? (
+                      <Image
+                        source={{ uri: resolveRemoteImageUrl(ent.image_url, ENT_IMG)! }}
+                        style={{ width: '100%', height: '100%' }}
+                        contentFit="cover"
+                        transition={150}
+                      />
+                    ) : (
+                      <Store size={22} color={colors.primary} strokeWidth={1.5} />
+                    )}
+                    {(ent.est_ouvert_maintenant === false || (ent.est_ouvert_maintenant == null && ent.ouvert === false)) ? (
+                      <View style={styles.closedOverlay}>
+                        <Text style={styles.closedTxt}>Fermé</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <View style={styles.entGridCardBody}>
+                    <Text style={[styles.entGridCardName, { color: colors.text }]} numberOfLines={1}>{ent.nom}</Text>
+                    <Text style={[styles.entGridCardMeta, { color: colors.textMuted }]} numberOfLines={1}>
+                      {[ent.categorie_nom, ent.adresse].filter(Boolean).join(' · ')}
+                    </Text>
+                    {ent.note_moyenne ? (
+                      <View style={styles.entRatingRow}>
+                        <Star size={12} color="#F5A524" fill="#F5A524" strokeWidth={0} />
+                        <Text style={[styles.enterpriseCardRating, { color: colors.text }]}>{ent.note_moyenne.toFixed(1)}</Text>
+                        {ent.nb_avis ? <Text style={[styles.enterpriseCardRatingAvis, { color: colors.textMuted }]}>({ent.nb_avis})</Text> : null}
+                      </View>
+                    ) : null}
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            displayEnterprises.map((ent) => (
+              <Pressable
+                key={ent.id}
+                style={({ pressed }) => [
+                  styles.entSearchCard,
+                  { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.93 : 1 },
+                ]}
+                onPress={() => router.push(`/marketplace/${ent.id}` as never)}>
+                <View style={[styles.entSearchCardImg, { backgroundColor: colors.primarySoft }]}>
+                  {resolveRemoteImageUrl(ent.image_url, ENT_IMG) ? (
+                    <Image
+                      source={{ uri: resolveRemoteImageUrl(ent.image_url, ENT_IMG)! }}
+                      style={{ width: '100%', height: '100%' }}
+                      contentFit="cover"
+                      transition={150}
+                    />
+                  ) : (
+                    <Store size={22} color={colors.primary} strokeWidth={1.5} />
+                  )}
+                  {(ent.est_ouvert_maintenant === false || (ent.est_ouvert_maintenant == null && ent.ouvert === false)) ? (
+                    <View style={styles.closedOverlay}>
+                      <Text style={styles.closedTxt}>Fermé</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <View style={styles.entSearchCardBody}>
+                  <Text style={[styles.entSearchCardName, { color: colors.text }]} numberOfLines={1}>{ent.nom}</Text>
+                  <Text style={[styles.entSearchCardMeta, { color: colors.textMuted }]} numberOfLines={1}>
+                    {[ent.categorie_nom, ent.adresse].filter(Boolean).join(' · ')}
+                  </Text>
+                  {ent.note_moyenne ? (
+                    <View style={styles.entRatingRow}>
+                      <Star size={12} color="#F5A524" fill="#F5A524" strokeWidth={0} />
+                      <Text style={[styles.enterpriseCardRating, { color: colors.text }]}>{ent.note_moyenne.toFixed(1)}</Text>
+                      {ent.nb_avis ? <Text style={[styles.enterpriseCardRatingAvis, { color: colors.textMuted }]}>({ent.nb_avis})</Text> : null}
+                    </View>
+                  ) : null}
+                </View>
+              </Pressable>
+            ))
+          )}
         </View>
       ) : null}
 
@@ -1016,7 +1072,7 @@ export default function HomeScreen() {
           <Text style={[styles.errorTxt, { color: colors.textMuted }]}>
             {feedError instanceof Error ? feedError.message : 'Impossible de charger les produits.'}
           </Text>
-          <Pressable style={[styles.retryBtn, { backgroundColor: colors.primary }]} onPress={() => void refetchFeed()}>
+          <Pressable style={[styles.retryBtn, { backgroundColor: colors.primary }]} onPress={() => guarded(() => void refetchFeed())}>
             <Text style={[styles.retryBtnTxt, { color: colors.onPrimary }]}>Réessayer</Text>
           </Pressable>
         </View>
@@ -1363,12 +1419,12 @@ const styles = StyleSheet.create({
   // Enterprise card (horizontal)
   enterpriseCard: {
     width: 124,
-    borderRadius: 16,
+    borderRadius: 14,
     overflow: 'hidden',
     shadowColor: '#0C3020',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     elevation: 3,
     paddingBottom: 10,
     borderWidth: 1,
@@ -1378,7 +1434,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   enterpriseCardImg: {
-    width: 120,
+    width: '100%',
     height: 90,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1427,23 +1483,49 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 8,
     shadowColor: '#0C3020',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   entRowImg: {
-    width: 52,
-    height: 52,
+    width: 56,
+    height: 56,
     borderRadius: 14,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  entRowName: { fontSize: 13, fontWeight: '700' },
-  entRowMeta: { fontSize: 11, marginTop: 2 },
+  entRowName: { fontSize: 14, fontWeight: '700', letterSpacing: -0.1 },
+  entRowMeta: { fontSize: 12, marginTop: 2 },
   entRowRating: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   entRowRatingTxt: { fontSize: 13, fontWeight: '700' },
+
+  // Enterprise search card (mobile: card with cover image)
+  entSearchCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: 12,
+    shadowColor: '#0C3020',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  entSearchCardImg: {
+    width: '100%',
+    height: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  entSearchCardBody: {
+    padding: 12,
+    gap: 4,
+  },
+  entSearchCardName: { fontSize: 15, fontWeight: '700', letterSpacing: -0.2 },
+  entSearchCardMeta: { fontSize: 12 },
 
   // Enterprise grid (desktop)
   entGrid: {
@@ -1466,7 +1548,7 @@ const styles = StyleSheet.create({
   },
   entGridCardImg: {
     width: '100%',
-    height: 100,
+    height: 130,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -1475,8 +1557,8 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 4,
   },
-  entGridCardName: { fontSize: 13, fontWeight: '700' },
-  entGridCardMeta: { fontSize: 11 },
+  entGridCardName: { fontSize: 14, fontWeight: '700', letterSpacing: -0.1 },
+  entGridCardMeta: { fontSize: 12 },
 
   // Premium product card (2-col grid → 4-col on desktop)
   premiumCard: {
@@ -1484,8 +1566,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     shadowColor: '#0C3020',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     elevation: 3,
     borderWidth: 1,
   },
@@ -1513,9 +1595,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -1538,7 +1620,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   premiumCardName: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     letterSpacing: -0.1,
   },
@@ -1548,7 +1630,7 @@ const styles = StyleSheet.create({
     gap: 4,
     flexWrap: 'wrap',
   },
-  premiumCardVendor: { fontSize: 11 },
+  premiumCardVendor: { fontSize: 11, fontWeight: '500' },
   premiumCardAvatar: {
     width: 16,
     height: 16,

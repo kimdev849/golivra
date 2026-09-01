@@ -2,7 +2,7 @@ import { SafeAsyncStorage as AsyncStorage } from '@/lib/safe-async-storage';
 import { SITE_URL } from '@/lib/config';
 import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import {
   Bell,
   CalendarDays,
@@ -49,6 +49,7 @@ import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useLogout } from '@/hooks/use-logout';
 import { useUnreadNotifications } from '@/hooks/use-unread-notifications';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 import { fetchUserAddresses } from '@/lib/addresses';
 import { apiFetch } from '@/lib/api';
 import { getSessionToken } from '@/lib/auth';
@@ -165,6 +166,7 @@ function MenuRow({
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const guarded = useGuardedCallback();
   const insets = useSafeAreaInsets();
   const colors = useAppColors();
   const { unreadCount } = useUnreadNotifications();
@@ -194,7 +196,7 @@ export default function ProfileScreen() {
     try {
       const token = await getSessionToken();
       // DA zéro blocage : pas de token → mode invité (pas d'erreur)
-      if (!token) { setIsLoading(false); return; }
+      if (!token) { setMe(null); setStats({ totalOrders: 0, activeOrders: 0, totalFavorites: 0, totalAddresses: 0 }); setIsLoading(false); return; }
 
       // Show cached profile immediately
       const cached = peekAuthMe(token);
@@ -372,7 +374,7 @@ export default function ProfileScreen() {
             </ThemedText>
             <Pressable
               style={[styles.retry, { backgroundColor: colors.primary }]}
-              onPress={() => void load()}>
+              onPress={() => guarded(() => void load())}>
               <ThemedText style={[styles.retryText, { color: colors.onPrimary }]}>
                 Réessayer
               </ThemedText>

@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import { useIsFocused } from '@react-navigation/native';
 
 import { MapPin, Package, Phone, Plus } from 'lucide-react-native';

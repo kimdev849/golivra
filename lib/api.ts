@@ -82,8 +82,13 @@ function notifySlowConnection(): void {
   const now = Date.now();
   if (now - lastSlowToastAt < 25_000) return;
   if (now - appStartTime < 8_000) return;
-  // Sur web, on ne peut pas vérifier AppState — on affiche toujours le toast.
-  if (!IS_WEB && AppState.currentState !== 'active') return;
+  // Sur web, le toast "Connexion lente" est toujours un faux positif :
+  // l'utilisateur a une bonne connexion, c'est le serveur Render qui
+  // cold-start (30-60s). Le warmup devrait empêcher ça ; si le serveur
+  // est vraiment lent, le timeout gère l'erreur. Afficher "Connexion
+  // lente" sur web fait croire à tort que SA connexion est mauvaise.
+  if (IS_WEB) return;
+  if (AppState.currentState !== 'active') return;
   lastSlowToastAt = now;
   showToast({
     message: 'Connexion lente…',
@@ -148,7 +153,7 @@ export async function apiFetch<T = unknown>(path: string, options: ApiFetchOptio
         (cause as { aborted?: boolean }).aborted === true ||
         /abort/i.test((cause as Error).message ?? ''));
     const message = aborted
-      ? 'Connexion lente. Réessayez.'
+      ? (IS_WEB ? 'Le serveur met du temps à répondre. Réessayez.' : 'Connexion lente. Réessayez.')
       : networkErrorMessage(cause);
     if (!skipIncidentReport) {
       void reportAppIncident({

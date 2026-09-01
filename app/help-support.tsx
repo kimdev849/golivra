@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import { SITE_URL, SITE_URLS } from '@/lib/config';
 import {
   ChevronLeft,

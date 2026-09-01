@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/hooks/use-safe-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,6 +21,7 @@ import { useVendor } from '@/contexts/vendor-context';
 import { useActionFeedback } from '@/hooks/use-action-feedback';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { useVendorTheme } from '@/hooks/use-vendor-theme';
+import { useGuardedCallback } from '@/hooks/use-guarded-callback';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { getSessionToken } from '@/lib/auth';
 import { deliveryAddressError, formatDeliveryAddressText, snapshotFromFields } from '@/lib/format-address';
@@ -57,6 +58,7 @@ type PayState = 'idle' | 'processing' | 'waiting' | 'failed';
 
 export default function VendorCreateDirectDeliveryScreen() {
   const router = useRouter();
+  const guarded = useGuardedCallback();
   const insets = useSafeAreaInsets();
   const { shop } = useVendor();
   const colors = useAppColors();
@@ -321,7 +323,7 @@ export default function VendorCreateDirectDeliveryScreen() {
 
           <Pressable
             style={[styles.submit, { backgroundColor: palette.primaryDeep }, busy && styles.submitDisabled]}
-            onPress={() => void payAndCreate()}
+            onPress={() => guarded(() => void payAndCreate())}
             disabled={busy}>
             {busy ? (
               <>

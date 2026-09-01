@@ -51,6 +51,21 @@ export function useLogout(options: Options = { clearCart: true }) {
     try {
       hapticSuccess();
 
+      // IMPORTANT: clear auth state BEFORE navigation to prevent race condition
+      // where the profile tab re-focuses and still sees the old token.
+      try {
+        await logoutLocal();
+      } catch {
+        // Non bloquant
+      }
+      if (options.clearCart !== false) {
+        try {
+          await saveCart(null);
+        } catch {
+          // Non bloquant
+        }
+      }
+
       navigateToAuthAfterLogout();
 
       try {
@@ -59,6 +74,7 @@ export function useLogout(options: Options = { clearCart: true }) {
         if (Notifications) await Notifications.setBadgeCountAsync(0);
       } catch { /* ignore */ }
 
+      // Fire-and-forget: unregister push token (non-blocking)
       void (async () => {
         try {
           const { getExpoPushToken } = await import('@/lib/notifications-service');
@@ -67,18 +83,6 @@ export function useLogout(options: Options = { clearCart: true }) {
           if (token) await unregisterPushToken(token);
         } catch {
           // Non bloquant
-        }
-        try {
-          await logoutLocal();
-        } catch {
-          // Non bloquant
-        }
-        if (options.clearCart !== false) {
-          try {
-            await saveCart(null);
-          } catch {
-            // Non bloquant
-          }
         }
       })();
     } catch {
