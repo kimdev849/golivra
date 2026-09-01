@@ -443,12 +443,16 @@ export default function HomeScreen() {
   // on ajoute un élément invisible pour que le dernier vrai produit ne
   // prenne pas toute la largeur (bug connu de FlatList numColumns).
   const paddedProducts = useMemo(() => {
-    if (isDesktop || displayProducts.length === 0 || displayProducts.length % 2 === 0) {
-      return displayProducts;
-    }
-    // Élément sentinel : même shape qu'un ProductPublic mais id vide
-    const sentinel = { ...displayProducts[0], id: '__pad__' } as ProductPublic;
-    return [...displayProducts, sentinel];
+    if (displayProducts.length === 0) return displayProducts;
+    const cols = isDesktop ? DESKTOP_GRID_COLUMNS : 2;
+    const remainder = displayProducts.length % cols;
+    if (remainder === 0) return displayProducts;
+    const padCount = cols - remainder;
+    const sentinels = Array.from({ length: padCount }, (_, i) => ({
+      ...displayProducts[0],
+      id: `__pad__${i}`,
+    })) as ProductPublic[];
+    return [...displayProducts, ...sentinels];
   }, [displayProducts, isDesktop]);
 
   const isEnterpriseView = !searchActive && (category === 'restaurant' || category === 'boutique');
@@ -636,7 +640,7 @@ export default function HomeScreen() {
   const renderProduct = useCallback(
     ({ item }: { item: ProductPublic }) => {
       // Élément sentinel invisible (padding grille)
-      if (item.id === '__pad__') return <View style={styles.gridCell} />;
+      if (typeof item.id === 'string' && item.id.startsWith('__pad')) return <View style={styles.gridCell} />;
       return (
       <View style={styles.gridCell}>
         <PremiumCard
@@ -1494,7 +1498,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   premiumCardImgDesktop: {
-    aspectRatio: 4 / 3,
+    aspectRatio: 1,
   },
   promoBadge: {
     position: 'absolute',
@@ -1574,7 +1578,7 @@ const styles = StyleSheet.create({
   // la carte garde la même taille que les autres (pas de carte pleine largeur).
   gridRow: { gap: 10, marginBottom: 10 },
   gridRowDesktop: { gap: 16, marginBottom: 16 },
-  gridCell: { width: '48.5%' },
+  gridCell: { flex: 1, minWidth: 0 },
 
   // Loader
   loaderRow: {
