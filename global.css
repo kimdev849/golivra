@@ -3,11 +3,56 @@
 @tailwind utilities;
 
 /* ═══════════════════════════════════════════════════════════════════
-   Web-specific resets — nettoie les styles moches des navigateurs
-   sur les inputs, boutons, et focuses.
+   MOBILE-FIRST WEB RESETS
+   Optimisé pour que GoLivra se comporte comme une app native
+   quand ouvert dans un navigateur mobile (Safari iOS, Chrome Android).
    ═══════════════════════════════════════════════════════════════════ */
 
-/* Supprime les styles par défaut des inputs sur web (sans toucher au border-radius géré par React Native) */
+/* ── Body : plein écran, pas de scroll, safe area ── */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  /* Empêche le zoom pinch-to-zoom sur mobile web */
+  touch-action: manipulation;
+  /* Empêche la sélection de texte globally */
+  -webkit-user-select: none;
+  user-select: none;
+  /* Font smoothing moderne */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Fix iOS Dynamic Island / notch / home indicator */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  /* Default background pendant le chargement */
+  background-color: #062A1B;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh; /* dynamic viewport height — fix keyboard resize */
+  height: 100vh; /* fallback */
+}
+
+/* Les éléments scrollables reprennent la sélection de texte */
+input, textarea, [contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   INPUT & BUTTON RESETS — styles par défaut des navigateurs
+   ═══════════════════════════════════════════════════════════════════ */
+
 input,
 textarea,
 select,
@@ -40,26 +85,27 @@ select:-webkit-autofill:focus {
   background-color: transparent !important;
 }
 
-/* Supprime les scrollbars moches sur webkit */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
+/* ═══════════════════════════════════════════════════════════════════
+   SCROLLBARS & SELECTION
+   ═══════════════════════════════════════════════════════════════════ */
 
+/* Scrollbars fines et discrètes */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.12);
   border-radius: 3px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.22);
 }
 
-/* Empêche le surlignage bleu au double-clic sur les textes */
+/* Empêche le surlignage bleu au double-clic */
 * {
   -webkit-tap-highlight-color: transparent;
 }
@@ -76,5 +122,48 @@ button::-webkit-focus-inner {
 
 /* Sélection de texte plus propre */
 ::selection {
-  background-color: rgba(14, 134, 212, 0.2);
+  background-color: rgba(14, 134, 212, 0.18);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MOBILE WEB SPECIFIC — iPhone / Android browser
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Fix iOS rubber-band scrolling (bounce) */
+@supports (-webkit-touch-callout: none) {
+  body {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Empêche le pull-to-refresh sur Android Chrome */
+body {
+  overscroll-behavior-y: contain;
+}
+
+/* Standalone mode (quand installé comme PWA) */
+@media all and (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RESPONSIVE : Font size adjustments pour mobile web
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Sur les petits écrans mobile web, on ajuste quelques tailles pour
+   que le texte reste confortable à lire sans zoom */
+@media screen and (max-width: 767px) {
+  /* Fix : les inputs React Native Web sur mobile web ont parfois
+     une taille de police trop petite */
+  input[type="text"],
+  input[type="tel"],
+  input[type="password"],
+  input[type="email"],
+  input[type="search"],
+  input[type="url"],
+  textarea {
+    font-size: 16px !important; /* Évite le zoom auto sur iOS Safari */
+  }
 }

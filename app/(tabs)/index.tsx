@@ -1319,7 +1319,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
   },
-  searchInput: { flex: 1, fontSize: 13, paddingVertical: 0 },
+  searchInput: { flex: 1, fontSize: 16, paddingVertical: 0 },
 
   // Filter chips
   filterRowWrap: { position: 'relative', overflow: 'hidden' },

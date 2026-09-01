@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+    <!-- ═══ Mobile-First Viewport ═══ -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+
+    <!-- ═══ PWA / Standalone Mode ═══ -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#062A1B" />
+    <meta name="color-scheme" content="light dark" />
+
+    <!-- ═══ SEO & Social ═══ -->
+    <title>GoLivra — Livraison à domicile</title>
+    <meta name="description" content="Commandez vos plats et produits préférés. Livraison rapide par des livreurs professionnels." />
+    <meta name="keywords" content="livraison, commande, restaurant, boutique, GoLivra, Brazzaville" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="GoLivra" />
+    <meta property="og:description" content="Commandez vos plats et produits préférés. Livraison rapide." />
+
+    <!-- ═══ Prevent phone number auto-detection ═══ -->
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- ═══ Favicon & PWA ═══ -->
+    <link rel="icon" type="image/png" href="./assets/images/app.icon.png" />
+    <link rel="apple-touch-icon" href="./assets/images/app.icon.png" />
+    <link rel="manifest" href="./manifest.json" />
+
+    <style>
+      /* ═══════════════════════════════════════════════════════════════
+         MOBILE-FIRST RESETS — base du body et de l'envoi web
+         ═══════════════════════════════════════════════════════════════ */
+
+      /* Fix iOS overscroll bounce (rubber-band) */
+      html {
+        -webkit-text-size-adjust: 100%;
+        -webkit-tap-highlight-color: transparent;
+        overscroll-behavior: none;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        /* Safe area insets pour iPhone notch / Dynamic Island */
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+        /* Fond sombre pour éviter le flash blanc pendant le chargement */
+        background-color: #062A1B;
+        /* Empêche le zoom au double-tap */
+        touch-action: manipulation;
+        /* Empêche la sélection de texte sur les éléments non-texte */
+        -webkit-user-select: none;
+        user-select: none;
+      }
+
+      /* Les champs de saisie restent sélectionnables */
+      input, textarea {
+        -webkit-user-select: text;
+        user-select: text;
+      }
+
+      /* Conteneur Expo root */
+      #root {
+        width: 100%;
+        height: 100%;
+        /* Safe area padding */
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+
+      /* Fix pour les écrans mobile web : pas de scroll body */
+      #root > div {
+        height: 100%;
+        overflow: hidden;
+      }
+
+      /* ═══ Standalone mode (PWA installé) ═══ */
+      @media all and (display-mode: standalone) {
+        body {
+          padding-top: env(safe-area-inset-top);
+        }
+      }
+
+      /* ═══ Dark mode system ═══ */
+      @media (prefers-color-scheme: dark) {
+        body {
+          background-color: #062A1B;
+        }
+      }
+
+      /* ═══ Fix iOS Safari rubber-band scrolling ═══ */
+      @supports (-webkit-touch-callout: none) {
+        body {
+          -webkit-overflow-scrolling: touch;
+        }
+      }
+
+      /* ═══ Mobile keyboard resize fix ═══ */
+      @supports (height: 100dvh) {
+        body {
+          height: 100dvh;
+        }
+        #root {
+          height: 100dvh;
+        }
+      }
+
+      /* ═══ Loading spinner ═══ */
+      .app-loading {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #062A1B;
+        z-index: 9999;
+      }
+      .app-loading img {
+        width: 80px;
+        height: 80px;
+        opacity: 0.8;
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 0.5; transform: scale(0.95); }
+        50% { opacity: 1; transform: scale(1); }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Loading state while JS bundles load -->
+    <div id="root">
+      <div class="app-loading">
+        <img src="./assets/images/app.icon.png" alt="GoLivra" />
+      </div>
+    </div>
+  </body>
+</html>
