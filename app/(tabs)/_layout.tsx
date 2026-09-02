@@ -161,6 +161,13 @@ export default function TabLayout() {
   }
 
   // ── Mobile : bottom tab bar classique ────────────────────────
+  // Sur web : pas de position:absolute (le CSS overflow:hidden du
+  // conteneur parent clip le tab bar). On utilise un layout flex
+  // normal avec un fond opaque, comme une barre fixe en bas.
+  const mobileTabBarStyle = Platform.OS === 'web'
+    ? { borderTopWidth: 0, elevation: 0, backgroundColor: 'transparent' }
+    : { position: 'absolute' as const, borderTopWidth: 0, elevation: 0, backgroundColor: 'transparent' };
+
   return (
     <CartProvider>
       <Tabs
@@ -170,12 +177,7 @@ export default function TabLayout() {
           tabBarInactiveTintColor: Colors[colorScheme ?? 'light'].tabIconDefault,
           headerShown: false,
           tabBarHideOnKeyboard: true,
-          tabBarStyle: {
-            position: 'absolute',
-            borderTopWidth: 0,
-            elevation: 0,
-            backgroundColor: 'transparent',
-          },
+          tabBarStyle: mobileTabBarStyle,
         }}>
         <Tabs.Screen
           name="index"
