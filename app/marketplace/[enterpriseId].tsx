@@ -387,11 +387,7 @@ export default function EnterpriseDetailScreen() {
                     Votre commande devrait être prête dans environ {formatHumanMinutes(prepMin)}. Ensuite, un livreur viendra vous la remettre directement à l'adresse indiquée.
                   </ThemedText>
                 </View>
-                <ThemedText style={styles.etaBody}>
-                  {isRestaurant
-                    ? 'Le restaurant prépare votre commande en premier, puis un livreur vient vous la remettre directement.'
-                    : 'La boutique prépare votre commande en premier, puis un livreur vient vous la remettre directement.'}
-                </ThemedText>
+
                 <Pressable
                   style={styles.etaToggle}
                   onPress={() => setEtaDetailOpen((v) => !v)}
@@ -433,9 +429,7 @@ export default function EnterpriseDetailScreen() {
                     Votre commande devrait être prête dans environ {prepMin} min. Ensuite, un livreur viendra vous la remettre directement à l'adresse indiquée.
                   </ThemedText>
                 </View>
-                <ThemedText style={styles.etaBody}>
-                  Un livreur vient ensuite vous la remettre directement, selon votre adresse.
-                </ThemedText>
+
               </>
             )}
           </View>
