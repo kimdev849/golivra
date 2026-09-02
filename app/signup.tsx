@@ -20,7 +20,6 @@ import {
   Lock,
   MapPin,
   MessageCircle,
-  PartyPopper,
   Smartphone,
   Store,
   Tag,
@@ -84,7 +83,7 @@ function headerCopy(variant: SignupVariant) {
 function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
   const router = useRouter();
   const colors = useAppColors();
-  const { showSuccess, FeedbackOverlay } = useActionFeedback();
+  const { FeedbackOverlay } = useActionFeedback();
   const { width } = useWindowDimensions();
   const [profile, setProfile] = useState<Profile>(forcedProfile ?? (variant === 'default' ? 'client' : 'vendeur'));
   const [commerceKind, setCommerceKind] = useState<CommerceKind | null>(variant === 'default' ? null : variant);
@@ -250,11 +249,7 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
         const { enterprise: _ent, ...session } = result;
         await persistAuthSession(session);
         signupDoneRef.current = true;
-        showSuccess(
-          'Compte créé !',
-          `Votre ${commerceKind === 'restaurant' ? 'restaurant' : 'boutique'} est enregistré et en attente de validation. Complétez votre fiche (logo, description) pour attirer vos premiers clients.`,
-          { primaryLabel: 'Continuer', onPrimary: () => router.replace(VENDOR_HREF.root), icon: PartyPopper },
-        );
+        router.replace(VENDOR_HREF.root);
         return;
       }
 
@@ -269,15 +264,10 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
       }
       await persistAuthSession(session);
       signupDoneRef.current = true;
-      showSuccess(
-        'Bienvenue à bord !',
-        'Votre compte GoLivra est prêt. Prenez le temps de compléter votre profil (photo, adresses), puis découvrez les commerces près de chez vous.',
-        {
-          primaryLabel: 'Explorer',
-          onPrimary: () => router.replace('/(tabs)'),
-          icon: PartyPopper,
-        },
-      );
+      // Naviguer directement vers l'accueil : le showSuccess avec onPrimary
+      // causait un retour à l'écran de connexion sur certains appareils car
+      // le router n'était plus disponible au moment du clic sur le bouton.
+      router.replace('/(tabs)');
     } catch (e) {
       if (signupDoneRef.current) return;
       const reqId = (e as { requestId?: string })?.requestId;
