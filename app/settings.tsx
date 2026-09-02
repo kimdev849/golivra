@@ -119,7 +119,17 @@ export default function SettingsScreen() {
 
   const handleClearCache = async () => {
     try {
-      // Clés à conserver : panier, onboarding, thème, taille de texte,
+      // 1) Vider le cache mémoire (requêtes catalogue, données entreprise, etc.)
+      const { clearClientDataCache } = await import('@/lib/client-data');
+      clearClientDataCache();
+
+      // 2) Vider le cache React Query (tout le data lives cache)
+      try {
+        const { queryClient } = await import('@/app/_layout');
+        queryClient.clear();
+      } catch { /* best-effort */ }
+
+      // 3) Clés à conserver : panier, onboarding, thème, taille de texte,
       // biométrie et session — ne pas les supprimer lors du « vider le cache »
       // (F-SET-01).
       const PRESERVE_KEYS = new Set([
@@ -392,24 +402,29 @@ export default function SettingsScreen() {
         ══════════════════════════════════════════════════ */}
         {renderSectionLabel('Paramètres avancés')}
         <View style={localStyles.menuCard}>
-          <Pressable
-            style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
-            onPress={handleClearCache}
-            android_ripple={{ color: colors.primaryMuted }}>
-            <View style={[localStyles.rowIcon, { backgroundColor: colors.errorSoft }]}>
-              <Trash2 size={20} color={colors.error} strokeWidth={LUCIDE_STROKE} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <ThemedText type="defaultSemiBold">
-                {cacheCleared ? '✅ Cache vidé !' : 'Vider le cache'}
-              </ThemedText>
-              <ThemedText type="muted" style={localStyles.rowSub}>
-                Libérez de l'espace de stockage
-              </ThemedText>
-            </View>
-            <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
-          </Pressable>
-          <View style={localStyles.divider} />
+          {/* Vider le cache : uniquement sur mobile (inutile sur web) */}
+          {Platform.OS !== 'web' && (
+            <>
+              <Pressable
+                style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
+                onPress={handleClearCache}
+                android_ripple={{ color: colors.primaryMuted }}>
+                <View style={[localStyles.rowIcon, { backgroundColor: colors.errorSoft }]}>
+                  <Trash2 size={20} color={colors.error} strokeWidth={LUCIDE_STROKE} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText type="defaultSemiBold">
+                    {cacheCleared ? '✅ Cache vidé !' : 'Vider le cache'}
+                  </ThemedText>
+                  <ThemedText type="muted" style={localStyles.rowSub}>
+                    Libérez de l'espace de stockage
+                  </ThemedText>
+                </View>
+                <ChevronRight size={18} color={colors.textMuted} strokeWidth={LUCIDE_STROKE} />
+              </Pressable>
+              <View style={localStyles.divider} />
+            </>
+          )}
           <Pressable
             style={({ pressed }) => [localStyles.row, pressed && localStyles.rowPressed]}
             onPress={() => router.push('/how-multi-delivery')}
