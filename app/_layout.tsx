@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { AppState, Platform, View } from 'react-native';
+import { AppState, Platform, useColorScheme, View } from 'react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
@@ -18,6 +18,7 @@ import { OfflineBanner } from '@/components/offline-banner';
 import { CustomSplashScreen } from '@/components/splash-screen';
 import { AppThemeProvider, useAppTheme } from '@/contexts/app-theme-context';
 import { TextScaleProvider } from '@/contexts/text-scale-context';
+import { useAppColors } from '@/hooks/use-app-colors';
 import { useIsOffline } from '@/hooks/use-network-status';
 import { useWebNotifications } from '@/hooks/use-web-notifications';
 import { prefetchClientCatalog } from '@/lib/client-data';
@@ -131,13 +132,13 @@ function RootNavigation() {
     <NavThemeProvider value={navTheme}>
       <Stack screenOptions={stackScreenOptions(colors)}>
         <Stack.Screen name="index" />
-        <Stack.Screen name="auth" options={stackAuthOptions()} />
+        <Stack.Screen name="auth" options={stackAuthOptions(colors)} />
         <Stack.Screen name="forgot-password" />
-        <Stack.Screen name="signup" options={stackAuthOptions()} />
-        <Stack.Screen name="signup/choose" options={stackAuthOptions()} />
-        <Stack.Screen name="signup/client" options={stackAuthOptions()} />
-        <Stack.Screen name="signup/restaurant" options={stackAuthOptions()} />
-        <Stack.Screen name="signup/boutique" options={stackAuthOptions()} />
+        <Stack.Screen name="signup" options={stackAuthOptions(colors)} />
+        <Stack.Screen name="signup/choose" options={stackAuthOptions(colors)} />
+        <Stack.Screen name="signup/client" options={stackAuthOptions(colors)} />
+        <Stack.Screen name="signup/restaurant" options={stackAuthOptions(colors)} />
+        <Stack.Screen name="signup/boutique" options={stackAuthOptions(colors)} />
         <Stack.Screen name="(tabs)" options={{ animation: 'fade', animationDuration: 200 }} />
         <Stack.Screen name="vendor" options={{ animation: 'fade', animationDuration: 200 }} />
         <Stack.Screen name="courier" options={{ animation: 'fade', animationDuration: 200 }} />
@@ -158,6 +159,24 @@ function RootNavigation() {
   );
 }
 
+
+/**
+ * Conteneur racine avec fond dynamique (clair/sombre).
+ *
+ * Sans ce composant, les vues racines (`GestureHandlerRootView` + `View`
+ * imbriqué) n'ont pas de `backgroundColor`. En edge-to-edge, la barre
+ * de navigation système est transparente : la fenêtre Android (blanche par
+ * défaut) transparaît en bas de l'écran — surtout visible en mode sombre
+ * sous forme de bande blanche au-dessus des boutons de navigation.
+ */
+function ThemedRootContainer({ children }: { children: React.ReactNode }) {
+  const colors = useAppColors();
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {children}
+    </View>
+  );
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -187,6 +206,16 @@ function useSilentReconnectRefresh() {
   }, [offline]);
 }
 
+function ThemedGestureRoot({ children }: { children: React.ReactNode }) {
+  const scheme = useColorScheme();
+  const bg = scheme === 'dark' ? '#0B0C0E' : '#FFFFFF';
+  return (
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: bg }}>
+      {children}
+    </GestureHandlerRootView>
+  );
+}
+
 function RootLayout() {
   const [splashVisible, setSplashVisible] = useState(true);
 
@@ -211,12 +240,12 @@ function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemedGestureRoot>
         <TextScaleProvider>
         <AppThemeProvider>
           <BiometricAppGate>
             <AppStatusGate>
-              <View style={{ flex: 1 }}>
+              <ThemedRootContainer>
                 {splashVisible && (
                   <CustomSplashScreen onAnimationComplete={handleSplashDone} />
                 )}
@@ -225,12 +254,12 @@ function RootLayout() {
                 <RootNavigation />
                 {splashVisible && <StatusBar style="light" />}
                 <AppToastHost />
-              </View>
+              </ThemedRootContainer>
             </AppStatusGate>
           </BiometricAppGate>
         </AppThemeProvider>
         </TextScaleProvider>
-      </GestureHandlerRootView>
+      </ThemedGestureRoot>
     </QueryClientProvider>
   );
 }

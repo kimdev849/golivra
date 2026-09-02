@@ -187,7 +187,7 @@ export default function ProductDetailScreen() {
   const liveStatus = computeLiveStatus(enterprise?.horaires ?? [], {
     prepMinutes: enterprisePrepMinutes(enterprise),
     kind: enterprise?.type === 'restaurant' ? 'restaurant' : 'boutique',
-    fermeManuellement: enterprise?.ouvert === false,
+    fermeManuellement: false, // est_ouvert est un snapshot serveur recalculé en live côté client
     sansHoraires: enterprise?.accepte_commandes === false,
   }, now);
   const heuresBloquees = !!enterprise && liveStatus.commandesBloquees;

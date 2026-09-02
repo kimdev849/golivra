@@ -14,11 +14,30 @@ import type { EnterpriseHoraires } from '@/lib/enterprise';
  */
 /**
  * Convertit une Date (peut importe le fuseau) en heure de Brazzaville (UTC+1).
+ *
+ * Utilise les méthodes UTC (getUTCHours, getUTCDay…) pour éviter les bugs
+ * liés à `getTimezoneOffset()` sur certains appareils Android où la valeur
+ * peut être décalée d'1 h, causant des faux « fermé » pendant les heures
+ * d'ouverture.
  */
 function nowInBrazzavilleFrom(date: Date): Date {
-  const utcMs = date.getTime() + date.getTimezoneOffset() * 60_000;
-  const BRAZZA_OFFSET = 1 * 60_000; // UTC+1
-  return new Date(utcMs + BRAZZA_OFFSET);
+  // On récupère les composantes UTC de la date source.
+  const utcMs = date.getTime();
+  // Brazzaville = UTC+1 → on ajoute 1 h en ms.
+  const brazzaMs = utcMs + 1 * 60 * 60_000;
+  const tmp = new Date(brazzaMs);
+  // On construit une Date « locale » avec les valeurs UTC de `tmp` :
+  // getHours() / getDay() etc. retourneront alors l'heure de Brazzaville,
+  // quelle que soit la timezone de l'appareil.
+  return new Date(
+    tmp.getUTCFullYear(),
+    tmp.getUTCMonth(),
+    tmp.getUTCDate(),
+    tmp.getUTCHours(),
+    tmp.getUTCMinutes(),
+    tmp.getUTCSeconds(),
+    tmp.getUTCMilliseconds(),
+  );
 }
 
 /** Maintenant en heure de Brazzaville (UTC+1). */

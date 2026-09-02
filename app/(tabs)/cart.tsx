@@ -511,7 +511,7 @@ export default function CartScreen() {
           (ent?.type ?? seg.enterpriseType ?? 'restaurant') === 'boutique'
             ? 'boutique'
             : 'restaurant',
-        fermeManuellement: ent?.ouvert === false,
+        fermeManuellement: false, // est_ouvert est un snapshot serveur recalculé en live côté client
         sansHoraires: ent?.accepte_commandes === false,
       }, now);
       return status.commandesBloquees;
@@ -633,7 +633,7 @@ export default function CartScreen() {
                   kind: (ent?.type ?? seg.enterpriseType ?? 'restaurant') === 'boutique'
                     ? 'boutique'
                     : 'restaurant',
-                  fermeManuellement: ent?.ouvert === false,
+                  fermeManuellement: false, // est_ouvert est un snapshot serveur recalculé en live côté client
                   sansHoraires: ent?.accepte_commandes === false,
                 }, now);
 

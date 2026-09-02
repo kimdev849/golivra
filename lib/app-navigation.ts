@@ -23,13 +23,14 @@ export function stackTabRootOptions(): NativeStackNavigationOptions {
   };
 }
 
-export function stackAuthOptions(): NativeStackNavigationOptions {
+export function stackAuthOptions(colors?: AppPalette): NativeStackNavigationOptions {
   return {
     // Slide latéral fluide sur toutes les plateformes (type Facebook) avec
     // geste de retour — navigation simple et naturelle entre connexion/inscription.
     animation: 'slide_from_right',
     animationDuration: 250,
     gestureEnabled: true,
+    contentStyle: { backgroundColor: colors?.background ?? '#0B0C0E' },
   };
 }
 
