@@ -465,7 +465,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addTile: {
-    aspectRatio: 1,
     borderRadius: 12,
     borderWidth: 1.5,
     borderStyle: 'dashed',
