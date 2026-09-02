@@ -209,9 +209,12 @@ export async function apiFetch<T = unknown>(path: string, options: ApiFetchOptio
         severity: res.status >= 500 ? 'error' : 'warn',
       });
     }
-    const err = new Error(message) as Error & { requestId?: string; code?: string };
+    const err = new Error(message) as Error & { requestId?: string; code?: string; field?: string };
     err.requestId = responseRequestId;
     err.code = code;
+    if (typeof parsed === 'object' && parsed !== null && 'field' in parsed) {
+      err.field = (parsed as { field?: string }).field;
+    }
     throw err;
   }
 

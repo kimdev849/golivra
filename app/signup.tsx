@@ -295,7 +295,13 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
       if (__DEV__) {
         console.warn('[signup] échec inscription', { reqId, message: msg });
       }
-      setError(reqId ? `${msg} (ref. ${reqId.slice(0, 8)})` : msg);
+      // Si le backend indique le champ en erreur, surligner visuellement
+      // pour que l'utilisateur voie immédiatement quel champ corriger.
+      const backendField = (e as { field?: string }).field;
+      if (backendField) {
+        setFieldErrors((prev) => ({ ...prev, [backendField]: msg }));
+      }
+      setError(msg);
     }
     finally { setIsSubmitting(false); }
   };
