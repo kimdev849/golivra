@@ -2,7 +2,7 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { PlatformPressable } from '@react-navigation/elements';
 import * as Haptics from 'expo-haptics';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -15,6 +15,7 @@ import { useCart } from '@/contexts/cart-context';
 import { useAppColors } from '@/hooks/use-app-colors';
 import { shouldShowTabBar } from '@/lib/tab-bar-visibility';
 
+const IS_WEB = Platform.OS === 'web';
 const TAB_ORDER = ['index', 'explore', 'cart', 'favorites', 'profile'] as const;
 
 function triggerTabHaptic() {
@@ -87,6 +88,23 @@ function TabItem({
   );
 }
 
+/**
+ * Wrapper component qui utilise Animated.View (natif) ou View simple (web)
+ * pour éviter les problèmes de position:absolute + reanimated sur mobile web.
+ */
+function AnimatedOrPlainView({ style, pointerEvents, children }: {
+  style?: any;
+  pointerEvents?: 'auto' | 'none' | 'box-none' | 'box-none' | undefined;
+  children: React.ReactNode;
+}) {
+  // Sur web : View simple avec zIndex garanti (pas de reanimated pour le root)
+  if (IS_WEB) {
+    return <View style={style} pointerEvents={pointerEvents}>{children}</View>;
+  }
+  // Sur natif : Animated.View avec animation slide-up
+  return <Animated.View style={style} pointerEvents={pointerEvents}>{children}</Animated.View>;
+}
+
 export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { itemCount } = useCart();
   const colors = useAppColors();
@@ -105,14 +123,23 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
     transform: [{ translateY: (1 - visibility.value) * 80 }],
   }));
 
+  // Sur web, on masque complètement le tab bar quand il n'est pas visible
+  // (pas d'animation reanimated sur le root pour éviter les bugs mobile web).
+  if (IS_WEB && !visible) return null;
+
   const orderedRoutes = TAB_ORDER.map((name) => state.routes.find((r) => r.name === name)).filter(
     (r): r is (typeof state.routes)[number] => r != null,
   );
 
   const focusedRouteName = state.routes[state.index]?.name;
 
+  // Sur web : style simple sans animation. Sur natif : animation slide-up.
+  const rootStyle: any[] = IS_WEB
+    ? [styles.root, styles.rootWeb]
+    : [styles.root, barAnimStyle];
+
   return (
-    <Animated.View style={[styles.root, barAnimStyle]} pointerEvents={visible ? 'auto' : 'none'}>
+    <AnimatedOrPlainView style={rootStyle} pointerEvents={visible ? 'auto' : 'none'}>
       <View
         style={[
           styles.bar,
@@ -162,7 +189,7 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
           );
         })}
       </View>
-    </Animated.View>
+    </AnimatedOrPlainView>
   );
 }
 
@@ -172,6 +199,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
+  },
+  rootWeb: {
+    // Sur web, z-index élevé pour passer au-dessus du contenu
+    // même avec overflow:hidden sur le conteneur parent.
+    zIndex: 50,
   },
   bar: {
     flexDirection: 'row',
