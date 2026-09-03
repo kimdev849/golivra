@@ -115,10 +115,10 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
 
   const focusedRouteName = state.routes[state.index]?.name;
 
-  // Web & natif : position:absolute pour que la tab bar soit toujours
-  // visible en bas, au-dessus du contenu scrollable.
+  // Sur web : position:fixed en bas du viewport pour toujours être visible.
+  // Sur natif : position:absolute, bottom:0 (edge-to-edge).
   const rootStyle: any[] = IS_WEB
-    ? [styles.root]
+    ? [styles.webRoot]
     : [styles.root, barAnimStyle];
 
   const Wrapper = IS_WEB ? View : Animated.View;
@@ -184,6 +184,13 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
+  },
+  webRoot: {
+    position: 'fixed' as any,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
   },
   bar: {
     flexDirection: 'row',

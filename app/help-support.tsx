@@ -7,13 +7,13 @@ import {
   ChevronUp,
   HelpCircle,
   Mail,
-  MessageCircle,
   Phone,
   Share2,
   Star,
   Bug,
   ExternalLink,
 } from 'lucide-react-native';
+import { Image } from 'expo-image';
 import { useState } from 'react';
 import {
   Linking,
@@ -118,8 +118,8 @@ export default function HelpSupportScreen() {
         <ThemedText style={styles.sectionLabel}>Contact rapide</ThemedText>
         <View style={styles.menuCard}>
           <MenuRow
-            icon={<MessageCircle size={20} color="#25D366" strokeWidth={LUCIDE_STROKE} />}
-            iconBg="#25D366"
+            icon={<Image source={require('@/assets/images/logo.whastapp.png')} style={styles.whatsappLogo} contentFit="contain" cachePolicy="memory-disk" />}
+            iconBg="transparent"
             title="WhatsApp"
             subtitle="Réponse rapide, 7j/7"
             onPress={handleWhatsApp}
@@ -335,6 +335,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingBottom: 14,
     paddingLeft: 62,
+  },
+  whatsappLogo: {
+    width: 22,
+    height: 22,
   },
   faqAnswerText: {
     fontSize: 13,
