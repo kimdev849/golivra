@@ -46,7 +46,7 @@ export default function AuthScreen() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const colors = useAppColors();
-  const { isDark, setDarkMode } = useAppTheme();
+  const { isDark, setPreference } = useAppTheme();
   const styles = useMemo(() => makeAuthStyles(colors), [colors]);
   const [loginPhone, setLoginPhone] = useState('+242 ');
   const [password, setPassword] = useState('');
@@ -191,7 +191,8 @@ export default function AuthScreen() {
         ]}
           onPress={() => {
             void Haptics.selectionAsync();
-            void setDarkMode(!isDark);
+            // Réinitialise en mode système : l'app suit le thème du téléphone
+            void setPreference('system');
           }}
           hitSlop={8}>
           {isDark ? (

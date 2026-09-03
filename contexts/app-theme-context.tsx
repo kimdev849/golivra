@@ -8,7 +8,7 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
-import { useColorScheme as useSystemColorScheme } from 'react-native';
+import { Platform, useColorScheme as useSystemColorScheme } from 'react-native';
 
 import {
   paletteForScheme,
@@ -44,6 +44,22 @@ function resolveScheme(preference: ThemePreference, system: ColorSchemeName | nu
 
 export function AppThemeProvider({ children }: { children: ReactNode }) {
   const systemScheme = useSystemColorScheme();
+  // Sur web, on ajoute un listener matchMedia pour détecter les changements
+  // de thème système (dark↔light) car React Native Web ne réagit pas
+  // toujours aux changements prefers-color-scheme en temps réel.
+  const [webSystemScheme, setWebSystemScheme] = useState<ColorSchemeName | null>(null);
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e: MediaQueryListEvent) => {
+      setWebSystemScheme(e.matches ? 'dark' : 'light');
+    };
+    setWebSystemScheme(mql.matches ? 'dark' : 'light');
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+  const effectiveSystem = webSystemScheme ?? systemScheme;
+
   const [preference, setPreferenceState] = useState<ThemePreference>('system');
   const [ready, setReady] = useState(false);
 
@@ -113,7 +129,7 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const colorScheme = resolveScheme(preference, systemScheme ?? 'light');
+  const colorScheme = resolveScheme(preference, effectiveSystem ?? 'light');
   const colors = useMemo(() => paletteForScheme(colorScheme), [colorScheme]);
 
   const persistPreference = useCallback(async (pref: ThemePreference) => {

@@ -115,12 +115,11 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
 
   const focusedRouteName = state.routes[state.index]?.name;
 
-  // Sur web : position:fixed inline (pas StyleSheet) car 'fixed' n'est
-  // pas un style React Native standard — React Native Web l'accepte inline.
+  // Sur web : flux flex normal (BottomTabView gère le layout :
+  // screen flex:1 + tab bar en bas). Pas de position:absolute/fixed.
   // Sur natif : position:absolute, bottom:0 (edge-to-edge).
-  const webFixedStyle = { position: 'fixed' as const, bottom: 0, left: 0, right: 0, zIndex: 100 };
   const rootStyle: any[] = IS_WEB
-    ? [webFixedStyle]
+    ? [{ width: '100%' as const }]
     : [styles.root, barAnimStyle];
 
   const Wrapper = IS_WEB ? View : Animated.View;
