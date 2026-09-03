@@ -115,11 +115,10 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
 
   const focusedRouteName = state.routes[state.index]?.name;
 
-  // Sur web : flux flex normal (BottomTabView gère le layout :
-  // screen flex:1 + tab bar en bas). Pas de position:absolute/fixed.
-  // Sur natif : position:absolute, bottom:0 (edge-to-edge).
+  // Sur web ET natif : position:absolute, bottom:0 (edge-to-edge).
+  // La tab bar chevauche le contenu scrollable, comme une barre fixe en bas.
   const rootStyle: any[] = IS_WEB
-    ? [{ width: '100%' as const }]
+    ? [{ position: 'absolute' as const, bottom: 0, left: 0, right: 0 }]
     : [styles.root, barAnimStyle];
 
   const Wrapper = IS_WEB ? View : Animated.View;
