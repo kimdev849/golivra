@@ -9,7 +9,7 @@
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── Body : plein écran, pas de scroll, safe area ── */
-html, body, #root {
+html, body {
   margin: 0;
   padding: 0;
   width: 100%;
@@ -39,9 +39,10 @@ body {
 #root {
   display: flex;
   flex-direction: column;
-  height: 100dvh; /* dynamic viewport height — fix keyboard resize */
-  height: 100vh; /* fallback */
+  height: 100dvh;
+  height: 100vh;
   background-color: #0B0C0E;
+  overscroll-behavior: none;
 }
 
 /* Les éléments scrollables reprennent la sélection de texte */

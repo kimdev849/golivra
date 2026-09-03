@@ -163,11 +163,10 @@ export default function TabLayout() {
   }
 
   // ── Mobile : bottom tab bar classique ────────────────────────
-  // Sur web : la barre est un flex child (pas position:absolute) pour
-  // éviter que overflow:hidden du conteneur parent ne la clippe.
-  // On donne un fond opaque pour qu'elle soit visible sur tout fond.
+  // Web & natif : position:absolute, bottom:0 pour que la tab bar
+  // chevauche le contenu scrollable sans le pousser vers le haut.
   const mobileTabBarStyle = Platform.OS === 'web'
-    ? { borderTopWidth: 0, elevation: 0, backgroundColor: appColors.surface }
+    ? { position: 'absolute' as const, bottom: 0, left: 0, right: 0, borderTopWidth: 0, elevation: 0, backgroundColor: appColors.surface }
     : { position: 'absolute' as const, borderTopWidth: 0, elevation: 0, backgroundColor: 'transparent' };
 
   return (

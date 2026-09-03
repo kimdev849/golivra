@@ -115,11 +115,10 @@ export function GolivraTabBar({ state, descriptors, navigation }: BottomTabBarPr
 
   const focusedRouteName = state.routes[state.index]?.name;
 
-  // Sur web : pas de position:absolute (on est un flex child normal dans
-  // le layout React Navigation). flexShrink:0 empêche la compression.
-  // Sur natif : position:absolute, bottom:0.
+  // Web & natif : position:absolute pour que la tab bar soit toujours
+  // visible en bas, au-dessus du contenu scrollable.
   const rootStyle: any[] = IS_WEB
-    ? [{ width: '100%' as const, flexShrink: 0 }]
+    ? [styles.root]
     : [styles.root, barAnimStyle];
 
   const Wrapper = IS_WEB ? View : Animated.View;
