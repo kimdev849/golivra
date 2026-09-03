@@ -8,6 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { AppState, Platform, View } from 'react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 
 import { AnnouncementBanner } from '@/components/announcement-banner';
@@ -129,6 +130,7 @@ function RootNavigation() {
   );
 
   return (
+    <SafeAreaProvider>
     <NavThemeProvider value={navTheme}>
       <Stack screenOptions={stackScreenOptions(colors)}>
         <Stack.Screen name="index" />
@@ -156,6 +158,7 @@ function RootNavigation() {
       </Stack>
       <StatusBar style={colors.statusBar} />
     </NavThemeProvider>
+    </SafeAreaProvider>
   );
 }
 
