@@ -10,6 +10,7 @@ import { WebNavbar, NAVBAR_HEIGHT } from '@/components/web-navbar';
 import { CartProvider } from '@/contexts/cart-context';
 import { LUCIDE_STROKE } from '@/constants/icons';
 import { Colors } from '@/constants/theme';
+import { useAppColors } from '@/hooks/use-app-colors';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useIsWebDesktop } from '@/hooks/use-is-web-desktop';
 import { isAuthErrorMessage } from '@/lib/app-bootstrap';
@@ -20,6 +21,7 @@ import { VENDOR_HREF } from '@/lib/vendor-nav';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const appColors = useAppColors();
   const router = useRouter();
   const [sessionOk, setSessionOk] = useState(true);
   const isDesktop = useIsWebDesktop();
@@ -161,11 +163,11 @@ export default function TabLayout() {
   }
 
   // ── Mobile : bottom tab bar classique ────────────────────────
-  // Sur web : pas de position:absolute (le CSS overflow:hidden du
-  // conteneur parent clip le tab bar). On utilise un layout flex
-  // normal avec un fond opaque, comme une barre fixe en bas.
+  // Sur web : la barre est un flex child (pas position:absolute) pour
+  // éviter que overflow:hidden du conteneur parent ne la clippe.
+  // On donne un fond opaque pour qu'elle soit visible sur tout fond.
   const mobileTabBarStyle = Platform.OS === 'web'
-    ? { borderTopWidth: 0, elevation: 0, backgroundColor: 'transparent' }
+    ? { borderTopWidth: 0, elevation: 0, backgroundColor: appColors.surface }
     : { position: 'absolute' as const, borderTopWidth: 0, elevation: 0, backgroundColor: 'transparent' };
 
   return (

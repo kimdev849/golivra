@@ -150,7 +150,7 @@ export default function ForgotPasswordScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={insets.top}>
         <ScrollView
-          style={{ backgroundColor: colors.background }}
+          style={{ flex: 1, backgroundColor: colors.background }}
           contentContainerStyle={[
             styles.scroll,
             // Padding bas généreux (comme la page de connexion) : rend le

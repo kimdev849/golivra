@@ -209,7 +209,7 @@ export default function AuthScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}>
         <ScrollView
-          style={{ backgroundColor: colors.background }}
+          style={{ flex: 1, backgroundColor: colors.background }}
           contentContainerStyle={[
             styles.scrollContent,
             { paddingTop: 24 + tallScreenPad },
