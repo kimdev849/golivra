@@ -209,6 +209,7 @@ export default function AuthScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}>
         <ScrollView
+          style={{ backgroundColor: colors.background }}
           contentContainerStyle={[
             styles.scrollContent,
             { paddingTop: 24 + tallScreenPad },
@@ -417,6 +418,7 @@ function makeAuthStyles(c: AppPalette) {
     },
     keyboardContainer: {
       flex: 1,
+      backgroundColor: c.background,
     },
     // Padding bas généreux (fixe, sans contenu) : rend la page assez haute
     // pour défiler quand le clavier est ouvert, comme l'inscription. Rien

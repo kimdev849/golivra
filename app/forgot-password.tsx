@@ -146,10 +146,11 @@ export default function ForgotPasswordScreen() {
     <ThemedView style={styles.container}>
       <AuthBackdrop colors={colors} />
       <KeyboardAvoidingView
-        style={styles.flex}
+        style={[styles.flex, { backgroundColor: colors.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={insets.top}>
         <ScrollView
+          style={{ backgroundColor: colors.background }}
           contentContainerStyle={[
             styles.scroll,
             // Padding bas généreux (comme la page de connexion) : rend le

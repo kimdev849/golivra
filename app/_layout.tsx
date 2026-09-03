@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { AppState, Platform, useColorScheme, View } from 'react-native';
+import { AppState, Platform, View } from 'react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
@@ -207,8 +207,8 @@ function useSilentReconnectRefresh() {
 }
 
 function ThemedGestureRoot({ children }: { children: React.ReactNode }) {
-  const scheme = useColorScheme();
-  const bg = scheme === 'dark' ? '#0B0C0E' : '#FFFFFF';
+  const { isDark } = useAppTheme();
+  const bg = isDark ? '#0B0C0E' : '#FFFFFF';
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: bg }}>
       {children}
@@ -240,26 +240,26 @@ function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemedGestureRoot>
+      <AppThemeProvider>
         <TextScaleProvider>
-        <AppThemeProvider>
-          <BiometricAppGate>
-            <AppStatusGate>
-              <ThemedRootContainer>
-                {splashVisible && (
-                  <CustomSplashScreen onAnimationComplete={handleSplashDone} />
-                )}
-                <OfflineBanner />
-                <AnnouncementBanner />
-                <RootNavigation />
-                {splashVisible && <StatusBar style="light" />}
-                <AppToastHost />
-              </ThemedRootContainer>
-            </AppStatusGate>
-          </BiometricAppGate>
-        </AppThemeProvider>
+          <ThemedGestureRoot>
+            <BiometricAppGate>
+              <AppStatusGate>
+                <ThemedRootContainer>
+                  {splashVisible && (
+                    <CustomSplashScreen onAnimationComplete={handleSplashDone} />
+                  )}
+                  <OfflineBanner />
+                  <AnnouncementBanner />
+                  <RootNavigation />
+                  {splashVisible && <StatusBar style="light" />}
+                  <AppToastHost />
+                </ThemedRootContainer>
+              </AppStatusGate>
+            </BiometricAppGate>
+          </ThemedGestureRoot>
         </TextScaleProvider>
-      </ThemedGestureRoot>
+      </AppThemeProvider>
     </QueryClientProvider>
   );
 }

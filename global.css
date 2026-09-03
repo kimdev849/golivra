@@ -16,6 +16,7 @@ html, body, #root {
   height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
+  background-color: #0B0C0E;
   /* Empêche le zoom pinch-to-zoom sur mobile web */
   touch-action: manipulation;
   /* Empêche la sélection de texte globally */
@@ -32,8 +33,7 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
-  /* Default background pendant le chargement */
-  background-color: #062A1B;
+  background-color: #0B0C0E;
 }
 
 #root {
@@ -41,6 +41,7 @@ body {
   flex-direction: column;
   height: 100dvh; /* dynamic viewport height — fix keyboard resize */
   height: 100vh; /* fallback */
+  background-color: #0B0C0E;
 }
 
 /* Les éléments scrollables reprennent la sélection de texte */

@@ -4,8 +4,8 @@
   "description": "Commandez vos plats et produits préférés. Livraison rapide.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#062A1B",
-  "theme_color": "#062A1B",
+  "background_color": "#0B0C0E",
+  "theme_color": "#0B0C0E",
   "orientation": "portrait",
   "scope": "/",
   "icons": [

@@ -313,8 +313,9 @@ function SignupScreenBase({ variant, forcedProfile }: BaseProps) {
     <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
       <AuthBackdrop colors={colors} />
       <FeedbackOverlay />
-      <KeyboardAvoidingView style={styles.keyboardContainer} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}>
+      <KeyboardAvoidingView style={[styles.keyboardContainer, { backgroundColor: colors.background }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}>
         <ScrollView
+          style={{ backgroundColor: colors.background }}
           contentContainerStyle={[
             styles.scrollContent,
             Platform.OS === 'android' ? styles.scrollContentAndroid : undefined,
