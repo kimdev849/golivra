@@ -17,6 +17,7 @@ import { AppToastHost } from '@/components/app-toast-host';
 import { BiometricAppGate } from '@/components/biometric-app-gate';
 import { OfflineBanner } from '@/components/offline-banner';
 import { CustomSplashScreen } from '@/components/splash-screen';
+import { WebBottomNav } from '@/components/web-bottom-nav';
 import { AppThemeProvider, useAppTheme } from '@/contexts/app-theme-context';
 import { TextScaleProvider } from '@/contexts/text-scale-context';
 import { useAppColors } from '@/hooks/use-app-colors';
@@ -257,6 +258,7 @@ function RootLayout() {
                   <RootNavigation />
                   {splashVisible && <StatusBar style="light" />}
                   <AppToastHost />
+                  <WebBottomNav />
                 </ThemedRootContainer>
               </AppStatusGate>
             </BiometricAppGate>
